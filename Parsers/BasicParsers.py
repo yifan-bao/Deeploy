@@ -63,7 +63,7 @@ class GELUParser(NodeParser):
         data_out = ctxt.lookup(_mangleVariableName(node.outputs[0].name))
         self.parserDict['data_in'] = data_in.name
         self.parserDict['data_out'] = data_out.name
-        self.parserDict['size'] = np.prod(data_in[0].shape)
+        self.parserDict['size'] = np.prod(data_in.shape)
         
         return ctxt, True
         
@@ -99,7 +99,7 @@ class RequantShiftParser(NodeParser):
         data_out = ctxt.lookup(_mangleVariableName(node.outputs[0].name))
         self.parserDict['data_in'] = data_in.name
         self.parserDict['data_out'] = data_out.name
-        self.parserDict['size'] = np.prod(data_in[0].shape)
+        self.parserDict['size'] = np.prod(data_in.shape)
 
         add = node.attrs['add'].values
         mul = node.attrs['mul'].values

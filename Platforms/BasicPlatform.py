@@ -23,7 +23,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from BasicParsers import *
+from Parsers.BasicParsers import *
 from templates import *
 
 GELUMapper = lambda : NodeMapper(GELUParser, iGELUTemplate.referenceTemplate)

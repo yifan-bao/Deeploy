@@ -29,14 +29,14 @@ from functools import partial
 
 import onnxLayers
 from parserTypes import *
-from BasicPlatform import *
+from Platforms.BasicPlatform import *
 
 model = onnx.load_model('./quantlib_trial.onnx')
 graph = gs.import_onnx(model)
 
 LayerOpMapping = {
     'Conv' : partial(onnxLayers.ConvLayer, maps=[DummyMapper]),
-    'RequantShift' : partial(onnxLayers.RequantShiftLayer, maps=[DummyMapper]),
+    'RequantShift' : partial(onnxLayers.RequantShiftLayer, maps=[RequantShiftMapper]),
     'Reshape': partial(onnxLayers.ReshapeLayer, maps=[DummyMapper]),
     'iLayerNorm': partial(onnxLayers.iLayerNormLayer, maps=[DummyMapper]),
     'MultiHeadSelfAttention': partial(onnxLayers.MHSALayer, maps=[DummyMapper]),
