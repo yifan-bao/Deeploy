@@ -29,14 +29,16 @@ import numpy as np
 from typing import List, Callable, Iterable, Union, Tuple
 import onnx
 import onnx_graphsurgeon as gs
+import re
 
 from templates import AllocateTemplate, FreeTemplate
 
 def _mangleVariableName(name:str) -> str:
-    return '__QL_BUFFER_' + name
+    
+    return '_MICRO_BUFFER__' + re.sub('\.','_',name)
 
 def _mangleParameterName(nodeName:str, parameterName:str) -> str:
-    return '__QL_PARAMETER_' + nodeName + '_' + parameterName
+    return '_MICRO_PARAMETER__' + re.sub('.','_',nodeName) + '_' + re.sub('.','_',parameterName)
 
 class NetworkBuffer():
     def __init__(self, name: str, shape, type: str):
@@ -209,7 +211,7 @@ class NodeMapper():
         return self.parser.parse(ctxt, node)
 
     def generate(self) -> List[str]:
-        return self.template.render(**self.parser.parserDict)
+        return [self.template.render(**self.parser.parserDict)]
     
 class NetworkContainer():
     def __init__(self, graph: gs.Graph, layerOpMapping, scheduler: Callable = lambda x: x):
@@ -221,7 +223,7 @@ class NetworkContainer():
         self.layerOpMapping = layerOpMapping
         self.layerOpMapping['Constant'] = lambda x: self.ctxt.hoistConstant(x)
 
-    def _createGlobalContext(self, ctxt: NetworkContext, graph):
+    def _createIOBindings(self, ctxt: NetworkContext, graph):
 
         ctxt = ctxt.copy()
 
@@ -242,7 +244,7 @@ class NetworkContainer():
     def parse(self) -> bool:
 
         # Reset context
-        self.ctxt = self._createGlobalContext(NetworkContext(), self.graph)
+        self.ctxt = self._createIOBindings(NetworkContext(), self.graph)
         
         # Create schedule, binding, then parse resulting program for correctness
         # Create schedule
@@ -267,7 +269,7 @@ class NetworkContainer():
             self.parsed = False
             return False
     
-    def generate(self) -> str:
+    def generateInferenceCode(self) -> str:
         if not self.parsed:
             raise ValueError('You need to parse the network before generating code!')
         
@@ -275,11 +277,11 @@ class NetworkContainer():
         #import IPython; IPython.embed()
         for name, node in self.layerBinding:
             self.ctxt, code = node.generate(self.ctxt)
-            for substr in code:
-                print(substr)
-                #callStack += substr + '\n'
+            for section in code:
+                for substr in section:
+                    callStack += substr + '\n'
 
         return callStack
         
-
+    
     

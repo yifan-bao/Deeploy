@@ -33,18 +33,17 @@ class GELUParser(NodeParser):
     def __init__(self):
         super().__init__()
 
-    def parseNode(self, node: gs.ir.node.Node) -> bool:
-        self.parserDict = {}
+    def nodeParse(self, node: gs.ir.node.Node) -> bool:
 
         ret = all([
-            node.op == 'iGELU', 
             'b' in node.attrs,
             'D' in node.attrs,
             'n_levels' in node.attrs,
             'one' in node.attrs,
             'totScaler' in node.attrs,
             len(node.inputs) == 1,
-            len(node.outputs) == 1])
+            len(node.outputs) == 1
+        ])
 
         if ret:
             self.parserDict['b'] = int(node.attrs['b'].values)
@@ -74,15 +73,13 @@ class RequantShiftParser(NodeParser):
     def nodeParse(self, node: gs.ir.node.Node) -> (bool):
 
         ret = all([
-            node.op == 'RequantShift',
-            'add' in node.attrs,
             'div' in node.attrs,
-            'mul' in node.attrs,
             'n_levels' in node.attrs,
             'signed' in node.attrs,
-            len(node.inputs) == 1,
+            len(node.inputs) == 3,
             len(node.outputs) == 1
         ])
+        
 
         if ret:
             self.parserDict['n_levels'] = int(node.attrs['n_levels'].values)
@@ -94,33 +91,39 @@ class RequantShiftParser(NodeParser):
     def nodeCtxtParse(self, ctxt: NetworkContext, node: gs.ir.node.Node) -> (NetworkContext, bool):
 
         ctxt = ctxt.copy()
+
+        inputs = ['data_in', 'mul', 'add']
+        outputs = ['data_out']
         
-        data_in = ctxt.lookup(_mangleVariableName(node.inputs[0].name))
-        data_out = ctxt.lookup(_mangleVariableName(node.outputs[0].name))
-        self.parserDict['data_in'] = data_in.name
-        self.parserDict['data_out'] = data_out.name
-        self.parserDict['size'] = np.prod(data_in.shape)
+        for idx, inputNode in enumerate(node.inputs):
+            self.parserDict[inputs[idx]] = ctxt.lookup(_mangleVariableName(inputNode.name)).name
+        for idx, outputNode in enumerate(node.outputs):
+            self.parserDict[outputs[idx]] = ctxt.lookup(_mangleVariableName(outputNode.name)).name
+            
+        self.parserDict['size'] = np.prod(ctxt.lookup(_mangleVariableName(node.inputs[0].name)).shape)
 
-        add = node.attrs['add'].values
-        mul = node.attrs['mul'].values
+        #import IPython; IPython.embed()
+        
+#         add = node.attrs['add'].values
+#         mul = node.attrs['mul'].values
 
-        if np.prod(add.shape) > 1:
-            addName = _mangleParameterName(node.name, 'add')
-            addBuffer = GlobalBuffer(addName, add.shape, 'int32_t', add)
+#         if np.prod(add.shape) > 1:
+#             addName = _mangleParameterName(node.name, 'add')
+#             addBuffer = GlobalBuffer(addName, add.shape, 'int32_t', add)
 
-            ctxt.hoistParameter(addBuffer)
-            self.parserDict['add'] = addBuffer.name
-        else:
-            self.parserDict['add'] = int(add)
+#             ctxt.hoistParameter(addBuffer)
+#             self.parserDict['add'] = addBuffer.name
+#         else:
+#             self.parserDict['add'] = int(add)
 
-        if np.prod(mul.shape) > 1:
-            mulName = _mangleParameterName(node.name, 'mul')
-            mulBuffer = GlobalBuffer(mulName, mul.shape, 'int32_t', mul)
+#         if np.prod(mul.shape) > 1:
+#             mulName = _mangleParameterName(node.name, 'mul')
+#             mulBuffer = GlobalBuffer(mulName, mul.shape, 'int32_t', mul)
 
-            ctxt.hoistParameter(mulBuffer)
-            self.parserDict['mul'] = mulBuffer.name
-        else:
-            self.parserDict['mul'] = int(mul)
+#             ctxt.hoistParameter(mulBuffer)
+#             self.parserDict['mul'] = mulBuffer.name
+#         else:
+#             self.parserDict['mul'] = int(mul)
 
         return ctxt, True
 
