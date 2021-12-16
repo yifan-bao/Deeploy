@@ -35,30 +35,30 @@ from parserTypes import NodeMapper, NetworkContext, _mangleVariableName, _mangle
 class ONNXLayer():
     def __init__(self, node: gs.ir.node.Node, maps : List[NodeMapper]):
         self.node = node
-
+        self.maps = maps
         # Assign the first mapper that works
         #import IPython; IPython.embed()
+        self.mapper = None
         
-        possibleMappings = [i().checkCompat(node) for i in maps]
-        mappingIdxs = [idx for idx,x in enumerate(possibleMappings) if x == True]
-        
-        if len(mappingIdxs) == 0:
-            raise RuntimeError(f'Did not find adequate mapping for node {node.name}!')
-        elif len(mappingIdxs) > 1:
-            print(f'[WARNING]: More than one possible mapping found for {node.name}! Choosing first match.')
-            
-        self.mapper = maps[mappingIdxs[0]]()
-    
     # Call this, DO NOT override! -> This should assert that all variables required are in the node!
     def parse(self, ctxt: NetworkContext) -> (NetworkContext, bool):
-        newCtxt = ctxt.copy()
-        newCtxt, ret = self.mapper.parse(newCtxt, self.node)
-        if ret:
-            return newCtxt, True
-        else:
-            return ctxt, False
-    
-    # Do not override - this generates code + buffer allocation / de-allocation
+
+        # iterate through all possible mappings and return the first that works
+        for mapping in self.maps:
+            newCtxt = ctxt.copy()
+            try:
+                mapper = mapping()
+                newCtxt, ret = mapper.parse(newCtxt, self.node)
+                if ret:
+                    self.mapper = mapper
+                    return newCtxt, True
+            except Exception as e:
+                pass
+            
+        # If none worked, throw exception
+        raise RuntimeError(f'Did not find adequate mapping for node {self.node.name}!')
+        
+    # Do not override unless you know what you're doin - this generates code + buffer allocation / de-allocation
     # parseIO has to be called in advance!
     def generate(self, ctxt: NetworkContext) -> (NetworkContext, List[str]):
 
@@ -74,7 +74,24 @@ class ONNXLayer():
 
         generated_code = [alloc, call, dealloc]
         return (ctxt, generated_code)
-    
+
+class ReshapeLayer(ONNXLayer):
+    def __init__(self, node: gs.ir.node.Node, maps : List[NodeMapper]):
+        super().__init__(node, maps)
+
+    def generate(self, ctxt: NetworkContext) -> (NetworkContext, List[str]):        
+        outputs = [node for node in self.node.outputs]
+        inputs = [node for node in self.node.inputs]
+        
+        outputNames = [_mangleVariableName(node.name) for node in outputs]
+        inputNames = [_mangleVariableName(node.name) for node in inputs]
+        
+        alloc = ctxt.allocLocal(self.node.name, outputNames)
+        call = self.mapper.generate()
+        dealloc = ctxt.freeLocal(self.node.name, inputNames)
+        
+        return (ctxt, [call])
+        
 class iGELULayer(ONNXLayer):
     def __init__(self, node: gs.ir.node.Node, maps : List[NodeMapper]):
         super().__init__(node, maps)
@@ -96,10 +113,6 @@ class ConvLayer(ONNXLayer):
         super().__init__(node, maps)
         
 class iLayerNormLayer(ONNXLayer):
-    def __init__(self, node: gs.ir.node.Node, maps : List[NodeMapper]):
-        super().__init__(node, maps)
-
-class ReshapeLayer(ONNXLayer):
     def __init__(self, node: gs.ir.node.Node, maps : List[NodeMapper]):
         super().__init__(node, maps)
 

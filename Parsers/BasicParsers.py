@@ -127,7 +127,35 @@ class GatherParser(NodeParser):
         self.parserDict['size'] = np.prod(ctxt.lookup(_mangleVariableName(node.inputs[0].name)).shape)
 
         return ctxt, True
+    
+class ReshapeParser(NodeParser):
+    def __init__(self):
+        super().__init__()
 
+    def nodeParse(self, node: gs.ir.node.Node) -> (bool):
+
+        ret = all([
+            len(node.inputs) == 2,
+            len(node.outputs) == 1
+        ])
+        
+        return ret
+    
+    def nodeCtxtParse(self, ctxt: NetworkContext, node: gs.ir.node.Node) -> (NetworkContext, bool):
+
+        ctxt = ctxt.copy()
+
+        inputs = ['data_in', 'indices']
+        outputs = ['data_out']
+        
+        for idx, inputNode in enumerate(node.inputs):
+            self.parserDict[inputs[idx]] = ctxt.lookup(_mangleVariableName(inputNode.name)).name
+        for idx, outputNode in enumerate(node.outputs):
+            self.parserDict[outputs[idx]] = ctxt.lookup(_mangleVariableName(outputNode.name)).name
+            
+        self.parserDict['size'] = np.prod(ctxt.lookup(_mangleVariableName(node.inputs[0].name)).shape)
+
+        return ctxt, True    
     
 class RequantShiftParser(NodeParser):
     def __init__(self):

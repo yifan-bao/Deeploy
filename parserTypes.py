@@ -45,20 +45,19 @@ class NetworkBuffer():
         self.name = name
         self.shape = shape
         self.nLevels = nLevels
+
+        # Do not override - Should be written in the parsing passes
         self._users = []
+        
+        # Do not override - Should be written in the typechecking passes
+        self._type = None
 
     # Allocation code. Choose your Template, might want to override aswell!
     def alloc(self) -> str:
         # SCHEREMO: currently signed, but can be infered from n_levels and signed flags
-
-        numBits = int(math.log2(self.nLevels))
-        nextBufferSize = 8 * ((numBits-7)//8 + 1)
-        if nextBufferSize == 24:
-            nextBufferSize = 32
         
-        return AllocateTemplate.referenceTemplate.render(type = f'int{nextBufferSize}_t', name = self.name, size = np.prod(self.shape))
-
-        
+        return AllocateTemplate.referenceTemplate.render(type = self._type, name = self.name, size = np.prod(self.shape))
+    
     # Deallocation code. Choose your Template! 
     def dealloc(self) -> str:
         return FreeTemplate.referenceTemplate.render(name = self.name)
@@ -215,10 +214,24 @@ class NodeParser():
             
             # Hoist constant inputs
             if type(inputNode) == gs.ir.tensor.Constant and not ctxt.is_global(data_in):
-                # SCHEREMO: This is currently static, but should be annotated in ONNX
-                localBuffer = NetworkBuffer.fromNode(inputNode, 256)
-                globalBuffer = GlobalBuffer.fromNetworkBuffer(localBuffer, values=inputNode.values)
-                ctxt.add(globalBuffer, 'global')
+                # SCHEREMO: This is currently heuristic, but should be annotated in ONNX
+                if inputNode.values.max() < 2**8:
+                    localBuffer = NetworkBuffer.fromNode(inputNode, 2**8)
+                    globalBuffer = GlobalBuffer.fromNetworkBuffer(localBuffer, values=inputNode.values)
+                    globalBuffer._type = 'int8_t'
+                    ctxt.add(globalBuffer, 'global')
+                    
+                elif inputNode.values.max() < 2**16:
+                    localBuffer = NetworkBuffer.fromNode(inputNode, 2**16)
+                    globalBuffer = GlobalBuffer.fromNetworkBuffer(localBuffer, values=inputNode.values)
+                    globalBuffer._type = 'int16_t'
+                    ctxt.add(globalBuffer, 'global')
+                    
+                else:
+                    localBuffer = NetworkBuffer.fromNode(inputNode, 2**32)
+                    globalBuffer = GlobalBuffer.fromNetworkBuffer(localBuffer, values=inputNode.values)
+                    globalBuffer._type = 'int32_t'
+                    ctxt.add(globalBuffer, 'global')
             else:
                 localBuffer = ctxt.lookup(data_in)
                 ctxt.addUser(data_in, node.name)
@@ -245,12 +258,6 @@ class NodeMapper():
         self.template = template
         self.parserDict = {}
 
-    def checkCompat(self, node: gs.ir.node.Node) -> bool:
-        OGdict = self.parser.parserDict
-        retParse = self.parser.nodeParse(node)
-        self.parser.parserDict = OGdict
-        return retParse
-    
     def parse(self, ctxt: NetworkContext, node: gs.ir.node.Node) -> (NetworkContext, bool):
         hoistedCtxt, parseable = self.parser.parse(ctxt, node)
         if parseable:
@@ -261,7 +268,6 @@ class NodeMapper():
                 raise ValueError(f'Typechecking for node {node.name} failed')
         else:
             raise ValueError(f'Could not parse node {node.name}')
-
     
     def generate(self) -> List[str]:
         return [self.template.render(**self.parser.parserDict)]
@@ -285,14 +291,18 @@ class NetworkContainer():
             data_size = node.shape
             # SCHEREMO: Should be parsed from graph
             data_type = 2**8
-            ctxt.add(NetworkBuffer(data_name, data_size, data_type), 'global')
+            nb = NetworkBuffer(data_name, data_size, data_type)
+            nb._type = 'int8_t'
+            ctxt.add(nb, 'global')
 
         for node in graph.outputs:
             data_name = _mangleVariableName(node.name)
             data_size = node.shape
             # SCHEREMO: Should be parsed from graph
             data_type = 2**32
-            ctxt.add(NetworkBuffer(data_name, data_size, data_type), 'global')
+            nb = NetworkBuffer(data_name, data_size, data_type)
+            nb._type = 'int32_t'
+            ctxt.add(nb, 'global')
 
         return ctxt
         
@@ -340,7 +350,3 @@ class NetworkContainer():
     def getParameterSize(self) -> int:
         if not self.parsed:
             raise ValueError('You need to parse the network before getting RAM Size!')
-        
-        
-    
-    

@@ -1,8 +1,8 @@
 # ----------------------------------------------------------------------
 #
-# File: RequantShiftTemplate.py
+# File: ReshapeTemplate.py
 #
-# Last edited: 14.12.2021        
+# Last edited: 16.12.2021        
 # 
 # Copyright (C) 2021, ETH Zurich and University of Bologna.
 #
@@ -25,8 +25,5 @@
 
 from mako.template import Template
 
-referenceTemplate = Template("void RequantShift(${data_in}, ${data_out}, ${size}, ${log2D}, ${mul}, ${add}, ${n_levels}, ${signed});")
+referenceTemplate = Template(" type* ${data} = ${shape} ")
 
-int8Template = Template("void RequantShift_int8(${data_in}, ${data_out}, ${size}, ${log2D}, ${mul}, ${add}, ${n_levels}, ${signed});")
-int16Template = Template("void RequantShift_int16(${data_in}, ${data_out}, ${size}, ${log2D}, ${mul}, ${add}, ${n_levels}, ${signed});")
-int32Template = Template("void RequantShift_int32(${data_in}, ${data_out}, ${size}, ${log2D}, ${mul}, ${add}, ${n_levels}, ${signed});")
