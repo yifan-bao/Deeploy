@@ -24,9 +24,15 @@
 # limitations under the License.
 
 from Parsers.BasicParsers import *
+from TypeCheckers.BasicCheckers import *
 from templates import *
 
-GELUMapper = lambda : NodeMapper(GELUParser, iGELUTemplate.referenceTemplate)
-RequantShiftMapper = lambda : NodeMapper(RequantShiftParser, RequantShiftTemplate.referenceTemplate)
-DummyMapper = lambda : NodeMapper(DummyParser, DummyTemplate.referenceTemplate)
-    
+GELUMapper = lambda : NodeMapper(GELUParser, DummyChecker, iGELUTemplate.referenceTemplate)
+RequantShiftMapper = lambda : NodeMapper(RequantShiftParser, DummyChecker, RequantShiftTemplate.referenceTemplate)
+DummyMapper = lambda : NodeMapper(DummyParser, DummyChecker, DummyTemplate.referenceTemplate)
+AddMapper = lambda : NodeMapper(AddParser, DummyChecker, AddTemplate.referenceTemplate)
+
+# GELUMapper = lambda : NodeMapper(DummyParser, DummyChecker, DummyTemplate.referenceTemplate)
+# RequantShiftMapper = lambda : NodeMapper(DummyParser, DummyChecker, DummyTemplate.referenceTemplate)
+# DummyMapper = lambda : NodeMapper(DummyParser, DummyChecker, DummyTemplate.referenceTemplate)
+# AddMapper = lambda : NodeMapper(DummyParser, DummyChecker, DummyTemplate.referenceTemplate)

@@ -40,7 +40,7 @@ LayerOpMapping = {
     'Reshape': partial(onnxLayers.ReshapeLayer, maps=[DummyMapper]),
     'iLayerNorm': partial(onnxLayers.iLayerNormLayer, maps=[DummyMapper]),
     'MultiHeadSelfAttention': partial(onnxLayers.MHSALayer, maps=[DummyMapper]),
-    'Add': partial(onnxLayers.AddLayer, maps=[DummyMapper]),
+    'Add': partial(onnxLayers.AddLayer, maps=[AddMapper]),
     'iGELU' : partial(onnxLayers.iGELULayer, maps=[GELUMapper]),
     'MatMul': partial(onnxLayers.GEMMLayer, maps=[DummyMapper]),
     'Gemm': partial(onnxLayers.GEMMLayer, maps=[DummyMapper]),
@@ -48,11 +48,11 @@ LayerOpMapping = {
     'Gather': partial(onnxLayers.GatherLayer, maps=[DummyMapper])
 }
 
-def scheduler(in_list):
-    return in_list
+def scheduler(graph: gs.Graph):
+    return graph.nodes
 
 model = NetworkContainer(graph, LayerOpMapping, scheduler)
 model.parse()
 print(model.generateInferenceCode())
-
 import IPython; IPython.embed()
+

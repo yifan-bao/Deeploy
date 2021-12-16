@@ -29,6 +29,34 @@ from templates import *
 import numpy as np
 import math
 
+class AddParser(NodeParser):
+    def __init__(self):
+        super().__init__()
+
+    def nodeParse(self, node: gs.ir.node.Node) -> bool:
+
+        ret = all([
+            len(node.inputs) == 2,
+            len(node.outputs) == 1
+        ])
+
+        return ret
+
+    def nodeCtxtParse(self, ctxt: NetworkContext, node: gs.ir.node.Node) -> (NetworkContext, bool):
+
+        ctxt = ctxt.copy()
+        
+        data_in_1 = ctxt.lookup(_mangleVariableName(node.inputs[0].name))
+        data_in_2 = ctxt.lookup(_mangleVariableName(node.inputs[1].name))
+        data_out = ctxt.lookup(_mangleVariableName(node.outputs[0].name))
+        self.parserDict['data_in_1'] = data_in_1.name
+        self.parserDict['data_in_2'] = data_in_2.name
+        self.parserDict['data_out'] = data_out.name
+        self.parserDict['size'] = np.prod(data_in_1.shape)
+        
+        return ctxt, True
+
+
 class GELUParser(NodeParser):
     def __init__(self):
         super().__init__()
@@ -102,29 +130,6 @@ class RequantShiftParser(NodeParser):
             
         self.parserDict['size'] = np.prod(ctxt.lookup(_mangleVariableName(node.inputs[0].name)).shape)
 
-        #import IPython; IPython.embed()
-        
-#         add = node.attrs['add'].values
-#         mul = node.attrs['mul'].values
-
-#         if np.prod(add.shape) > 1:
-#             addName = _mangleParameterName(node.name, 'add')
-#             addBuffer = GlobalBuffer(addName, add.shape, 'int32_t', add)
-
-#             ctxt.hoistParameter(addBuffer)
-#             self.parserDict['add'] = addBuffer.name
-#         else:
-#             self.parserDict['add'] = int(add)
-
-#         if np.prod(mul.shape) > 1:
-#             mulName = _mangleParameterName(node.name, 'mul')
-#             mulBuffer = GlobalBuffer(mulName, mul.shape, 'int32_t', mul)
-
-#             ctxt.hoistParameter(mulBuffer)
-#             self.parserDict['mul'] = mulBuffer.name
-#         else:
-#             self.parserDict['mul'] = int(mul)
-
         return ctxt, True
 
 class DummyParser(NodeParser):
@@ -145,7 +150,5 @@ class DummyParser(NodeParser):
         self.parserDict['data_in'] = inputs[0].name
         self.parserDict['data_out'] = outputs[0].name
         self.parserDict['size'] = np.prod(inputs[0].shape)
-
-        #import IPython; IPython.embed()
         
         return ctxt, True

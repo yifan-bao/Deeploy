@@ -50,51 +50,27 @@ class ONNXLayer():
         self.mapper = maps[mappingIdxs[0]]()
     
     # Call this, DO NOT override! -> This should assert that all variables required are in the node!
-    def parse(self, ctxt: NetworkContext) -> NetworkContext:
-        ctxt = ctxt.copy()
-        # SCHEREMO: REALLY UGLY HACK - BITWIDTH SHOULD BE IN THE GRAPH
-        ctxt = self.parseIO(ctxt, ['int8_t'])
-        ctxt = self.mapper.parse(ctxt, self.node)
-        return ctxt
+    def parse(self, ctxt: NetworkContext) -> (NetworkContext, bool):
+        newCtxt = ctxt.copy()
+        newCtxt, ret = self.mapper.parse(newCtxt, self.node)
+        if ret:
+            return newCtxt, True
+        else:
+            return ctxt, False
     
-    # Don't override this, it checks for consistency (all inputs are available, no outputs are defined)
-    # Also hoists inputs that are parameters
-    def parseIO(self, ctxt: NetworkContext, outTypes:List[str]):
-        ctxt = ctxt.copy()
-        data_in_buffers = []
-        data_out_buffers = []
-        for inputNode in self.node.inputs:
-            data_in = _mangleVariableName(inputNode.name)
-            if type(inputNode) == gs.ir.tensor.Constant:
-                localBuffer = NetworkBuffer.fromNode(inputNode, 'int8_t')
-                globalBuffer = GlobalBuffer.fromNetworkBuffer(localBuffer, values=inputNode.values)
-                ctxt.add(globalBuffer, 'global')
-            else:
-                localBuffer = ctxt.lookup(data_in)
-                ctxt.addUser(data_in, self.node.name)
-            data_in_buffers.append(localBuffer.name)
-        for outputNode, outtype in zip(self.node.outputs,outTypes):
-            data_out_name = _mangleVariableName(outputNode.name)
-            data_out_size = outputNode.shape
-            data_out_type = outtype
-            if data_out_name not in ctxt.globalObjects.keys():
-                localBuffer = NetworkBuffer(data_out_name, data_out_size, data_out_type)
-                ctxt.add(localBuffer, 'local')
-            else:
-                localBuffer = ctxt.lookup(data_out_name)
-            data_out_buffers.append(localBuffer.name)
-
-        self.data_in = data_in_buffers
-        self.data_out = data_out_buffers
-        
-        return ctxt
-
     # Do not override - this generates code + buffer allocation / de-allocation
     # parseIO has to be called in advance!
     def generate(self, ctxt: NetworkContext) -> (NetworkContext, List[str]):
-        alloc = ctxt.allocLocal(self.node.name, self.data_out)
+
+        outputs = [node for node in self.node.outputs]
+        inputs = [node for node in self.node.inputs]
+
+        outputNames = [_mangleVariableName(node.name) for node in outputs]
+        inputNames = [_mangleVariableName(node.name) for node in inputs]
+        
+        alloc = ctxt.allocLocal(self.node.name, outputNames)
         call = self.mapper.generate()
-        dealloc = ctxt.freeLocal(self.node.name, self.data_in)
+        dealloc = ctxt.freeLocal(self.node.name, inputNames)
 
         generated_code = [alloc, call, dealloc]
         return (ctxt, generated_code)
