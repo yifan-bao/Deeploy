@@ -1,8 +1,8 @@
 # ----------------------------------------------------------------------
 #
-# File: onnxParse.py
+# File: GatherTemplate.py
 #
-# Last edited: 13.12.2021        
+# Last edited: 16.12.2021        
 # 
 # Copyright (C) 2021, ETH Zurich and University of Bologna.
 #
@@ -23,21 +23,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import onnx
-import onnx_graphsurgeon as gs
+from mako.template import Template
 
-from parserTypes import *
-from Platforms.BasicPlatform import *
-
-model = onnx.load_model('./quantlib_trial.onnx')
-graph = gs.import_onnx(model)
-
-def scheduler(graph: gs.Graph):
-    return graph.nodes
-
-model = NetworkContainer(graph, BasicMapping, scheduler)
-model.parse()
-import IPython; IPython.embed()
-print(model.generateInferenceCode())
-import IPython; IPython.embed()
+referenceTemplate = Template("void Gather(${data_out}, ${data_in}, ${size}, ${indices}, ${axis});")
 

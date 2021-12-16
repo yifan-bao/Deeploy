@@ -3,4 +3,7 @@ from .RequantShiftTemplate import *
 from .AllocateTemplate import *
 from .FreeTemplate import *
 from .AddTemplate import *
+from .GEMMTemplate import *
+from .MHSATemplate import *
+from .GatherTemplate import *
 from .DummyTemplate import *

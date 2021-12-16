@@ -53,6 +53,8 @@ class NetworkBuffer():
 
         numBits = int(math.log2(self.nLevels))
         nextBufferSize = 8 * ((numBits-7)//8 + 1)
+        if nextBufferSize == 24:
+            nextBufferSize = 32
         
         return AllocateTemplate.referenceTemplate.render(type = f'int{nextBufferSize}_t', name = self.name, size = np.prod(self.shape))
 
@@ -125,7 +127,8 @@ class NetworkContext():
 
         assert len(node.outputs) == 1, "Constant has more than one output"
 
-        nb = NetworkBuffer(_mangleVariableName(node.outputs[0].name), node.outputs[0].shape, 'int8_t')
+        # SCHEREMO: Constants are hoisted with nLevels = 2**8 - should be read from graph at some point
+        nb = NetworkBuffer(_mangleVariableName(node.outputs[0].name), node.outputs[0].shape, 2**8)
         param = GlobalBuffer.fromNetworkBuffer(nb, values=node.attrs['value'].values)
         self.add(param, 'global')
 
@@ -186,7 +189,7 @@ class NodeTypeChecker():
         return True
 
     # Override this. This should check add the output node to the context with the correct n_levels
-    def typeInferOutput(self, ctxt: NetworkContext, node: gs.ir.node.Node) -> NetworkContext:
+    def typeInferOutput(self, ctxt: NetworkContext, node: gs.ir.node.Node, **kwargs) -> NetworkContext:
         return ctxt, True, 2**32
     
 class NodeParser():
@@ -252,10 +255,13 @@ class NodeMapper():
         hoistedCtxt, parseable = self.parser.parse(ctxt, node)
         if parseable:
             if(self.typeChecker.typeCheckNode(hoistedCtxt,node)):
-                typedCtxt = self.typeChecker.typeInferOutput(hoistedCtxt, node)
+                typedCtxt = self.typeChecker.typeInferOutput(hoistedCtxt, node, **self.parser.parserDict)
                 return self.parser.nodeCtxtParse(typedCtxt, node)
-            
-        return (ctxt, False)
+            else:
+                raise ValueError(f'Typechecking for node {node.name} failed')
+        else:
+            raise ValueError(f'Could not parse node {node.name}')
+
     
     def generate(self) -> List[str]:
         return [self.template.render(**self.parser.parserDict)]
@@ -278,14 +284,14 @@ class NetworkContainer():
             data_name = _mangleVariableName(node.name)
             data_size = node.shape
             # SCHEREMO: Should be parsed from graph
-            data_type = 256
+            data_type = 2**8
             ctxt.add(NetworkBuffer(data_name, data_size, data_type), 'global')
 
         for node in graph.outputs:
             data_name = _mangleVariableName(node.name)
             data_size = node.shape
             # SCHEREMO: Should be parsed from graph
-            data_type = 256
+            data_type = 2**32
             ctxt.add(NetworkBuffer(data_name, data_size, data_type), 'global')
 
         return ctxt

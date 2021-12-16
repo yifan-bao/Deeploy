@@ -93,7 +93,42 @@ class GELUParser(NodeParser):
         self.parserDict['size'] = np.prod(data_in.shape)
         
         return ctxt, True
+
+class GatherParser(NodeParser):
+    def __init__(self):
+        super().__init__()
+
+    def nodeParse(self, node: gs.ir.node.Node) -> (bool):
+
+        ret = all([
+            'axis' in node.attrs,
+            len(node.inputs) == 2,
+            len(node.outputs) == 1
+        ])
         
+
+        if ret:
+            self.parserDict['axis'] = node.attrs['axis']
+
+        return ret
+    
+    def nodeCtxtParse(self, ctxt: NetworkContext, node: gs.ir.node.Node) -> (NetworkContext, bool):
+
+        ctxt = ctxt.copy()
+
+        inputs = ['data_in', 'indices']
+        outputs = ['data_out']
+        
+        for idx, inputNode in enumerate(node.inputs):
+            self.parserDict[inputs[idx]] = ctxt.lookup(_mangleVariableName(inputNode.name)).name
+        for idx, outputNode in enumerate(node.outputs):
+            self.parserDict[outputs[idx]] = ctxt.lookup(_mangleVariableName(outputNode.name)).name
+            
+        self.parserDict['size'] = np.prod(ctxt.lookup(_mangleVariableName(node.inputs[0].name)).shape)
+
+        return ctxt, True
+
+    
 class RequantShiftParser(NodeParser):
     def __init__(self):
         super().__init__()
@@ -132,6 +167,241 @@ class RequantShiftParser(NodeParser):
 
         return ctxt, True
 
+class ConvParser(NodeParser):
+    def __init__(self):
+        super().__init__()
+
+    
+    def nodeParse(self, node: gs.ir.node.Node) -> (bool):
+
+        wellFormed = all([
+            'dilations' in node.attrs,
+            'group' in node.attrs,
+            'kernel_shape' in node.attrs,
+            'pads' in node.attrs,
+            'strides' in node.attrs,
+            # While ONNX allows for 3 inputs (BIAS), we only accept 2, the input and the weight
+            len(node.inputs) == 2,
+            len(node.outputs) == 1
+        ])
+        
+
+        if wellFormed:
+            ret = all([
+                # Don't support dilations
+                all([coeff == 1 for coeff in node.attrs['dilations']])
+            ])
+            
+            if ret:
+                self.parserDict['group'] = node.attrs['group']
+                self.parserDict['kernel_shape'] = node.attrs['kernel_shape']
+                self.parserDict['pads'] = node.attrs['pads']
+                self.parserDict['strides'] = node.attrs['strides']
+
+        return ret
+    
+    def nodeCtxtParse(self, ctxt: NetworkContext, node: gs.ir.node.Node) -> (NetworkContext, bool):
+
+        ctxt = ctxt.copy()
+
+        inputs = ['data_in', 'weight']
+        outputs = ['data_out']
+        
+        for idx, inputNode in enumerate(node.inputs):
+            self.parserDict[inputs[idx]] = ctxt.lookup(_mangleVariableName(inputNode.name)).name
+        for idx, outputNode in enumerate(node.outputs):
+            self.parserDict[outputs[idx]] = ctxt.lookup(_mangleVariableName(outputNode.name)).name
+            
+        self.parserDict['size'] = np.prod(ctxt.lookup(_mangleVariableName(node.inputs[0].name)).shape)
+
+        return ctxt, True
+    
+class MHSAParser(NodeParser):
+    def __init__(self):
+        super().__init__()
+
+    def nodeParse(self, node: gs.ir.node.Node) -> (bool):
+
+        ret = all([
+            'attn_requant_mul' in node.attrs,
+            'attn_requant_div' in node.attrs,
+            'wo_requant_mul' in node.attrs,
+            'wo_requant_div' in node.attrs,
+            'wq_requant_mul' in node.attrs,
+            'wq_requant_div' in node.attrs,
+            'wk_requant_mul' in node.attrs,
+            'wk_requant_div' in node.attrs,
+            'wv_requant_mul' in node.attrs,
+            'wv_requant_div' in node.attrs,
+            'isoftmaxA' in node.attrs,
+            'isoftmaxB' in node.attrs,
+            'isoftmaxC' in node.attrs,
+            'isoftmaxlog2' in node.attrs,
+            'n_levels' in node.attrs,
+            len(node.inputs) == 11,
+            len(node.outputs) == 1
+        ])
+        
+
+        if ret:
+            self.parserDict['attn_requant_mul'] = int(node.attrs['attn_requant_mul'].values),
+            self.parserDict['attn_requant_div'] = int(node.attrs['attn_requant_div'].values),
+            self.parserDict['wo_requant_mul'] = int(node.attrs['wo_requant_mul'].values),
+            self.parserDict['wo_requant_div'] = int(node.attrs['wo_requant_div'].values),
+            self.parserDict['wq_requant_mul'] = int(node.attrs['wq_requant_mul'].values),
+            self.parserDict['wq_requant_div'] = int(node.attrs['wq_requant_div'].values),
+            self.parserDict['wk_requant_mul'] = int(node.attrs['wk_requant_mul'].values),
+            self.parserDict['wk_requant_div'] = int(node.attrs['wk_requant_div'].values),
+            self.parserDict['wv_requant_mul'] = int(node.attrs['wv_requant_mul'].values),
+            self.parserDict['wv_requant_div'] = int(node.attrs['wv_requant_div'].values),
+            self.parserDict['isoftmaxA'] = int(node.attrs['isoftmaxA'].values),
+            self.parserDict['isoftmaxB'] = int(node.attrs['isoftmaxB'].values),
+            self.parserDict['isoftmaxC'] = int(node.attrs['isoftmaxC'].values),
+            self.parserDict['isoftmaxlog2'] = int(node.attrs['isoftmaxlog2'].values),
+            self.parserDict['n_levels'] = int(node.attrs['n_levels'].values),
+            
+        return ret
+    
+    def nodeCtxtParse(self, ctxt: NetworkContext, node: gs.ir.node.Node) -> (NetworkContext, bool):
+
+        ctxt = ctxt.copy()
+
+        inputs = ['q', 'k', 'v', 'wq_weight', 'wq_bias' , 'wk_weight', 'wk_bias', 'wv_weight', 'wv_bias', 'wo_weight', 'wo_bias']
+        outputs = ['data_out']
+        
+        for idx, inputNode in enumerate(node.inputs):
+            self.parserDict[inputs[idx]] = ctxt.lookup(_mangleVariableName(inputNode.name)).name
+        for idx, outputNode in enumerate(node.outputs):
+            self.parserDict[outputs[idx]] = ctxt.lookup(_mangleVariableName(outputNode.name)).name
+            
+        self.parserDict['size'] = np.prod(ctxt.lookup(_mangleVariableName(node.inputs[0].name)).shape)
+
+        return ctxt, True
+
+    
+
+class iLayerNormParser(NodeParser):
+    def __init__(self):
+        super().__init__()
+
+    def nodeParse(self, node: gs.ir.node.Node) -> (bool):
+
+        ret = all([
+            'D' in node.attrs,
+            'n_levels' in node.attrs,
+            'totScaler' in node.attrs,
+            len(node.inputs) == 3,
+            len(node.outputs) == 1
+        ])
+        
+
+        if ret:
+            self.parserDict['n_levels'] = int(node.attrs['n_levels'].values)
+            self.parserDict['totScaler'] = int(node.attrs['totScaler'].values)
+            self.parserDict['log2D'] = int(math.log2(node.attrs['D'].values))
+
+        return ret
+    
+    def nodeCtxtParse(self, ctxt: NetworkContext, node: gs.ir.node.Node) -> (NetworkContext, bool):
+
+        ctxt = ctxt.copy()
+
+        inputs = ['data_in', 'weight', 'bias']
+        outputs = ['data_out']
+        
+        for idx, inputNode in enumerate(node.inputs):
+            self.parserDict[inputs[idx]] = ctxt.lookup(_mangleVariableName(inputNode.name)).name
+        for idx, outputNode in enumerate(node.outputs):
+            self.parserDict[outputs[idx]] = ctxt.lookup(_mangleVariableName(outputNode.name)).name
+            
+        self.parserDict['size'] = np.prod(ctxt.lookup(_mangleVariableName(node.inputs[0].name)).shape)
+
+        return ctxt, True
+
+class GEMMParser(NodeParser):
+    def __init__(self):
+        super().__init__()
+
+    def nodeParse(self, node: gs.ir.node.Node) -> (bool):
+
+        ret = all([
+            len(node.inputs) == 3,
+            len(node.outputs) == 1,
+            'alpha' in node.attrs,
+            'beta' in node.attrs,
+        ])
+
+        if ret:
+            self.parserDict['alpha'] = node.attrs['alpha']
+            self.parserDict['beta'] = node.attrs['beta']
+            if 'transA' in node.attrs:
+                self.parserDict['transA'] = node.attrs['transA']
+            else:
+                self.parserDict['transA'] = 0
+
+            if 'transB' in node.attrs:
+                self.parserDict['transB'] = node.attrs['transB']
+            else:
+                self.parserDict['transB'] = 0
+            
+        return ret
+    
+    def nodeCtxtParse(self, ctxt: NetworkContext, node: gs.ir.node.Node) -> (NetworkContext, bool):
+
+        ctxt = ctxt.copy()
+
+        inputs = ['A', 'B', 'C']
+        outputs = ['data_out']
+        
+        for idx, inputNode in enumerate(node.inputs):
+            self.parserDict[inputs[idx]] = ctxt.lookup(_mangleVariableName(inputNode.name)).name
+        for idx, outputNode in enumerate(node.outputs):
+            self.parserDict[outputs[idx]] = ctxt.lookup(_mangleVariableName(outputNode.name)).name
+            
+        self.parserDict['size'] = np.prod(ctxt.lookup(_mangleVariableName(node.inputs[0].name)).shape)
+
+        return ctxt, True  
+    
+class MatMulParser(NodeParser):
+    def __init__(self):
+        super().__init__()
+
+    def nodeParse(self, node: gs.ir.node.Node) -> (bool):
+
+        ret = all([
+            len(node.inputs) == 2,
+            len(node.outputs) == 1
+        ])
+
+        # Assign GEMM-like attributes to be able to reuse same kernel binding
+        if ret:
+            self.parserDict['alpha'] = 1
+            self.parserDict['beta'] = 1
+            self.parserDict['transB'] = 0
+            self.parserDict['transA'] = 0
+
+        return ret
+    
+    def nodeCtxtParse(self, ctxt: NetworkContext, node: gs.ir.node.Node) -> (NetworkContext, bool):
+
+        ctxt = ctxt.copy()
+
+        inputs = ['A', 'B']
+        outputs = ['data_out']
+        
+        for idx, inputNode in enumerate(node.inputs):
+            self.parserDict[inputs[idx]] = ctxt.lookup(_mangleVariableName(inputNode.name)).name
+        for idx, outputNode in enumerate(node.outputs):
+            self.parserDict[outputs[idx]] = ctxt.lookup(_mangleVariableName(outputNode.name)).name
+
+        # Create fake C node for GEMM-compatibility
+        self.parserDict['C'] = 'NULL'
+            
+        self.parserDict['size'] = np.prod(ctxt.lookup(_mangleVariableName(node.inputs[0].name)).shape)
+
+        return ctxt, True    
+
+    
 class DummyParser(NodeParser):
     def __init__(self):
         super().__init__()
