@@ -23,10 +23,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from mako.template import Template
+from DumpO.DumpOTypes import NodeTemplate
 
-referenceTemplate = "void Add(${data_in_1}, ${data_in_2}, ${data_out}, ${size});"
+referenceTemplate = NodeTemplate("void Add(${data_in_1}, ${data_in_2}, ${data_out}, ${size});")
 
-int8Template = "void Add_int8(${data_in_1}, ${data_in_2}, ${data_out}, ${size});"
-int16Template = "void Add_int16(${data_in_1}, ${data_in_2}, ${data_out}, ${size});"
-int32Template = "void Add_int32(${data_in_1}, ${data_in_2}, ${data_out}, ${size});"
+int8Template = NodeTemplate("void Add_int8(${data_in_1}, ${data_in_2}, ${data_out}, ${size});")
+int16Template = NodeTemplate("void Add_int16(${data_in_1}, ${data_in_2}, ${data_out}, ${size});")
+int32Template = NodeTemplate("void Add_int32(${data_in_1}, ${data_in_2}, ${data_out}, ${size});")

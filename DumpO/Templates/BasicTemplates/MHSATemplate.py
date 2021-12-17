@@ -23,7 +23,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from mako.template import Template
+from DumpO.DumpOTypes import NodeTemplate
 
-referenceTemplate = "void MHSA(${data_out}, ${q}, ${k}, ${v}, ${wq_weight}, ${wq_bias}, ${wk_weight}, ${wk_bias}, ${wv_weight}, ${wv_bias}, ${wo_weight}, ${wo_bias});"
+referenceTemplate = NodeTemplate("void MHSA(${data_out}, ${q}, ${k}, ${v}, ${wq_weight}, ${wq_bias}, ${wk_weight}, ${wk_bias}, ${wv_weight}, ${wv_bias}, ${wo_weight}, ${wo_bias});")
 

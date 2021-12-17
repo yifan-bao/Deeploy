@@ -23,8 +23,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-referenceTemplate = "void RequantShift(${data_in}, ${data_out}, ${size}, ${log2D}, ${mul}, ${add}, ${n_levels}, ${signed});"
+from DumpO.DumpOTypes import NodeTemplate
 
-int8Template = "void RequantShift_int8(${data_in}, ${data_out}, ${size}, ${log2D}, ${mul}, ${add}, ${n_levels}, ${signed});"
-int16Template = "void RequantShift_int16(${data_in}, ${data_out}, ${size}, ${log2D}, ${mul}, ${add}, ${n_levels}, ${signed});"
-int32Template = "void RequantShift_int32(${data_in}, ${data_out}, ${size}, ${log2D}, ${mul}, ${add}, ${n_levels}, ${signed});"
+referenceTemplate = NodeTemplate("void RequantShift(${data_in}, ${data_out}, ${size}, ${log2D}, ${mul}, ${add}, ${n_levels}, ${signed});")
+
+int8Template = NodeTemplate("void RequantShift_int8(${data_in}, ${data_out}, ${size}, ${log2D}, ${mul}, ${add}, ${n_levels}, ${signed});")
+int16Template = NodeTemplate("void RequantShift_int16(${data_in}, ${data_out}, ${size}, ${log2D}, ${mul}, ${add}, ${n_levels}, ${signed});")
+int32Template = NodeTemplate("void RequantShift_int32(${data_in}, ${data_out}, ${size}, ${log2D}, ${mul}, ${add}, ${n_levels}, ${signed});")

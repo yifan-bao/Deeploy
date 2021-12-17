@@ -54,7 +54,7 @@ class AddChecker(NodeTypeChecker):
         outputNames = [mangleVariableName(node.name) for node in outputNodes]
         for node, name in zip(outputNodes, outputNames):
             if not newCtxt.is_global(name):
-                nb = NetworkBuffer(
+                nb = newCtxt.VariableBuffer(
                     name = name,
                     shape = node.shape,
                     nLevels = nLevels
@@ -92,7 +92,7 @@ class GatherChecker(NodeTypeChecker):
         outputNames = [mangleVariableName(node.name) for node in outputNodes]
         for node, name in zip(outputNodes, outputNames):
             if not newCtxt.is_global(name):
-                nb = NetworkBuffer(
+                nb = newCtxt.VariableBuffer(
                     name = name,
                     shape = node.shape,
                     nLevels = nLevels
@@ -129,7 +129,7 @@ class ReshapeChecker(NodeTypeChecker):
         outputNames = [mangleVariableName(node.name) for node in outputNodes]
         for node, name in zip(outputNodes, outputNames):
             if not newCtxt.is_global(name):
-                nb = NetworkBuffer(
+                nb = newCtxt.VariableBuffer(
                     name = name,
                     shape = node.shape,
                     nLevels = nLevels
@@ -170,7 +170,7 @@ class MHSAChecker(NodeTypeChecker):
         outputNames = [mangleVariableName(node.name) for node in outputNodes]
         for node, name in zip(outputNodes, outputNames):
             if not newCtxt.is_global(name):
-                nb = NetworkBuffer(
+                nb = newCtxt.VariableBuffer(
                     name = name,
                     shape = node.shape,
                     nLevels = nLevels
@@ -211,7 +211,7 @@ class GEMMChecker(NodeTypeChecker):
         outputNames = [mangleVariableName(node.name) for node in outputNodes]
         for node, name in zip(outputNodes, outputNames):
             if not newCtxt.is_global(name):
-                nb = NetworkBuffer(
+                nb = newCtxt.VariableBuffer(
                     name = name,
                     shape = node.shape,
                     nLevels = nLevels
@@ -248,7 +248,7 @@ class iLayerNormChecker(NodeTypeChecker):
         outputNames = [mangleVariableName(node.name) for node in outputNodes]
         for node, name in zip(outputNodes, outputNames):
             if not newCtxt.is_global(name):
-                nb = NetworkBuffer(
+                nb = newCtxt.VariableBuffer(
                     name = name,
                     shape = node.shape,
                     nLevels = nLevels
@@ -284,7 +284,7 @@ class GELUChecker(NodeTypeChecker):
         outputNames = [mangleVariableName(node.name) for node in outputNodes]
         for node, name in zip(outputNodes, outputNames):
             if not newCtxt.is_global(name):
-                nb = NetworkBuffer(
+                nb = newCtxt.VariableBuffer(
                     name = name,
                     shape = node.shape,
                     nLevels = nLevels
@@ -323,7 +323,7 @@ class ConvChecker(NodeTypeChecker):
         outputNames = [mangleVariableName(node.name) for node in outputNodes]
         for node, name in zip(outputNodes, outputNames):
             if not newCtxt.is_global(name):
-                nb = NetworkBuffer(
+                nb = newCtxt.VariableBuffer(
                     name = name,
                     shape = node.shape,
                     nLevels = nLevels
@@ -361,7 +361,7 @@ class RequantShiftChecker(NodeTypeChecker):
         outputNames = [mangleVariableName(node.name) for node in outputNodes]
         for node, name in zip(outputNodes, outputNames):
             if not newCtxt.is_global(name):
-                nb = NetworkBuffer(
+                nb = newCtxt.VariableBuffer(
                     name = name,
                     shape = node.shape,
                     nLevels = nLevels
@@ -394,7 +394,7 @@ class DummyChecker(NodeTypeChecker):
         outputNames = [mangleVariableName(node.name) for node in outputNodes]
         for node, name in zip(outputNodes, outputNames):
             if not newCtxt.is_global(name):
-                nb = NetworkBuffer(
+                nb = newCtxt.VariableBuffer(
                     name = name,
                     shape = node.shape,
                     nLevels = nLevels

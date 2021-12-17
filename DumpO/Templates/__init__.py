@@ -1,1 +1,1 @@
-from .BasicTemplates import *
+from . import *

@@ -38,19 +38,19 @@ class DataTypes(Enum):
     int16_t = 16
     int32_t = 32
 
-GELU_int8_Mapper = NodeMapper(GELUParser(), GELUChecker(DataTypes.int8_t, DataTypes.int8_t), mako.template.Template(iGELUTemplate.referenceTemplate))
-iLayerNorm_int8_Mapper = NodeMapper(iLayerNormParser(), iLayerNormChecker(DataTypes.int8_t, DataTypes.int8_t), mako.template.Template(DummyTemplate.referenceTemplate))
-MatMul_int8_Mapper = NodeMapper(MatMulParser(), GEMMChecker(DataTypes.int8_t, DataTypes.int32_t), mako.template.Template(GEMMTemplate.referenceTemplate))
-GEMM_int8_Mapper = NodeMapper(GEMMParser(), GEMMChecker(DataTypes.int8_t, DataTypes.int32_t), mako.template.Template(GEMMTemplate.referenceTemplate))
-Conv_int8_Mapper = NodeMapper(Conv2DParser(), ConvChecker(DataTypes.int8_t, DataTypes.int32_t), mako.template.Template(DummyTemplate.referenceTemplate))
-MHSA_int8_Mapper = NodeMapper(MHSAParser(), MHSAChecker(DataTypes.int8_t, DataTypes.int32_t), mako.template.Template(MHSATemplate.referenceTemplate))
+GELU_int8_Mapper = NodeMapper(GELUParser(), GELUChecker(DataTypes.int8_t, DataTypes.int8_t), iGELUTemplate.referenceTemplate)
+iLayerNorm_int8_Mapper = NodeMapper(iLayerNormParser(), iLayerNormChecker(DataTypes.int8_t, DataTypes.int8_t), DummyTemplate.referenceTemplate)
+MatMul_int8_Mapper = NodeMapper(MatMulParser(), GEMMChecker(DataTypes.int8_t, DataTypes.int32_t), GEMMTemplate.referenceTemplate)
+GEMM_int8_Mapper = NodeMapper(GEMMParser(), GEMMChecker(DataTypes.int8_t, DataTypes.int32_t), GEMMTemplate.referenceTemplate)
+Conv_int8_Mapper = NodeMapper(Conv2DParser(), ConvChecker(DataTypes.int8_t, DataTypes.int32_t), DummyTemplate.referenceTemplate)
+MHSA_int8_Mapper = NodeMapper(MHSAParser(), MHSAChecker(DataTypes.int8_t, DataTypes.int32_t), MHSATemplate.referenceTemplate)
 
-GatherMappers = [NodeMapper(GatherParser(), GatherChecker(type), mako.template.Template(GatherTemplate.referenceTemplate)) for type in DataTypes]
-ReshapeMappers = [NodeMapper(ReshapeParser(), ReshapeChecker(type), mako.template.Template(SkipTemplate.referenceTemplate)) for type in DataTypes]
-RequantShiftMappers = [NodeMapper(RequantShiftParser(), RequantShiftChecker(type, DataTypes.int8_t), mako.template.Template(RequantShiftTemplate.referenceTemplate)) for type in DataTypes]
-AddMappers = [NodeMapper(AddParser(), AddChecker(type, DataTypes.int32_t), mako.template.Template(AddTemplate.referenceTemplate)) for type in DataTypes]
+GatherMappers = [NodeMapper(GatherParser(), GatherChecker(type), GatherTemplate.referenceTemplate) for type in DataTypes]
+ReshapeMappers = [NodeMapper(ReshapeParser(), ReshapeChecker(type), SkipTemplate.referenceTemplate) for type in DataTypes]
+RequantShiftMappers = [NodeMapper(RequantShiftParser(), RequantShiftChecker(type, DataTypes.int8_t), RequantShiftTemplate.referenceTemplate) for type in DataTypes]
+AddMappers = [NodeMapper(AddParser(), AddChecker(type, DataTypes.int32_t), AddTemplate.referenceTemplate) for type in DataTypes]
 
-DummyMapper = NodeMapper(DummyParser(), DummyChecker(DataTypes.int8_t), mako.template.Template(DummyTemplate.referenceTemplate))
+DummyMapper = NodeMapper(DummyParser(), DummyChecker(DataTypes.int8_t), DummyTemplate.referenceTemplate)
 
 BasicMapping = {
     'Conv' : ConvLayer([Conv_int8_Mapper]),
@@ -85,4 +85,28 @@ def TypeInfer(node):
     #return DataTypes.int32_t
     raise TypeError(f'Could not infer type of node {node.name}')
 
-BasicPlatform = DeploymentPlatform(BasicMapping, DataTypes, TypeInfer)
+class SimpleNetworkBuffer(VariableBuffer):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        
+    def alloc(self):
+        return AllocTemplate.referenceLocalTemplate.generate(type = self._type._name_, name=self.name, size = np.prod(self.shape))
+
+    def dealloc(self):
+        return FreeTemplate.referenceLocalTemplate.generate(name = self.name)
+
+class SimpleGlobalBuffer(ConstantBuffer):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        
+    def alloc(self):
+        values = list(self.values.reshape(-1))
+        strValues = [str(value) for value in values]
+        valueString = ', '.join(strValues)
+        return AllocTemplate.referenceGlobalTemplate.generate(type = self._type._name_, name=self.name, size = np.prod(self.shape), values = valueString)
+
+    def dealloc(self):
+        return FreeTemplate.referenceGlobalTemplate.generate(name = self.name)
+
+
+BasicPlatform = DeploymentPlatform(BasicMapping, DataTypes, TypeInfer, SimpleNetworkBuffer, SimpleGlobalBuffer)

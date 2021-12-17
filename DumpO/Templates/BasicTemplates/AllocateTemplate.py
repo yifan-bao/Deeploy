@@ -23,8 +23,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from mako.template import Template
+from DumpO.DumpOTypes import NodeTemplate
 
-referenceLocalTemplate = "${type}* ${name} = (${type}*) malloc(sizeof(${type}) * ${size});"
+referenceLocalTemplate = NodeTemplate("${type}* ${name} = (${type}*) malloc(sizeof(${type}) * ${size});")
 
-referenceGlobalTemplate = "${type} ${name}[${size}] = {${values}};"
+referenceGlobalTemplate = NodeTemplate("${type} ${name}[${size}] = {${values}};")

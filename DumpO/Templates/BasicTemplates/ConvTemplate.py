@@ -23,4 +23,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-cmsisTemplate = "arm_convolve_HWC_q7_basic_nonsquare(${data_in}, ${dim_im_in_x}, ${dim_im_in_y}, ${ch_im_in}, ${weight}, ${ch_im_out}, ${dim_kernel_x}, ${dim_kernel_y}, ${padding_x}, ${padding_y}, ${stride_x}, ${stride_y}, ${bias}, ${bias_shift}, ${out_shift}, ${data_out}, ${dim_im_out_x}, ${dim_im_out_y}, ${bufferA}, ${bufferB});"
+from DumpO.DumpOTypes import NodeTemplate
+
+cmsisTemplate = NodeTemplate("arm_convolve_HWC_q7_basic_nonsquare(${data_in}, ${dim_im_in_x}, ${dim_im_in_y}, ${ch_im_in}, ${weight}, ${ch_im_out}, ${dim_kernel_x}, ${dim_kernel_y}, ${padding_x}, ${padding_y}, ${stride_x}, ${stride_y}, ${bias}, ${bias_shift}, ${out_shift}, ${data_out}, ${dim_im_out_x}, ${dim_im_out_y}, ${bufferA}, ${bufferB});")

@@ -24,7 +24,7 @@
 # limitations under the License.
 
 import copy
-import mako
+from mako.template import Template
 import numpy as np
 from typing import List, Callable, Iterable, Union, Tuple, Dict, Callable
 import onnx
@@ -33,10 +33,9 @@ import math
 from enum import Enum
 
 from DumpO.DumpOManglers import *
-from DumpO.Templates.BasicTemplates import AllocateTemplate, FreeTemplate
 
-class NetworkBuffer():
-    def __init__(self, name: str, shape, nLevels: int):
+class VariableBuffer():
+    def __init__(self, name: str = '', shape = [1], nLevels: int = 1):
         self.name = name
         self.shape = shape
         self.nLevels = nLevels
@@ -49,51 +48,48 @@ class NetworkBuffer():
 
     # Allocation code. Choose your Template, might want to override aswell!
     def alloc(self) -> str:
-        return mako.template.Template(AllocateTemplate.referenceLocalTemplate).render(type = self._type._name_, name = self.name, size = np.prod(self.shape))
+        return ''
     
     # Deallocation code. Choose your Template!
     def dealloc(self) -> str:
-        return mako.template.Template(FreeTemplate.referenceLocalTemplate).render(name = self.name)
+        return ''
     
-    def fromNode(node: gs.ir.node.Node, nLevels:int):
+    def fromNode(self, node: gs.ir.node.Node, nLevels:int):
         return(
-            NetworkBuffer(
+            type(self)(
                 name = mangleVariableName(node.name),
                 shape = node.shape,
                 nLevels = nLevels
             )
         )
     
-class GlobalBuffer(NetworkBuffer):
-    def __init__(self, name, shape, nLevels, values):
+class ConstantBuffer(VariableBuffer):
+    def __init__(self, name : str = '', shape = [1], nLevels : int = 1, values = [1]):
         super().__init__(name,shape,nLevels)
         self.values = values
 
     # Allocation code. Choose your Template, might want to override aswell!
     def alloc(self) -> str:
-        #import IPython; IPython.embed()
-        values = list(self.values.reshape(-1))
-        strValues = [str(value) for value in values]
-        valueString = ', '.join(strValues)
-        return mako.template.Template(AllocateTemplate.referenceGlobalTemplate).render(type = self._type._name_, name = self.name, size = np.prod(self.shape), values=valueString)
+        return ''
     
     # Deallocation code. Choose your Template!
     def dealloc(self) -> str:
-        return mako.template.Template(FreeTemplate.referenceGlobalTemplate).render(name = self.name)
-        
-    def fromNetworkBuffer(buffer, values):
-        gb = GlobalBuffer(name = buffer.name,
+        return ''
+
+    def fromVariableBuffer(self, buffer: VariableBuffer, values):
+        return type(self)(name = buffer.name,
                           nLevels = buffer.nLevels,
                           shape = buffer.shape,
                           values = values)
-        return(gb)
 
 class NetworkContext():
-    def __init__(self, globalObjects = {}, localObjects = {}):
+    def __init__(self, variableBuffer: VariableBuffer, constantBuffer: ConstantBuffer, globalObjects = {}, localObjects = {}):
         self.globalObjects = {}
         self.localObjects = {}
+        self.VariableBuffer = variableBuffer
+        self.ConstantBuffer = constantBuffer
         
-    def add(self, obj : NetworkBuffer, ctxt = 'local'):
+    def add(self, obj : VariableBuffer, ctxt = 'local'):
         if ctxt == 'local':
             if obj.name not in self.localObjects.keys():
                 self.localObjects[obj.name] = obj
@@ -135,15 +131,15 @@ class NetworkContext():
             name = mangleVariableName(node.name)
         
         # SCHEREMO: This is currently heuristic, but should be annotated in ONNX
-        localBuffer = NetworkBuffer.fromNode(node, 2**(type._value_))
-        globalBuffer = GlobalBuffer.fromNetworkBuffer(localBuffer, values=node.values)
+        localBuffer = self.VariableBuffer().fromNode(node = node, nLevels = 2**(type._value_))
+        globalBuffer = self.ConstantBuffer().fromVariableBuffer(localBuffer, values=node.values)
         globalBuffer._type = type
         globalBuffer.name = name
 
         self.add(globalBuffer, 'global')
         return None
 
-    def hoistParameter(self, buffer: GlobalBuffer):
+    def hoistParameter(self, buffer: ConstantBuffer):
     
         self.add(buffer, 'global')
     
@@ -190,7 +186,26 @@ class NetworkContext():
             
     def copy(self):
         return copy.deepcopy(self)
+
+class NodeTemplate():
+    def __init__(self, templateStr):
+        self.template = Template(templateStr)
+        
+    #Override this. Reports internal size of the tool (buffer size allocated in template) to the tool
+    def internalSize(self) -> int:
+        return 0
     
+    # Don't override this
+    def __deepcopy__(self, memo):
+        _copy = type(self)(self.template._source)
+        memo[id(self)] = _copy
+
+        return _copy
+
+    # Don't override this
+    def generate(self, **kwargs) -> str:
+        return self.template.render(**kwargs)
+        
 # TYPE CHECKERS ARE ASSUMED TO BE STATELESS!
 class NodeTypeChecker():
     def __init__(self):
@@ -247,22 +262,11 @@ class NodeParser():
 
 # Don't change anything here!
 class NodeMapper():
-    def __init__(self, parser: NodeParser, typeChecker: NodeTypeChecker, template: mako.template.Template):
+    def __init__(self, parser: NodeParser, typeChecker: NodeTypeChecker, template: NodeTemplate):
         self.parser = parser
         self.typeChecker = typeChecker
         self.template = template
         self.parserDict = {}
-
-    # Wrokaround because mako templates are not deepcopyable
-    def __deepcopy__(self, memo):
-        _copy = type(self)(None, None, None)
-        memo[id(self)] = _copy
-        _copy.parser = copy.deepcopy(self.parser, memo)
-        _copy.typeChecker = copy.deepcopy(self.typeChecker, memo)
-        _copy.parserDict = copy.deepcopy(self.parserDict, memo)
-        _copy.template = type(self.template)(self.template._source)
-
-        return _copy
     
     def parse(self, ctxt: NetworkContext, node: gs.ir.node.Node, typeInfer: Callable) -> (NetworkContext, bool):
         hoistedCtxt, parseable = self.parser.parse(ctxt, node, typeInfer)
@@ -276,7 +280,7 @@ class NodeMapper():
             return (ctxt, False)
     
     def generate(self) -> List[str]:
-        return [self.template.render(**self.parser.parserDict)]
+        return [self.template.generate(**self.parser.parserDict)]
 
 class ONNXLayer():
     
@@ -333,16 +337,18 @@ class ONNXLayer():
         return (ctxt, generated_code)
 
 class DeploymentPlatform():
-    def __init__(self, Mapping: Dict[str, ONNXLayer], DataTypes: Enum, TypeInfer: Callable):
+    def __init__(self, Mapping: Dict[str, ONNXLayer], DataTypes: Enum, TypeInfer: Callable, VariableBuffer: VariableBuffer, ConstantBuffer: ConstantBuffer):
         self.Mapping = Mapping
         self.DataTypes = DataTypes
         self.TypeInfer = TypeInfer
+        self.VariableBuffer = VariableBuffer
+        self.ConstantBuffer = ConstantBuffer
     
 class NetworkContainer():
     def __init__(self, graph: gs.Graph, platform: DeploymentPlatform, scheduler: Callable = lambda x: x):
         self.graph = graph
         self.scheduler = scheduler
-        self.ctxt = NetworkContext()
+        self.ctxt = NetworkContext(platform.VariableBuffer, platform.ConstantBuffer)
         self.layerBinding = []
         self.parsed = False
         self.Platform = platform
@@ -357,7 +363,7 @@ class NetworkContainer():
             data_size = node.shape
             # SCHEREMO: Should be parsed from graph
             data_type = 2**8
-            nb = NetworkBuffer(data_name, data_size, data_type)
+            nb = self.ctxt.VariableBuffer(data_name, data_size, data_type)
             nb._type = self.Platform.DataTypes.int8_t
             ctxt.add(nb, 'global')
 
@@ -366,7 +372,7 @@ class NetworkContainer():
             data_size = node.shape
             # SCHEREMO: Should be parsed from graph
             data_type = 2**32
-            nb = NetworkBuffer(data_name, data_size, data_type)
+            nb = self.ctxt.VariableBuffer(data_name, data_size, data_type)
             nb._type = self.Platform.DataTypes.int32_t
             ctxt.add(nb, 'global')
 
@@ -375,7 +381,7 @@ class NetworkContainer():
     def parse(self) -> bool:
 
         # Reset context
-        self.ctxt = self._createIOBindings(NetworkContext(), self.graph)
+        self.ctxt = self._createIOBindings(NetworkContext(self.Platform.VariableBuffer, self.Platform.ConstantBuffer), self.graph)
         
         # Create schedule, binding, then parse resulting program for correctness
         # Create schedule
@@ -409,7 +415,11 @@ class NetworkContainer():
             self.ctxt, code = node.generate(self.ctxt)
             for section in code:
                 for substr in section:
-                    callStack += substr + '\n'
+                    try:
+                        callStack += substr + '\n'
+                    except Exception as e:
+                        print(e)
+                        import IPython; IPython.embed()
 
         return callStack
 
@@ -420,6 +430,15 @@ class NetworkContainer():
         callStack = ''
         for node in self.ctxt.globalObjects.values():
             callStack += node.alloc() + '\n'
+        return callStack
+
+    def generateBufferDeAllocCode(self) -> str:
+        if not self.parsed:
+            raise ValueError('You need to parse the network before generating code!')
+        
+        callStack = ''
+        for node in self.ctxt.globalObjects.values():
+            callStack += node.dealloc() + '\n'
         return callStack
     
     def getParameterSize(self) -> int:

@@ -23,7 +23,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from mako.template import Template
+from DumpO.DumpOTypes import NodeTemplate
 
-referenceTemplate = " type* ${data} = ${shape} "
+referenceTemplate = NodeTemplate("type* ${data} = ${shape};")
 

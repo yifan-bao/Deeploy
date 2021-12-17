@@ -23,7 +23,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from mako.template import Template
+from DumpO.DumpOTypes import NodeTemplate
 
-referenceTemplate = "void iGELU(${data_in}, ${data_out}, ${size}, ${b}, ${log2D}, ${n_levels}, ${one}, ${totScaler});"
+referenceTemplate = NodeTemplate("void iGELU(${data_in}, ${data_out}, ${size}, ${b}, ${log2D}, ${n_levels}, ${one}, ${totScaler});")
 
