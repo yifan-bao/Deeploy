@@ -1,8 +1,8 @@
 # ----------------------------------------------------------------------
 #
-# File: onnxParse.py
+# File: MHSATemplate.py
 #
-# Last edited: 13.12.2021        
+# Last edited: 16.12.2021        
 # 
 # Copyright (C) 2021, ETH Zurich and University of Bologna.
 #
@@ -23,21 +23,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import onnx
-import onnx_graphsurgeon as gs
+from mako.template import Template
 
-from DumpOTypes import *
-from Platforms.BasicPlatform import *
-
-model = onnx.load_model('./quantlib_trial.onnx')
-graph = gs.import_onnx(model)
-
-def scheduler(graph: gs.Graph):
-    return graph.nodes
-
-model = NetworkContainer(graph, BasicPlatform, scheduler)
-model.parse()
-inferenceCode = model.generateInferenceCode()
-initializationCode = model.generateBufferInitializationCode()
-import IPython; IPython.embed()
+referenceTemplate = "void MHSA(${data_out}, ${q}, ${k}, ${v}, ${wq_weight}, ${wq_bias}, ${wk_weight}, ${wk_bias}, ${wv_weight}, ${wv_bias}, ${wo_weight}, ${wo_bias});"
 

@@ -23,8 +23,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from DumpOTypes import *
-from DumpOManglers import *
+from DumpO.DumpOTypes import *
+from DumpO.DumpOManglers import *
 import numpy as np
 import math
 

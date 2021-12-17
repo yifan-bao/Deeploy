@@ -28,10 +28,10 @@ from enum import Enum
 import mako
 import onnx_graphsurgeon as gs
 
-from Parsers.BasicParsers import *
-from TypeCheckers.BasicCheckers import *
-from Layers.BasicLayers import *
-from Templates.BasicTemplates import *
+from DumpO.Parsers.BasicParsers import *
+from DumpO.TypeCheckers.BasicCheckers import *
+from DumpO.Layers.BasicLayers import *
+from DumpO.Templates.BasicTemplates import *
 
 class DataTypes(Enum):
     int8_t = 8

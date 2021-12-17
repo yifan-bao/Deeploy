@@ -32,8 +32,8 @@ import onnx_graphsurgeon as gs
 import math
 from enum import Enum
 
-from DumpOManglers import *
-from Templates.BasicTemplates import AllocateTemplate, FreeTemplate
+from DumpO.DumpOManglers import *
+from DumpO.Templates.BasicTemplates import AllocateTemplate, FreeTemplate
 
 class NetworkBuffer():
     def __init__(self, name: str, shape, nLevels: int):

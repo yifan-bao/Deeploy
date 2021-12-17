@@ -27,8 +27,8 @@ import onnx
 import onnx_graphsurgeon as gs
 from typing import List
 
-from DumpOTypes import *
-from DumpOManglers import *
+from DumpO.DumpOTypes import *
+from DumpO.DumpOManglers import *
 
 class ReshapeLayer(ONNXLayer):
     def __init__(self, maps : List[NodeMapper]):
