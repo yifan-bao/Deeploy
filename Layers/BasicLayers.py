@@ -27,8 +27,8 @@ import onnx
 import onnx_graphsurgeon as gs
 from typing import List
 
-from parserTypes import *
-from parserTypes import _mangleVariableName, _mangleParameterName
+from DumpOTypes import *
+from DumpOManglers import *
 from onnxLayers import ONNXLayer
 
 class ReshapeLayer(ONNXLayer):
@@ -39,8 +39,8 @@ class ReshapeLayer(ONNXLayer):
         outputs = [node for node in self.node.outputs]
         inputs = [node for node in self.node.inputs]
         
-        outputNames = [_mangleVariableName(node.name) for node in outputs]
-        inputNames = [_mangleVariableName(node.name) for node in inputs]
+        outputNames = [mangleVariableName(node.name) for node in outputs]
+        inputNames = [mangleVariableName(node.name) for node in inputs]
         
         alloc = ctxt.allocLocal(self.node.name, outputNames)
         call = self.mapper.generate()

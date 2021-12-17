@@ -1,8 +1,8 @@
 # ----------------------------------------------------------------------
 #
-# File: parserTypes.py
+# File: DumpOTypes.py
 #
-# Last edited: 14.12.2021        
+# Last edited: 17.12.2021        
 # 
 # Copyright (C) 2021, ETH Zurich and University of Bologna.
 #
@@ -29,17 +29,11 @@ import numpy as np
 from typing import List, Callable, Iterable, Union, Tuple, Dict, Callable
 import onnx
 import onnx_graphsurgeon as gs
-import re
 import math
 from enum import Enum
 
-from templates import AllocateTemplate, FreeTemplate
-
-def _mangleVariableName(name:str) -> str:
-    return '_DumpO_BUFFER__' + re.sub('\.','_',name)
-
-def _mangleParameterName(nodeName:str, parameterName:str) -> str:
-    return '_DumpO_PARAMETER__' + re.sub('.','_',nodeName) + '_' + re.sub('.','_',parameterName)
+from DumpOManglers import *
+from Templates.BasicTemplates import AllocateTemplate, FreeTemplate
 
 class DeploymentPlatform():
     def __init__(self, Mapping: Dict[str, object], DataTypes: Enum, TypeInfer):
@@ -70,7 +64,7 @@ class NetworkBuffer():
     def fromNode(node: gs.ir.node.Node, nLevels:int):
         return(
             NetworkBuffer(
-                name = _mangleVariableName(node.name),
+                name = mangleVariableName(node.name),
                 shape = node.shape,
                 nLevels = nLevels
             )
@@ -144,7 +138,7 @@ class NetworkContext():
         assert len(node.outputs) <= 1, "Constant has more than one output"
 
         if name == "":
-            name = _mangleVariableName(node.name)
+            name = mangleVariableName(node.name)
         
         # SCHEREMO: This is currently heuristic, but should be annotated in ONNX
         try:
@@ -240,7 +234,7 @@ class NodeParser():
         
         data_in_buffers = []
         for inputNode in node.inputs:
-            data_in = _mangleVariableName(inputNode.name)
+            data_in = mangleVariableName(inputNode.name)
             
             # Hoist constant inputs
             if type(inputNode) == gs.ir.tensor.Constant and not ctxt.is_global(data_in):
@@ -303,14 +297,14 @@ class NetworkContainer():
         self.layerBinding = []
         self.parsed = False
         self.Platform = platform
-        self.Platform.Mapping['Constant'] = lambda x: self.ctxt.hoistConstant(x.attrs['value'], self.Platform.TypeInfer(x), _mangleVariableName(x.outputs[0].name))
+        self.Platform.Mapping['Constant'] = lambda x: self.ctxt.hoistConstant(x.attrs['value'], self.Platform.TypeInfer(x), mangleVariableName(x.outputs[0].name))
 
     def _createIOBindings(self, ctxt: NetworkContext, graph):
 
         ctxt = ctxt.copy()
 
         for node in graph.inputs:
-            data_name = _mangleVariableName(node.name)
+            data_name = mangleVariableName(node.name)
             data_size = node.shape
             # SCHEREMO: Should be parsed from graph
             data_type = 2**8
@@ -319,7 +313,7 @@ class NetworkContainer():
             ctxt.add(nb, 'global')
 
         for node in graph.outputs:
-            data_name = _mangleVariableName(node.name)
+            data_name = mangleVariableName(node.name)
             data_size = node.shape
             # SCHEREMO: Should be parsed from graph
             data_type = 2**32

@@ -30,8 +30,8 @@ import numpy as np
 from typing import List, Callable
 import copy
 
-from templates import *
-from parserTypes import NodeMapper, _mangleVariableName, _mangleParameterName, NetworkContext, NetworkBuffer, GlobalBuffer
+from DumpOTypes import *
+from DumpOManglers import *
 
 class ONNXLayer():
     
@@ -77,8 +77,8 @@ class ONNXLayer():
         outputs = [node for node in self.node.outputs]
         inputs = [node for node in self.node.inputs]
 
-        outputNames = [_mangleVariableName(node.name) for node in outputs]
-        inputNames = [_mangleVariableName(node.name) for node in inputs]
+        outputNames = [mangleVariableName(node.name) for node in outputs]
+        inputNames = [mangleVariableName(node.name) for node in inputs]
         
         alloc = ctxt.allocLocal(self.node.name, outputNames)
         call = self.mapper.generate()

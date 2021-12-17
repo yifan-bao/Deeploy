@@ -31,8 +31,7 @@ import onnx_graphsurgeon as gs
 from Parsers.BasicParsers import *
 from TypeCheckers.BasicCheckers import *
 from Layers.BasicLayers import *
-from templates import *
-
+from Templates.BasicTemplates import *
 
 class DataTypes(Enum):
     int8_t = 8
@@ -43,13 +42,15 @@ GELU_int8_Mapper = NodeMapper(GELUParser(), GELUChecker(DataTypes.int8_t, DataTy
 iLayerNorm_int8_Mapper = NodeMapper(iLayerNormParser(), iLayerNormChecker(DataTypes.int8_t, DataTypes.int8_t), mako.template.Template(DummyTemplate.referenceTemplate))
 MatMul_int8_Mapper = NodeMapper(MatMulParser(), GEMMChecker(DataTypes.int8_t, DataTypes.int32_t), mako.template.Template(GEMMTemplate.referenceTemplate))
 GEMM_int8_Mapper = NodeMapper(GEMMParser(), GEMMChecker(DataTypes.int8_t, DataTypes.int32_t), mako.template.Template(GEMMTemplate.referenceTemplate))
-Conv_int8_Mapper = NodeMapper(ConvParser(), ConvChecker(DataTypes.int8_t, DataTypes.int32_t), mako.template.Template(DummyTemplate.referenceTemplate))
+Conv_int8_Mapper = NodeMapper(Conv2DParser(), ConvChecker(DataTypes.int8_t, DataTypes.int32_t), mako.template.Template(DummyTemplate.referenceTemplate))
 MHSA_int8_Mapper = NodeMapper(MHSAParser(), MHSAChecker(DataTypes.int8_t, DataTypes.int32_t), mako.template.Template(MHSATemplate.referenceTemplate))
 
 GatherMappers = [NodeMapper(GatherParser(), GatherChecker(type), mako.template.Template(GatherTemplate.referenceTemplate)) for type in DataTypes]
 ReshapeMappers = [NodeMapper(ReshapeParser(), ReshapeChecker(type), mako.template.Template(SkipTemplate.referenceTemplate)) for type in DataTypes]
 RequantShiftMappers = [NodeMapper(RequantShiftParser(), RequantShiftChecker(type, DataTypes.int8_t), mako.template.Template(RequantShiftTemplate.referenceTemplate)) for type in DataTypes]
 AddMappers = [NodeMapper(AddParser(), AddChecker(type, DataTypes.int32_t), mako.template.Template(AddTemplate.referenceTemplate)) for type in DataTypes]
+
+DummyMapper = NodeMapper(DummyParser(), DummyChecker(DataTypes.int8_t), mako.template.Template(DummyTemplate.referenceTemplate))
 
 BasicMapping = {
     'Conv' : ConvLayer([Conv_int8_Mapper]),
@@ -63,8 +64,8 @@ BasicMapping = {
     'Add': AddLayer(AddMappers),
     'RequantShift' : RequantShiftLayer(RequantShiftMappers),
     'Reshape': ReshapeLayer(ReshapeMappers),
-    'Flatten': ReshapeLayer(ReshapeMappers),
-    'GlobalAveragePool': ReshapeLayer(ReshapeMappers),
+    'Flatten': ConvLayer([DummyMapper]),
+    'GlobalAveragePool': ConvLayer([DummyMapper]),
 }
 
 def TypeInfer(node):
@@ -79,9 +80,9 @@ def TypeInfer(node):
     for _type in DataTypes:
         if outNode.values.max() < 2**(_type._value_): #and outNode.values.min() >= -2**(_type._value_-1):
             return _type
-        
+
+    #SCHEREMO: Remove this - this should raise and error
+    #return DataTypes.int32_t
     raise TypeError(f'Could not infer type of node {node.name}')
 
 BasicPlatform = DeploymentPlatform(BasicMapping, DataTypes, TypeInfer)
-    
-DummyMapper = NodeMapper(DummyParser(), DummyChecker(), mako.template.Template(DummyTemplate.referenceTemplate))
