@@ -26,7 +26,7 @@
 import copy
 import mako
 import numpy as np
-from typing import List, Callable, Iterable, Union, Tuple, Dict
+from typing import List, Callable, Iterable, Union, Tuple, Dict, Callable
 import onnx
 import onnx_graphsurgeon as gs
 import re
@@ -42,9 +42,10 @@ def _mangleParameterName(nodeName:str, parameterName:str) -> str:
     return '_DumpO_PARAMETER__' + re.sub('.','_',nodeName) + '_' + re.sub('.','_',parameterName)
 
 class DeploymentPlatform():
-    def __init__(self, Mapping: Dict[str, object], DataTypes: Enum):
+    def __init__(self, Mapping: Dict[str, object], DataTypes: Enum, TypeInfer):
         self.Mapping = Mapping
         self.DataTypes = DataTypes
+        self.TypeInfer = TypeInfer
 
 class NetworkBuffer():
     def __init__(self, name: str, shape, nLevels: int):
@@ -60,12 +61,11 @@ class NetworkBuffer():
 
     # Allocation code. Choose your Template, might want to override aswell!
     def alloc(self) -> str:
-        # SCHEREMO: currently signed, but can be infered from n_levels and signed flags    
-        return mako.template.Template(AllocateTemplate.referenceTemplate).render(type = self._type._name_, name = self.name, size = np.prod(self.shape))
+        return mako.template.Template(AllocateTemplate.referenceLocalTemplate).render(type = self._type._name_, name = self.name, size = np.prod(self.shape))
     
     # Deallocation code. Choose your Template!
     def dealloc(self) -> str:
-        return mako.template.Template(FreeTemplate.referenceTemplate).render(name = self.name)
+        return mako.template.Template(FreeTemplate.referenceLocalTemplate).render(name = self.name)
     
     def fromNode(node: gs.ir.node.Node, nLevels:int):
         return(
@@ -80,6 +80,18 @@ class GlobalBuffer(NetworkBuffer):
     def __init__(self, name, shape, nLevels, values):
         super().__init__(name,shape,nLevels)
         self.values = values
+
+    # Allocation code. Choose your Template, might want to override aswell!
+    def alloc(self) -> str:
+        #import IPython; IPython.embed()
+        values = list(self.values.reshape(-1))
+        strValues = [str(value) for value in values]
+        valueString = ', '.join(strValues)
+        return mako.template.Template(AllocateTemplate.referenceGlobalTemplate).render(type = self._type._name_, name = self.name, size = np.prod(self.shape), values=valueString)
+    
+    # Deallocation code. Choose your Template!
+    def dealloc(self) -> str:
+        return mako.template.Template(FreeTemplate.referenceGlobalTemplate).render(name = self.name)
         
     def fromNetworkBuffer(buffer, values):
         gb = GlobalBuffer(name = buffer.name,
@@ -127,14 +139,26 @@ class NetworkContext():
         else:
             False
 
-    def hoistConstant(self, node: gs.ir.node.Node):
+    def hoistConstant(self, node: gs.ir.node.Node, type, name = ''):
 
-        assert len(node.outputs) == 1, "Constant has more than one output"
+        assert len(node.outputs) <= 1, "Constant has more than one output"
 
-        # SCHEREMO: Constants are hoisted with nLevels = 2**8 - should be read from graph at some point
-        nb = NetworkBuffer(_mangleVariableName(node.outputs[0].name), node.outputs[0].shape, 2**8)
-        param = GlobalBuffer.fromNetworkBuffer(nb, values=node.attrs['value'].values)
-        self.add(param, 'global')
+        if name == "":
+            name = _mangleVariableName(node.name)
+        
+        # SCHEREMO: This is currently heuristic, but should be annotated in ONNX
+        try:
+            localBuffer = NetworkBuffer.fromNode(node, 2**(type._value_))
+            globalBuffer = GlobalBuffer.fromNetworkBuffer(localBuffer, values=node.values)
+            globalBuffer._type = type
+            globalBuffer.name = name
+        except Exception as e:
+            print(e)
+            import IPython; IPython.embed()
+
+
+        self.add(globalBuffer, 'global')
+        return None
 
     def hoistParameter(self, buffer: GlobalBuffer):
     
@@ -211,7 +235,7 @@ class NodeParser():
     
     # Don't override this, it checks for consistency (all inputs are available, no outputs are defined)
     # Also hoists inputs that are parameters
-    def parseInputs(self, ctxt: NetworkContext, node: gs.ir.node.Node) -> (NetworkContext, bool):
+    def parseInputs(self, ctxt: NetworkContext, node: gs.ir.node.Node, typeInfer: Callable) -> (NetworkContext, bool):
         ctxt = ctxt.copy()
         
         data_in_buffers = []
@@ -220,38 +244,20 @@ class NodeParser():
             
             # Hoist constant inputs
             if type(inputNode) == gs.ir.tensor.Constant and not ctxt.is_global(data_in):
-                # SCHEREMO: This is currently heuristic, but should be annotated in ONNX
-                if inputNode.values.max() < 2**8:
-                    localBuffer = NetworkBuffer.fromNode(inputNode, 2**8)
-                    globalBuffer = GlobalBuffer.fromNetworkBuffer(localBuffer, values=inputNode.values)
-                    globalBuffer._type = 'int8_t'
-                    ctxt.add(globalBuffer, 'global')
-                    
-                elif inputNode.values.max() < 2**16:
-                    localBuffer = NetworkBuffer.fromNode(inputNode, 2**16)
-                    globalBuffer = GlobalBuffer.fromNetworkBuffer(localBuffer, values=inputNode.values)
-                    globalBuffer._type = 'int16_t'
-                    ctxt.add(globalBuffer, 'global')
-                    
-                else:
-                    localBuffer = NetworkBuffer.fromNode(inputNode, 2**32)
-                    globalBuffer = GlobalBuffer.fromNetworkBuffer(localBuffer, values=inputNode.values)
-                    globalBuffer._type = 'int32_t'
-                    ctxt.add(globalBuffer, 'global')
+                ctxt.hoistConstant(inputNode, typeInfer(inputNode))
             else:
                 localBuffer = ctxt.lookup(data_in)
                 ctxt.addUser(data_in, node.name)
-
-            data_in_buffers.append(localBuffer.name)
+                data_in_buffers.append(localBuffer.name)
     
         return ctxt, True
 
     # Don't touch this
-    def parse(self, ctxt: NetworkContext, node: gs.ir.node.Node) -> (NetworkContext, bool):
+    def parse(self, ctxt: NetworkContext, node: gs.ir.node.Node, typeInfer: Callable) -> (NetworkContext, bool):
         self.parserDict = {}
         ret1 = self.nodeParse(node)
         if ret1:
-            ctxt, ret2 = self.parseInputs(ctxt, node)
+            ctxt, ret2 = self.parseInputs(ctxt, node, typeInfer)
             return (ctxt, ret1 and ret2)
         else:
             return ctxt, False
@@ -275,16 +281,16 @@ class NodeMapper():
 
         return _copy
     
-    def parse(self, ctxt: NetworkContext, node: gs.ir.node.Node) -> (NetworkContext, bool):
-        hoistedCtxt, parseable = self.parser.parse(ctxt, node)
+    def parse(self, ctxt: NetworkContext, node: gs.ir.node.Node, typeInfer: Callable) -> (NetworkContext, bool):
+        hoistedCtxt, parseable = self.parser.parse(ctxt, node, typeInfer)
         if parseable:
             if( self.typeChecker.typeCheckNode(ctxt = hoistedCtxt, node = node)):
                 typedCtxt = self.typeChecker.typeInferOutput(hoistedCtxt, node, **self.parser.parserDict)
                 return self.parser.nodeCtxtParse(typedCtxt, node)
             else:
-                raise ValueError(f'Typechecking for node {node.name} failed')
+                return (ctxt, False)
         else:
-            raise ValueError(f'Could not parse node {node.name}')
+            return (ctxt, False)
     
     def generate(self) -> List[str]:
         return [self.template.render(**self.parser.parserDict)]
@@ -297,7 +303,7 @@ class NetworkContainer():
         self.layerBinding = []
         self.parsed = False
         self.Platform = platform
-        self.Platform.Mapping['Constant'] = lambda x: self.ctxt.hoistConstant(x)
+        self.Platform.Mapping['Constant'] = lambda x: self.ctxt.hoistConstant(x.attrs['value'], self.Platform.TypeInfer(x), _mangleVariableName(x.outputs[0].name))
 
     def _createIOBindings(self, ctxt: NetworkContext, graph):
 
@@ -341,7 +347,7 @@ class NetworkContainer():
 
         parseSuccess = True
         for (name, node) in self.layerBinding:
-            self.ctxt, parsePass = node.parse(self.ctxt)
+            self.ctxt, parsePass = node.parse(self.ctxt, self.Platform.TypeInfer)
             parseSuccess = parseSuccess and parsePass
 
         if parseSuccess:
@@ -364,7 +370,17 @@ class NetworkContainer():
 
         return callStack
 
+    def generateBufferInitializationCode(self) -> str:
+        if not self.parsed:
+            raise ValueError('You need to parse the network before generating code!')
+        
+        callStack = ''
+        for node in self.ctxt.globalObjects.values():
+            callStack += node.alloc() + '\n'
+        return callStack
+    
     def getParameterSize(self) -> int:
         if not self.parsed:
             raise ValueError('You need to parse the network before getting RAM Size!')
+        
         import IPython; IPython.embed()

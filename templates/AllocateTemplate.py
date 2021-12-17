@@ -25,5 +25,6 @@
 
 from mako.template import Template
 
-referenceTemplate = "${type}* ${name} = (${type}*) malloc(sizeof(${type}) * ${size});"
+referenceLocalTemplate = "${type}* ${name} = (${type}*) malloc(sizeof(${type}) * ${size});"
 
+referenceGlobalTemplate = "${type} ${name}[${size}] = {${values}};"

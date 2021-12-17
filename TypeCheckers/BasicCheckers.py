@@ -115,8 +115,7 @@ class ReshapeChecker(NodeTypeChecker):
     def typeCheckNode(self, ctxt: NetworkContext, node: gs.ir.node.Node) -> bool:
         inputName = [_mangleVariableName(i.name) for i in node.inputs]
         inputs = [ctxt.lookup(name) for name in inputName]
-        
-        return all([node.nLevels <= 2**(self.input_type._value_) for node in inputs])
+        return all([node.nLevels <= 2**(self.input_type._value_) for node in inputs[0:1]])
         
     def typeInferOutput(self, ctxt: NetworkContext, node: gs.ir.node.Node, **kwargs) -> NetworkContext:
         newCtxt = ctxt.copy()
@@ -144,7 +143,6 @@ class ReshapeChecker(NodeTypeChecker):
                 
         return newCtxt
 
-    
 class MHSAChecker(NodeTypeChecker):
     def __init__(self, input_type: Enum, output_type: Enum):
         super().__init__()

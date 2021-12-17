@@ -26,6 +26,7 @@
 from functools import partial
 from enum import Enum
 import mako
+import onnx_graphsurgeon as gs
 
 from Parsers.BasicParsers import *
 from TypeCheckers.BasicCheckers import *
@@ -50,7 +51,6 @@ ReshapeMappers = [NodeMapper(ReshapeParser(), ReshapeChecker(type), mako.templat
 RequantShiftMappers = [NodeMapper(RequantShiftParser(), RequantShiftChecker(type, DataTypes.int8_t), mako.template.Template(RequantShiftTemplate.referenceTemplate)) for type in DataTypes]
 AddMappers = [NodeMapper(AddParser(), AddChecker(type, DataTypes.int32_t), mako.template.Template(AddTemplate.referenceTemplate)) for type in DataTypes]
 
-
 BasicMapping = {
     'Conv' : ConvLayer([Conv_int8_Mapper]),
     'iLayerNorm': iLayerNormLayer([iLayerNorm_int8_Mapper]),
@@ -63,8 +63,25 @@ BasicMapping = {
     'Add': AddLayer(AddMappers),
     'RequantShift' : RequantShiftLayer(RequantShiftMappers),
     'Reshape': ReshapeLayer(ReshapeMappers),
+    'Flatten': ReshapeLayer(ReshapeMappers),
+    'GlobalAveragePool': ReshapeLayer(ReshapeMappers),
 }
 
-BasicPlatform = DeploymentPlatform(BasicMapping, DataTypes)
+def TypeInfer(node):
+    if type(node) == gs.ir.node.Node:
+        assert len(node.outputs) == 1, "Expected node for type inference to only have ONE output!"
+        outNode = node.attrs['value']
+    elif hasattr(node, 'values'):
+        outNode = node
+    else:
+        raise ValueError("TypeInfer was given a wring type of node!")
+    
+    for _type in DataTypes:
+        if outNode.values.max() < 2**(_type._value_): #and outNode.values.min() >= -2**(_type._value_-1):
+            return _type
+        
+    raise TypeError(f'Could not infer type of node {node.name}')
+
+BasicPlatform = DeploymentPlatform(BasicMapping, DataTypes, TypeInfer)
     
 DummyMapper = NodeMapper(DummyParser(), DummyChecker(), mako.template.Template(DummyTemplate.referenceTemplate))

@@ -37,7 +37,8 @@ def scheduler(graph: gs.Graph):
 
 model = NetworkContainer(graph, BasicPlatform, scheduler)
 model.parse()
-import IPython; IPython.embed()
-print(model.generateInferenceCode())
+inferenceCode = model.generateInferenceCode()
+initializationCode = model.generateBufferInitializationCode()
+deAllocationCode = model.generateBufferDeAllocationCode()
 import IPython; IPython.embed()
 

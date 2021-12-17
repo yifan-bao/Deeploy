@@ -27,7 +27,7 @@ from mako.template import Template
 import onnx_graphsurgeon as gs
 import math
 import numpy as np
-from typing import List
+from typing import List, Callable
 import copy
 
 from templates import *
@@ -57,18 +57,15 @@ class ONNXLayer():
         return _copy
     
     # Call this, DO NOT override! -> This should assert that all variables required are in the node!
-    def parse(self, ctxt: NetworkContext) -> (NetworkContext, bool):
+    def parse(self, ctxt: NetworkContext, typeInfer: Callable) -> (NetworkContext, bool):
 
         # iterate through all possible mappings and return the first that works
         for mapper in self.maps:
             newCtxt = ctxt.copy()
-            try:
-                newCtxt, ret = mapper.parse(newCtxt, self.node)
-                if ret:
-                    self.mapper = mapper
-                    return newCtxt, True
-            except Exception as e:
-                print(e)
+            newCtxt, ret = mapper.parse(newCtxt, self.node, typeInfer)
+            if ret:
+                self.mapper = mapper
+                return newCtxt, True
             
         # If none worked, throw exception
         raise RuntimeError(f'Did not find adequate mapping for node {self.node.name}!')
