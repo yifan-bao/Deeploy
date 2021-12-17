@@ -24,40 +24,47 @@
 # limitations under the License.
 
 from functools import partial
+from enum import Enum
+import mako
 
 from Parsers.BasicParsers import *
 from TypeCheckers.BasicCheckers import *
-import onnxLayers
+from Layers.BasicLayers import *
 from templates import *
 
-GELU_int8_Mapper = lambda : NodeMapper(GELUParser, GELU_int8_Checker, iGELUTemplate.referenceTemplate)
-RequantShift_int32_Mapper = lambda : NodeMapper(RequantShiftParser, RequantShift_int32_Checker, RequantShiftTemplate.int8Template)
-RequantShift_int16_Mapper = lambda : NodeMapper(RequantShiftParser, RequantShift_int16_Checker, RequantShiftTemplate.int16Template)
-RequantShift_int8_Mapper = lambda : NodeMapper(RequantShiftParser, RequantShift_int8_Checker, RequantShiftTemplate.int32Template)
-ReshapeMapper = lambda : NodeMapper(ReshapeParser, ReshapeChecker, SkipTemplate.referenceTemplate)
-Add_int8_Mapper = lambda : NodeMapper(AddParser, Add_int8_Checker, AddTemplate.int8Template)
-Add_int16_Mapper = lambda : NodeMapper(AddParser, Add_int16_Checker, AddTemplate.int16Template)
-Add_int32_Mapper = lambda : NodeMapper(AddParser, Add_int32_Checker, AddTemplate.int32Template)
-iLayerNorm_int8_Mapper = lambda : NodeMapper(iLayerNormParser, iLayerNorm_int8_Checker, DummyTemplate.referenceTemplate)
-MatMul_int8_Mapper = lambda : NodeMapper(MatMulParser, GEMM_int8_Checker, GEMMTemplate.referenceTemplate)
-GEMM_int8_Mapper = lambda : NodeMapper(GEMMParser, GEMM_int8_Checker, GEMMTemplate.referenceTemplate)
-Conv_int8_Mapper = lambda : NodeMapper(ConvParser, Conv_int8_Checker, DummyTemplate.referenceTemplate)
-MHSA_int8_Mapper = lambda : NodeMapper(MHSAParser, MHSA_int8_Checker, MHSATemplate.referenceTemplate)
-GatherMapper = lambda : NodeMapper(GatherParser, GatherChecker, GatherTemplate.referenceTemplate)
 
-DummyMapper = lambda : NodeMapper(DummyParser, DummyChecker, DummyTemplate.referenceTemplate)
+class DataTypes(Enum):
+    int8_t = 8
+    int16_t = 16
+    int32_t = 32
+
+GELU_int8_Mapper = NodeMapper(GELUParser(), GELUChecker(DataTypes.int8_t, DataTypes.int8_t), mako.template.Template(iGELUTemplate.referenceTemplate))
+iLayerNorm_int8_Mapper = NodeMapper(iLayerNormParser(), iLayerNormChecker(DataTypes.int8_t, DataTypes.int8_t), mako.template.Template(DummyTemplate.referenceTemplate))
+MatMul_int8_Mapper = NodeMapper(MatMulParser(), GEMMChecker(DataTypes.int8_t, DataTypes.int32_t), mako.template.Template(GEMMTemplate.referenceTemplate))
+GEMM_int8_Mapper = NodeMapper(GEMMParser(), GEMMChecker(DataTypes.int8_t, DataTypes.int32_t), mako.template.Template(GEMMTemplate.referenceTemplate))
+Conv_int8_Mapper = NodeMapper(ConvParser(), ConvChecker(DataTypes.int8_t, DataTypes.int32_t), mako.template.Template(DummyTemplate.referenceTemplate))
+MHSA_int8_Mapper = NodeMapper(MHSAParser(), MHSAChecker(DataTypes.int8_t, DataTypes.int32_t), mako.template.Template(MHSATemplate.referenceTemplate))
+
+GatherMappers = [NodeMapper(GatherParser(), GatherChecker(type), mako.template.Template(GatherTemplate.referenceTemplate)) for type in DataTypes]
+ReshapeMappers = [NodeMapper(ReshapeParser(), ReshapeChecker(type), mako.template.Template(SkipTemplate.referenceTemplate)) for type in DataTypes]
+RequantShiftMappers = [NodeMapper(RequantShiftParser(), RequantShiftChecker(type, DataTypes.int8_t), mako.template.Template(RequantShiftTemplate.referenceTemplate)) for type in DataTypes]
+AddMappers = [NodeMapper(AddParser(), AddChecker(type, DataTypes.int32_t), mako.template.Template(AddTemplate.referenceTemplate)) for type in DataTypes]
+
 
 BasicMapping = {
-    'Conv' : partial(onnxLayers.ConvLayer, maps=[Conv_int8_Mapper]),
-    'RequantShift' : partial(onnxLayers.RequantShiftLayer, maps=[RequantShift_int32_Mapper, RequantShift_int16_Mapper, RequantShift_int8_Mapper]),
-    'Reshape': partial(onnxLayers.ReshapeLayer, maps=[ReshapeMapper]),
-    'iLayerNorm': partial(onnxLayers.iLayerNormLayer, maps=[iLayerNorm_int8_Mapper]),
-    'MultiHeadSelfAttention': partial(onnxLayers.MHSALayer, maps=[MHSA_int8_Mapper]),
-    'Add': partial(onnxLayers.AddLayer, maps=[Add_int8_Mapper, Add_int16_Mapper, Add_int32_Mapper]),
-    'iGELU' : partial(onnxLayers.iGELULayer, maps=[GELU_int8_Mapper]),
-    'MatMul': partial(onnxLayers.GEMMLayer, maps=[MatMul_int8_Mapper]),
-    'Gemm': partial(onnxLayers.GEMMLayer, maps=[GEMM_int8_Mapper]),
-    'Gather': partial(onnxLayers.GatherLayer, maps=[GatherMapper]),
-
-    #'Transpose': partial(onnxLayers.ReshapeLayer, maps=[DummyMapper]),
+    'Conv' : ConvLayer([Conv_int8_Mapper]),
+    'iLayerNorm': iLayerNormLayer([iLayerNorm_int8_Mapper]),
+    'MultiHeadSelfAttention': MHSALayer([MHSA_int8_Mapper]),
+    'iGELU' : iGELULayer([GELU_int8_Mapper]),
+    'MatMul': GEMMLayer([MatMul_int8_Mapper]),
+    'Gemm': GEMMLayer([GEMM_int8_Mapper]),
+    
+    'Gather': GatherLayer(GatherMappers),
+    'Add': AddLayer(AddMappers),
+    'RequantShift' : RequantShiftLayer(RequantShiftMappers),
+    'Reshape': ReshapeLayer(ReshapeMappers),
 }
+
+BasicPlatform = DeploymentPlatform(BasicMapping, DataTypes)
+    
+DummyMapper = NodeMapper(DummyParser(), DummyChecker(), mako.template.Template(DummyTemplate.referenceTemplate))

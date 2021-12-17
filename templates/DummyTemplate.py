@@ -25,6 +25,6 @@
 
 from mako.template import Template
 
-referenceTemplate = Template("void DummyOP(${data_in}, ${data_out}, ${size});")
+referenceTemplate = "void DummyOP(${data_in}, ${data_out}, ${size});"
 
 

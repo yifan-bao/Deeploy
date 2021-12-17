@@ -28,32 +28,47 @@ import onnx_graphsurgeon as gs
 import math
 import numpy as np
 from typing import List
+import copy
 
 from templates import *
-from parserTypes import NodeMapper, NetworkContext, _mangleVariableName, _mangleParameterName, NetworkBuffer, GlobalBuffer
+from parserTypes import NodeMapper, _mangleVariableName, _mangleParameterName, NetworkContext, NetworkBuffer, GlobalBuffer
 
 class ONNXLayer():
-    def __init__(self, node: gs.ir.node.Node, maps : List[NodeMapper]):
-        self.node = node
+    
+    def __init__(self, maps : List[NodeMapper]):
         self.maps = maps
-        # Assign the first mapper that works
-        #import IPython; IPython.embed()
         self.mapper = None
-        
+        self.node = None
+
+    def __call__(self, node: gs.ir.node.Node):
+        _copy = copy.deepcopy(self)
+        _copy.node = node
+        return _copy
+
+    # Does not copy the node, so every node in the graph is kept as reference
+    # Also work around the fact that NodeMappers' templates are not deepcopyable
+    def __deepcopy__(self, memo):
+        _copy = type(self)([])
+        memo[id(self)] = _copy
+        _copy.maps = copy.deepcopy(self.maps, memo)
+        _copy.mapper = copy.deepcopy(self.mapper, memo)
+        _copy.node = self.node
+
+        return _copy
+    
     # Call this, DO NOT override! -> This should assert that all variables required are in the node!
     def parse(self, ctxt: NetworkContext) -> (NetworkContext, bool):
 
         # iterate through all possible mappings and return the first that works
-        for mapping in self.maps:
+        for mapper in self.maps:
             newCtxt = ctxt.copy()
             try:
-                mapper = mapping()
                 newCtxt, ret = mapper.parse(newCtxt, self.node)
                 if ret:
                     self.mapper = mapper
                     return newCtxt, True
             except Exception as e:
-                pass
+                print(e)
             
         # If none worked, throw exception
         raise RuntimeError(f'Did not find adequate mapping for node {self.node.name}!')
@@ -74,56 +89,4 @@ class ONNXLayer():
 
         generated_code = [alloc, call, dealloc]
         return (ctxt, generated_code)
-
-class ReshapeLayer(ONNXLayer):
-    def __init__(self, node: gs.ir.node.Node, maps : List[NodeMapper]):
-        super().__init__(node, maps)
-
-    def generate(self, ctxt: NetworkContext) -> (NetworkContext, List[str]):        
-        outputs = [node for node in self.node.outputs]
-        inputs = [node for node in self.node.inputs]
-        
-        outputNames = [_mangleVariableName(node.name) for node in outputs]
-        inputNames = [_mangleVariableName(node.name) for node in inputs]
-        
-        alloc = ctxt.allocLocal(self.node.name, outputNames)
-        call = self.mapper.generate()
-        dealloc = ctxt.freeLocal(self.node.name, inputNames)
-        
-        return (ctxt, [call])
-        
-class iGELULayer(ONNXLayer):
-    def __init__(self, node: gs.ir.node.Node, maps : List[NodeMapper]):
-        super().__init__(node, maps)
-        
-class RequantShiftLayer(ONNXLayer):
-    def __init__(self, node: gs.ir.node.Node, maps : List[NodeMapper]):
-        super().__init__(node, maps)
-        
-class AddLayer(ONNXLayer):
-    def __init__(self, node: gs.ir.node.Node, maps : List[NodeMapper]):
-        super().__init__(node, maps)
-
-class GEMMLayer(ONNXLayer):
-    def __init__(self, node: gs.ir.node.Node, maps : List[NodeMapper]):
-        super().__init__(node, maps)
     
-class ConvLayer(ONNXLayer):
-    def __init__(self, node: gs.ir.node.Node, maps : List[NodeMapper]):
-        super().__init__(node, maps)
-        
-class iLayerNormLayer(ONNXLayer):
-    def __init__(self, node: gs.ir.node.Node, maps : List[NodeMapper]):
-        super().__init__(node, maps)
-
-class TransposeLayer(ONNXLayer):
-    def __init__(self, node: gs.ir.node.Node, maps : List[NodeMapper]):
-        super().__init__(node, maps)
-
-class GatherLayer(ONNXLayer):
-    def __init__(self, node: gs.ir.node.Node, maps : List[NodeMapper]):
-        super().__init__(node, maps)
-
-class MHSALayer(ONNXLayer):
-    def __init__(self, node: gs.ir.node.Node, maps : List[NodeMapper]):
-        super().__init__(node, maps)

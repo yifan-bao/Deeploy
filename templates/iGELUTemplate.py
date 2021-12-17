@@ -25,5 +25,5 @@
 
 from mako.template import Template
 
-referenceTemplate = Template("void iGELU(${data_in}, ${data_out}, ${size}, ${b}, ${log2D}, ${n_levels}, ${one}, ${totScaler});")
+referenceTemplate = "void iGELU(${data_in}, ${data_out}, ${size}, ${b}, ${log2D}, ${n_levels}, ${one}, ${totScaler});"
 

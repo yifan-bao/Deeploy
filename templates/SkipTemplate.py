@@ -25,5 +25,5 @@
 
 from mako.template import Template
 
-referenceTemplate = Template(" type* ${data_out} = ${data_in} ")
+referenceTemplate = " type* ${data_out} = ${data_in} "
 

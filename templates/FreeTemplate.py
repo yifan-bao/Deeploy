@@ -25,6 +25,5 @@
 
 from mako.template import Template
 
-referenceTemplate = Template(
-    "free(${name});"
-)
+referenceTemplate = "free(${name});"
+

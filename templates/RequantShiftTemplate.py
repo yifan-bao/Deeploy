@@ -23,10 +23,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from mako.template import Template
+referenceTemplate = "void RequantShift(${data_in}, ${data_out}, ${size}, ${log2D}, ${mul}, ${add}, ${n_levels}, ${signed});"
 
-referenceTemplate = Template("void RequantShift(${data_in}, ${data_out}, ${size}, ${log2D}, ${mul}, ${add}, ${n_levels}, ${signed});")
-
-int8Template = Template("void RequantShift_int8(${data_in}, ${data_out}, ${size}, ${log2D}, ${mul}, ${add}, ${n_levels}, ${signed});")
-int16Template = Template("void RequantShift_int16(${data_in}, ${data_out}, ${size}, ${log2D}, ${mul}, ${add}, ${n_levels}, ${signed});")
-int32Template = Template("void RequantShift_int32(${data_in}, ${data_out}, ${size}, ${log2D}, ${mul}, ${add}, ${n_levels}, ${signed});")
+int8Template = "void RequantShift_int8(${data_in}, ${data_out}, ${size}, ${log2D}, ${mul}, ${add}, ${n_levels}, ${signed});"
+int16Template = "void RequantShift_int16(${data_in}, ${data_out}, ${size}, ${log2D}, ${mul}, ${add}, ${n_levels}, ${signed});"
+int32Template = "void RequantShift_int32(${data_in}, ${data_out}, ${size}, ${log2D}, ${mul}, ${add}, ${n_levels}, ${signed});"

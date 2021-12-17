@@ -27,5 +27,5 @@
 
 from mako.template import Template
 
-referenceTemplate = Template("void MHSA(${data_out}, ${q}, ${k}, ${v}, ${wq_weight}, ${wq_bias}, ${wk_weight}, ${wk_bias}, ${wv_weight}, ${wv_bias}, ${wo_weight}, ${wo_bias});")
+referenceTemplate = "void MHSA(${data_out}, ${q}, ${k}, ${v}, ${wq_weight}, ${wq_bias}, ${wk_weight}, ${wk_bias}, ${wv_weight}, ${wv_bias}, ${wo_weight}, ${wo_bias});"
 

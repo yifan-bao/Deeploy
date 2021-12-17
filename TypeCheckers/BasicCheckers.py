@@ -25,11 +25,14 @@
 
 from parserTypes import *
 from parserTypes import _mangleVariableName, _mangleParameterName
+from enum import Enum
 
-class Add_int8_Checker(NodeTypeChecker):
-    def __init__(self):
+class AddChecker(NodeTypeChecker):
+    def __init__(self, input_type: Enum, output_type: Enum):
         super().__init__()
-
+        self.input_type = input_type
+        self.output_type = output_type
+        
     # Checks that input is at most a 31-Bit value (avoid overflow)
     def typeCheckNode(self, ctxt: NetworkContext, node: gs.ir.node.Node) -> bool:
         inputName = [_mangleVariableName(i.name) for i in node.inputs]
@@ -37,7 +40,7 @@ class Add_int8_Checker(NodeTypeChecker):
 
         #SCHEREMO: Use this once global buffers get typed correctly
         #return all([node.nLevels <= 2**31 for node in inputs]) and all([node._type == inputs[0]._type for node in inputs])
-        return all([node.nLevels <= 2**8 for node in inputs]) 
+        return all([node.nLevels <= 2**(self.input_type._value_) for node in inputs]) 
         
     def typeInferOutput(self, ctxt: NetworkContext, node: gs.ir.node.Node, **kwargs) -> NetworkContext:
         newCtxt = ctxt.copy()
@@ -56,104 +59,27 @@ class Add_int8_Checker(NodeTypeChecker):
                     shape = node.shape,
                     nLevels = nLevels
                 )
-                nb._type = 'int32_t'
+                nb._type = self.output_type
                 newCtxt.add(nb, 'local')
             else:
                 nb = newCtxt.globalObjects[name]
                 assert nb.nLevels >= nLevels, f'Type mismatch at output node of {node.name}'
-                newCtxt.globalObjects[name]._type = 'int32_t'
-                
-        return newCtxt
-
-class Add_int16_Checker(NodeTypeChecker):
-    def __init__(self):
-        super().__init__()
-
-    # Checks that input is at most a 31-Bit value (avoid overflow)
-    def typeCheckNode(self, ctxt: NetworkContext, node: gs.ir.node.Node) -> bool:
-        inputName = [_mangleVariableName(i.name) for i in node.inputs]
-        inputs = [ctxt.lookup(name) for name in inputName]
-
-        #SCHEREMO: Use this once global buffers get typed correctly
-        #return all([node.nLevels <= 2**31 for node in inputs]) and all([node._type == inputs[0]._type for node in inputs])
-        return all([node.nLevels <= 2**16 for node in inputs]) 
-        
-    def typeInferOutput(self, ctxt: NetworkContext, node: gs.ir.node.Node, **kwargs) -> NetworkContext:
-        newCtxt = ctxt.copy()
-
-        inputName = [_mangleVariableName(i.name) for i in node.inputs]
-        inputs = [newCtxt.lookup(name) for name in inputName]        
-        
-        nLevels = inputs[0].nLevels + inputs[1].nLevels
-        
-        outputNodes = node.outputs
-        outputNames = [_mangleVariableName(node.name) for node in outputNodes]
-        for node, name in zip(outputNodes, outputNames):
-            if not newCtxt.is_global(name):
-                nb = NetworkBuffer(
-                    name = name,
-                    shape = node.shape,
-                    nLevels = nLevels
-                )
-                nb._type = 'int32_t'
-                newCtxt.add(nb, 'local')
-            else:
-                nb = newCtxt.globalObjects[name]
-                assert nb.nLevels >= nLevels, f'Type mismatch at output node of {node.name}'
-                newCtxt.globalObjects[name]._type = 'int32_t'
-                
-        return newCtxt
-
-class Add_int32_Checker(NodeTypeChecker):
-    def __init__(self):
-        super().__init__()
-
-    # Checks that input is at most a 31-Bit value (avoid overflow)
-    def typeCheckNode(self, ctxt: NetworkContext, node: gs.ir.node.Node) -> bool:
-        inputName = [_mangleVariableName(i.name) for i in node.inputs]
-        inputs = [ctxt.lookup(name) for name in inputName]
-
-        #SCHEREMO: Use this once global buffers get typed correctly
-        #return all([node.nLevels <= 2**31 for node in inputs]) and all([node._type == inputs[0]._type for node in inputs])
-        return all([node.nLevels <= 2**32 for node in inputs]) 
-        
-    def typeInferOutput(self, ctxt: NetworkContext, node: gs.ir.node.Node, **kwargs) -> NetworkContext:
-        newCtxt = ctxt.copy()
-
-        inputName = [_mangleVariableName(i.name) for i in node.inputs]
-        inputs = [newCtxt.lookup(name) for name in inputName]        
-        
-        nLevels = inputs[0].nLevels + inputs[1].nLevels
-        
-        outputNodes = node.outputs
-        outputNames = [_mangleVariableName(node.name) for node in outputNodes]
-        for node, name in zip(outputNodes, outputNames):
-            if not newCtxt.is_global(name):
-                nb = NetworkBuffer(
-                    name = name,
-                    shape = node.shape,
-                    nLevels = nLevels
-                )
-                nb._type = 'int32_t'
-                newCtxt.add(nb, 'local')
-            else:
-                nb = newCtxt.globalObjects[name]
-                assert nb.nLevels >= nLevels, f'Type mismatch at output node of {node.name}'
-                newCtxt.globalObjects[name]._type = 'int32_t'
+                newCtxt.globalObjects[name]._type = self.output_type
                 
         return newCtxt
 
 class GatherChecker(NodeTypeChecker):
-    def __init__(self):
+    def __init__(self, input_type: Enum):
         super().__init__()
+        self.input_type = input_type
 
     # Checks that input is at most an 32-Bit value
     def typeCheckNode(self, ctxt: NetworkContext, node: gs.ir.node.Node) -> bool:
         inputName = [_mangleVariableName(i.name) for i in node.inputs]
         inputs = [ctxt.lookup(name) for name in inputName]
         
-        return all([node.nLevels <= 2**32 for node in inputs])
-        
+        return all([node.nLevels <= 2**(self.input_type._value_) for node in inputs])
+    
     def typeInferOutput(self, ctxt: NetworkContext, node: gs.ir.node.Node, **kwargs) -> NetworkContext:
         newCtxt = ctxt.copy()
 
@@ -171,25 +97,26 @@ class GatherChecker(NodeTypeChecker):
                     shape = node.shape,
                     nLevels = nLevels
                 )
-                nb._type = inputs[0]._type
+                nb._type = self.input_type
                 newCtxt.add(nb, 'local')
             else:
                 nb = newCtxt.lookup(name)
                 assert nb.nLevels >= nLevels, f'Type mismatch at output node of {node.name}'
-                newCtxt.globalObjects[name]._type = inputs[0]._type
+                newCtxt.globalObjects[name]._type = self.input_type
                 
         return newCtxt
 
 class ReshapeChecker(NodeTypeChecker):
-    def __init__(self):
+    def __init__(self, input_type: Enum):
         super().__init__()
+        self.input_type = input_type
 
     # Checks that input is at most an 32-Bit value
     def typeCheckNode(self, ctxt: NetworkContext, node: gs.ir.node.Node) -> bool:
         inputName = [_mangleVariableName(i.name) for i in node.inputs]
         inputs = [ctxt.lookup(name) for name in inputName]
         
-        return all([node.nLevels <= 2**32 for node in inputs])
+        return all([node.nLevels <= 2**(self.input_type._value_) for node in inputs])
         
     def typeInferOutput(self, ctxt: NetworkContext, node: gs.ir.node.Node, **kwargs) -> NetworkContext:
         newCtxt = ctxt.copy()
@@ -208,27 +135,29 @@ class ReshapeChecker(NodeTypeChecker):
                     shape = node.shape,
                     nLevels = nLevels
                 )
-                nb._type = inputs[0]._type
+                nb._type = self.input_type
                 newCtxt.add(nb, 'local')
             else:
                 nb = newCtxt.lookup(name)
                 assert nb.nLevels >= nLevels, f'Type mismatch at output node of {node.name}'
-                newCtxt.globalObjects[name]._type = inputs[0]._type
+                newCtxt.globalObjects[name]._type = self.input_type
                 
         return newCtxt
 
     
-class MHSA_int8_Checker(NodeTypeChecker):
-    def __init__(self):
+class MHSAChecker(NodeTypeChecker):
+    def __init__(self, input_type: Enum, output_type: Enum):
         super().__init__()
+        self.input_type = input_type
+        self.output_type = output_type
 
     # Checks that input is at most an 8-Bit value
     def typeCheckNode(self, ctxt: NetworkContext, node: gs.ir.node.Node) -> bool:
         inputName = [_mangleVariableName(i.name) for i in node.inputs]
         inputs = [ctxt.lookup(name) for name in inputName]
         
-        return all([node.nLevels <= 2**8 for node in inputs[0:2]])
-        
+        return all([node.nLevels <= 2**(self.input_type._value_) for node in inputs[0:2]])
+    
     def typeInferOutput(self, ctxt: NetworkContext, node: gs.ir.node.Node, **kwargs) -> NetworkContext:
         newCtxt = ctxt.copy()
 
@@ -248,25 +177,27 @@ class MHSA_int8_Checker(NodeTypeChecker):
                     shape = node.shape,
                     nLevels = nLevels
                 )
-                nb._type = 'int32_t'
+                nb._type = self.output_type
                 newCtxt.add(nb, 'local')
             else:
                 nb = newCtxt.lookup(name)
                 assert nb.nLevels >= nLevels, f'Type mismatch at output node of {node.name}'
-                newCtxt.globalObjects[name]._type = 'int32_t'
+                newCtxt.globalObjects[name]._type = self.output_type
                 
         return newCtxt
 
-class GEMM_int8_Checker(NodeTypeChecker):
-    def __init__(self):
+class GEMMChecker(NodeTypeChecker):
+    def __init__(self, input_type: Enum, output_type: Enum):
         super().__init__()
+        self.input_type = input_type
+        self.output_type = output_type
 
     # Checks that input is at most an 8-Bit value
     def typeCheckNode(self, ctxt: NetworkContext, node: gs.ir.node.Node) -> bool:
         inputName = [_mangleVariableName(i.name) for i in node.inputs]
         inputs = [ctxt.lookup(name) for name in inputName]
-
-        return all([node.nLevels <= 2**8 for node in inputs[0:1]]) and all([node._type == 'int8_t' for node in inputs[0:1]])
+        
+        return all([node.nLevels <= 2**(self.input_type._value_) for node in inputs[0:1]]) and all([node._type == self.input_type for node in inputs[0:1]])
         
     def typeInferOutput(self, ctxt: NetworkContext, node: gs.ir.node.Node, **kwargs) -> NetworkContext:
         newCtxt = ctxt.copy()
@@ -277,7 +208,7 @@ class GEMM_int8_Checker(NodeTypeChecker):
         transA = kwargs['transA']
         transB = kwargs['transB']
         
-        nLevels = 2**16 * inputs[0].shape[-1 -transA]
+        nLevels = 2**((self.input_type._value_)*2) * inputs[0].shape[-1 -transA]
         
         outputNodes = node.outputs
         outputNames = [_mangleVariableName(node.name) for node in outputNodes]
@@ -288,26 +219,64 @@ class GEMM_int8_Checker(NodeTypeChecker):
                     shape = node.shape,
                     nLevels = nLevels
                 )
-                nb._type = 'int32_t'
+                nb._type = self.output_type
                 newCtxt.add(nb, 'local')
             else:
                 nb = newCtxt.lookup(name)
                 assert nb.nLevels >= nLevels, f'Type mismatch at output node of {node.name}'
-                newCtxt.globalObjects[name]._type = 'int32_t'
+                newCtxt.globalObjects[name]._type = self.output_type
                 
         return newCtxt
 
 
-class iLayerNorm_int8_Checker(NodeTypeChecker):
-    def __init__(self):
+class iLayerNormChecker(NodeTypeChecker):
+    def __init__(self, input_type: Enum, output_type: Enum):
         super().__init__()
+        self.input_type = input_type
+        self.output_type = output_type
 
     # Checks that input is at most an 8-Bit value
     def typeCheckNode(self, ctxt: NetworkContext, node: gs.ir.node.Node) -> bool:
         inputName = [_mangleVariableName(i.name) for i in node.inputs]
         inputs = [ctxt.lookup(name) for name in inputName]
         
-        return inputs[0].nLevels <= 2**8 and inputs[0]._type == 'int8_t'
+        return all([node.nLevels <= 2**(self.input_type._value_) for node in inputs[0:1]]) and inputs[0]._type == self.input_type
+                
+    def typeInferOutput(self, ctxt: NetworkContext, node: gs.ir.node.Node, **kwargs) -> NetworkContext:
+        newCtxt = ctxt.copy()
+        
+        nLevels = 2**8
+        
+        outputNodes = node.outputs
+        outputNames = [_mangleVariableName(node.name) for node in outputNodes]
+        for node, name in zip(outputNodes, outputNames):
+            if not newCtxt.is_global(name):
+                nb = NetworkBuffer(
+                    name = name,
+                    shape = node.shape,
+                    nLevels = nLevels
+                )
+                nb._type = self.output_type
+                newCtxt.add(nb, 'local')
+            else:
+                nb = newCtxt.lookup(name)
+                assert nb.nLevels >= nLevels, f'Type mismatch at output node of {node.name}'
+                newCtxt.globalObjects[name]._type = self.output_type
+                
+        return newCtxt
+
+class GELUChecker(NodeTypeChecker):
+    def __init__(self, input_type: Enum, output_type: Enum):
+        super().__init__()
+        self.input_type = input_type
+        self.output_type = output_type
+
+    # Checks that input is at most an 8-Bit value
+    def typeCheckNode(self, ctxt: NetworkContext, node: gs.ir.node.Node) -> bool:
+        inputName = [_mangleVariableName(i.name) for i in node.inputs]
+        inputs = [ctxt.lookup(name) for name in inputName]
+
+        return all([node.nLevels <= 2**(self.input_type._value_) for node in inputs[0:1]]) and inputs[0]._type == self.input_type
         
     def typeInferOutput(self, ctxt: NetworkContext, node: gs.ir.node.Node, **kwargs) -> NetworkContext:
         newCtxt = ctxt.copy()
@@ -323,60 +292,27 @@ class iLayerNorm_int8_Checker(NodeTypeChecker):
                     shape = node.shape,
                     nLevels = nLevels
                 )
-                nb._type = 'int8_t'
+                nb._type = self.output_type
                 newCtxt.add(nb, 'local')
             else:
                 nb = newCtxt.lookup(name)
                 assert nb.nLevels >= nLevels, f'Type mismatch at output node of {node.name}'
-                newCtxt.globalObjects[name]._type = 'int8_t'
-                
-        return newCtxt
-
-class GELU_int8_Checker(NodeTypeChecker):
-    def __init__(self):
-        super().__init__()
-
-    # Checks that input is at most an 8-Bit value
-    def typeCheckNode(self, ctxt: NetworkContext, node: gs.ir.node.Node) -> bool:
-        inputName = [_mangleVariableName(i.name) for i in node.inputs]
-        inputs = [ctxt.lookup(name) for name in inputName]
-        
-        return all([node.nLevels <= 2**8 for node in inputs]) and inputs[0]._type == 'int8_t'
-        
-    def typeInferOutput(self, ctxt: NetworkContext, node: gs.ir.node.Node, **kwargs) -> NetworkContext:
-        newCtxt = ctxt.copy()
-        
-        nLevels = 2**8
-        
-        outputNodes = node.outputs
-        outputNames = [_mangleVariableName(node.name) for node in outputNodes]
-        for node, name in zip(outputNodes, outputNames):
-            if not newCtxt.is_global(name):
-                nb = NetworkBuffer(
-                    name = name,
-                    shape = node.shape,
-                    nLevels = nLevels
-                )
-                nb._type = 'int8_t'
-                newCtxt.add(nb, 'local')
-            else:
-                nb = newCtxt.lookup(name)
-                assert nb.nLevels >= nLevels, f'Type mismatch at output node of {node.name}'
-                newCtxt.globalObjects[name]._type = 'int8_t'
+                newCtxt.globalObjects[name]._type = self.output_type
                 
         return newCtxt
 
 
-class Conv_int8_Checker(NodeTypeChecker):
-    def __init__(self):
+class ConvChecker(NodeTypeChecker):
+    def __init__(self, input_type: Enum, output_type: Enum):
         super().__init__()
+        self.input_type = input_type
+        self.output_type = output_type
 
-    # Checks that input is at most an 8-Bit value
     def typeCheckNode(self, ctxt: NetworkContext, node: gs.ir.node.Node) -> bool:
         inputName = [_mangleVariableName(i.name) for i in node.inputs]
         inputs = [ctxt.lookup(name) for name in inputName]
         
-        return all([node.nLevels <= 2**8 for node in inputs]) and all([node._type == 'int8_t' for node in inputs])
+        return all([node.nLevels <= 2**(self.input_type._value_) for node in inputs[0:1]]) and all([node._type == self.input_type for node in inputs[0:1]])
         
     def typeInferOutput(self, ctxt: NetworkContext, node: gs.ir.node.Node, **kwargs) -> NetworkContext:
         newCtxt = ctxt.copy()
@@ -395,27 +331,28 @@ class Conv_int8_Checker(NodeTypeChecker):
                     shape = node.shape,
                     nLevels = nLevels
                 )
-                nb._type = 'int32_t'
+                nb._type = self.output_type
                 newCtxt.add(nb, 'local')
             else:
                 nb = newCtxt.lookup(name)
                 assert nb.nLevels >= nLevels, f'Type mismatch at output node of {node.name}'
-                newCtxt.globalObjects[name]._type = 'int32_t'
+                newCtxt.globalObjects[name]._type = self.output_type
                 
         return newCtxt
 
 
-class RequantShift_int32_Checker(NodeTypeChecker):
-    def __init__(self):
+class RequantShiftChecker(NodeTypeChecker):
+    def __init__(self, input_type: Enum, output_type: Enum):
         super().__init__()
+        self.input_type = input_type
+        self.output_type = output_type
 
     # Checks that input is at most a 32-Bit value
     def typeCheckNode(self, ctxt: NetworkContext, node: gs.ir.node.Node) -> bool:
         inputName = [_mangleVariableName(i.name) for i in node.inputs]
         inputs = [ctxt.lookup(name) for name in inputName]
-        
-        if inputs[0].nLevels <= 2**32 and inputs[0]._type == 'int32_t':
-            return True
+
+        return all([node.nLevels <= 2**(self.input_type._value_) for node in inputs[0:1]]) and inputs[0]._type == self.input_type
         
     def typeInferOutput(self, ctxt: NetworkContext, node: gs.ir.node.Node, **kwargs) -> NetworkContext:
         newCtxt = ctxt.copy()
@@ -432,87 +369,14 @@ class RequantShift_int32_Checker(NodeTypeChecker):
                     shape = node.shape,
                     nLevels = nLevels
                 )
-                nb._type = 'int8_t'
+                nb._type = self.output_type
                 newCtxt.add(nb, 'local')
             else:
                 nb = newCtxt.lookup(name)
                 assert nb.nLevels >= nLevels, f'Type mismatch at output node of {node.name}'
-                newCtxt.globalObjects[name]._type = 'int8_t'
+                newCtxt.globalObjects[name]._type = self.output_type
                 
         return newCtxt
-
-class RequantShift_int8_Checker(NodeTypeChecker):
-    def __init__(self):
-        super().__init__()
-
-    # Checks that input is at most a 32-Bit value
-    def typeCheckNode(self, ctxt: NetworkContext, node: gs.ir.node.Node) -> bool:
-        inputName = [_mangleVariableName(i.name) for i in node.inputs]
-        inputs = [ctxt.lookup(name) for name in inputName]
-        
-        if inputs[0].nLevels <= 2**8 and inputs[0]._type == 'int8_t':
-            return True
-        
-    def typeInferOutput(self, ctxt: NetworkContext, node: gs.ir.node.Node, **kwargs) -> NetworkContext:
-        newCtxt = ctxt.copy()
-
-        # Dummy value for nLevels
-        nLevels = 256
-        
-        outputNodes = node.outputs
-        outputNames = [_mangleVariableName(node.name) for node in outputNodes]
-        for node, name in zip(outputNodes, outputNames):
-            if not newCtxt.is_global(name):
-                nb = NetworkBuffer(
-                    name = name,
-                    shape = node.shape,
-                    nLevels = nLevels
-                )
-                nb._type = 'int8_t'
-                newCtxt.add(nb, 'local')
-            else:
-                nb = newCtxt.lookup(name)
-                assert nb.nLevels >= nLevels, f'Type mismatch at output node of {node.name}'
-                newCtxt.globalObjects[name]._type = 'int8_t'
-                
-        return newCtxt
-
-class RequantShift_int16_Checker(NodeTypeChecker):
-    def __init__(self):
-        super().__init__()
-
-    # Checks that input is at most a 32-Bit value
-    def typeCheckNode(self, ctxt: NetworkContext, node: gs.ir.node.Node) -> bool:
-        inputName = [_mangleVariableName(i.name) for i in node.inputs]
-        inputs = [ctxt.lookup(name) for name in inputName]
-        
-        if inputs[0].nLevels <= 2**16 and inputs[0]._type == 'int16_t':
-            return True
-        
-    def typeInferOutput(self, ctxt: NetworkContext, node: gs.ir.node.Node, **kwargs) -> NetworkContext:
-        newCtxt = ctxt.copy()
-
-        # Dummy value for nLevels
-        nLevels = 256
-        
-        outputNodes = node.outputs
-        outputNames = [_mangleVariableName(node.name) for node in outputNodes]
-        for node, name in zip(outputNodes, outputNames):
-            if not newCtxt.is_global(name):
-                nb = NetworkBuffer(
-                    name = name,
-                    shape = node.shape,
-                    nLevels = nLevels
-                )
-                nb._type = 'int8_t'
-                newCtxt.add(nb, 'local')
-            else:
-                nb = newCtxt.lookup(name)
-                assert nb.nLevels >= nLevels, f'Type mismatch at output node of {node.name}'
-                newCtxt.globalObjects[name]._type = 'int8_t'
-                
-        return newCtxt
-
     
 class DummyChecker(NodeTypeChecker):
     def __init__(self):

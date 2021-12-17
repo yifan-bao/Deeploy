@@ -26,11 +26,12 @@
 import copy
 import mako
 import numpy as np
-from typing import List, Callable, Iterable, Union, Tuple
+from typing import List, Callable, Iterable, Union, Tuple, Dict
 import onnx
 import onnx_graphsurgeon as gs
 import re
 import math
+from enum import Enum
 
 from templates import AllocateTemplate, FreeTemplate
 
@@ -39,6 +40,11 @@ def _mangleVariableName(name:str) -> str:
 
 def _mangleParameterName(nodeName:str, parameterName:str) -> str:
     return '_DumpO_PARAMETER__' + re.sub('.','_',nodeName) + '_' + re.sub('.','_',parameterName)
+
+class DeploymentPlatform():
+    def __init__(self, Mapping: Dict[str, object], DataTypes: Enum):
+        self.Mapping = Mapping
+        self.DataTypes = DataTypes
 
 class NetworkBuffer():
     def __init__(self, name: str, shape, nLevels: int):
@@ -54,14 +60,13 @@ class NetworkBuffer():
 
     # Allocation code. Choose your Template, might want to override aswell!
     def alloc(self) -> str:
-        # SCHEREMO: currently signed, but can be infered from n_levels and signed flags
-        
-        return AllocateTemplate.referenceTemplate.render(type = self._type, name = self.name, size = np.prod(self.shape))
+        # SCHEREMO: currently signed, but can be infered from n_levels and signed flags    
+        return mako.template.Template(AllocateTemplate.referenceTemplate).render(type = self._type._name_, name = self.name, size = np.prod(self.shape))
     
-    # Deallocation code. Choose your Template! 
+    # Deallocation code. Choose your Template!
     def dealloc(self) -> str:
-        return FreeTemplate.referenceTemplate.render(name = self.name)
-
+        return mako.template.Template(FreeTemplate.referenceTemplate).render(name = self.name)
+    
     def fromNode(node: gs.ir.node.Node, nLevels:int):
         return(
             NetworkBuffer(
@@ -75,7 +80,7 @@ class GlobalBuffer(NetworkBuffer):
     def __init__(self, name, shape, nLevels, values):
         super().__init__(name,shape,nLevels)
         self.values = values
-
+        
     def fromNetworkBuffer(buffer, values):
         gb = GlobalBuffer(name = buffer.name,
                           nLevels = buffer.nLevels,
@@ -179,6 +184,7 @@ class NetworkContext():
     def copy(self):
         return copy.deepcopy(self)
 
+# TYPE CHECKERS ARE ASSUMED TO BE STATELESS!
 class NodeTypeChecker():
     def __init__(self):
         pass
@@ -253,15 +259,26 @@ class NodeParser():
 # Don't change anything here!
 class NodeMapper():
     def __init__(self, parser: NodeParser, typeChecker: NodeTypeChecker, template: mako.template.Template):
-        self.parser = parser()
-        self.typeChecker = typeChecker()
+        self.parser = parser
+        self.typeChecker = typeChecker
         self.template = template
         self.parserDict = {}
 
+    # Wrokaround because mako templates are not deepcopyable
+    def __deepcopy__(self, memo):
+        _copy = type(self)(None, None, None)
+        memo[id(self)] = _copy
+        _copy.parser = copy.deepcopy(self.parser, memo)
+        _copy.typeChecker = copy.deepcopy(self.typeChecker, memo)
+        _copy.parserDict = copy.deepcopy(self.parserDict, memo)
+        _copy.template = type(self.template)(self.template._source)
+
+        return _copy
+    
     def parse(self, ctxt: NetworkContext, node: gs.ir.node.Node) -> (NetworkContext, bool):
         hoistedCtxt, parseable = self.parser.parse(ctxt, node)
         if parseable:
-            if(self.typeChecker.typeCheckNode(hoistedCtxt,node)):
+            if( self.typeChecker.typeCheckNode(ctxt = hoistedCtxt, node = node)):
                 typedCtxt = self.typeChecker.typeInferOutput(hoistedCtxt, node, **self.parser.parserDict)
                 return self.parser.nodeCtxtParse(typedCtxt, node)
             else:
@@ -273,14 +290,14 @@ class NodeMapper():
         return [self.template.render(**self.parser.parserDict)]
     
 class NetworkContainer():
-    def __init__(self, graph: gs.Graph, layerOpMapping, scheduler: Callable = lambda x: x):
+    def __init__(self, graph: gs.Graph, platform: DeploymentPlatform, scheduler: Callable = lambda x: x):
         self.graph = graph
         self.scheduler = scheduler
         self.ctxt = NetworkContext()
         self.layerBinding = []
         self.parsed = False
-        self.layerOpMapping = layerOpMapping
-        self.layerOpMapping['Constant'] = lambda x: self.ctxt.hoistConstant(x)
+        self.Platform = platform
+        self.Platform.Mapping['Constant'] = lambda x: self.ctxt.hoistConstant(x)
 
     def _createIOBindings(self, ctxt: NetworkContext, graph):
 
@@ -292,7 +309,7 @@ class NetworkContainer():
             # SCHEREMO: Should be parsed from graph
             data_type = 2**8
             nb = NetworkBuffer(data_name, data_size, data_type)
-            nb._type = 'int8_t'
+            nb._type = self.Platform.DataTypes.int8_t
             ctxt.add(nb, 'global')
 
         for node in graph.outputs:
@@ -301,7 +318,7 @@ class NetworkContainer():
             # SCHEREMO: Should be parsed from graph
             data_type = 2**32
             nb = NetworkBuffer(data_name, data_size, data_type)
-            nb._type = 'int32_t'
+            nb._type = self.Platform.DataTypes.int32_t
             ctxt.add(nb, 'global')
 
         return ctxt
@@ -317,8 +334,8 @@ class NetworkContainer():
         for i in self.scheduler(self.graph):
             
             # Create binding
-            assert i.op in list(self.layerOpMapping.keys()), "Layer not in layer dict!"
-            layer = self.layerOpMapping[i.op](i)
+            assert i.op in list(self.Platform.Mapping.keys()), "Layer not in layer dict!"
+            layer = self.Platform.Mapping[i.op](i)
             if layer is not None:
                 self.layerBinding += [(layer.node.name, layer)]
 
@@ -350,3 +367,4 @@ class NetworkContainer():
     def getParameterSize(self) -> int:
         if not self.parsed:
             raise ValueError('You need to parse the network before getting RAM Size!')
+        import IPython; IPython.embed()

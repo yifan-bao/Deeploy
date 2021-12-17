@@ -25,8 +25,8 @@
 
 from mako.template import Template
 
-referenceTemplate = Template("void Add(${data_in_1}, ${data_in_2}, ${data_out}, ${size});")
+referenceTemplate = "void Add(${data_in_1}, ${data_in_2}, ${data_out}, ${size});"
 
-int8Template = Template("void Add_int8(${data_in_1}, ${data_in_2}, ${data_out}, ${size});")
-int16Template = Template("void Add_int16(${data_in_1}, ${data_in_2}, ${data_out}, ${size});")
-int32Template = Template("void Add_int32(${data_in_1}, ${data_in_2}, ${data_out}, ${size});")
+int8Template = "void Add_int8(${data_in_1}, ${data_in_2}, ${data_out}, ${size});"
+int16Template = "void Add_int16(${data_in_1}, ${data_in_2}, ${data_out}, ${size});"
+int32Template = "void Add_int32(${data_in_1}, ${data_in_2}, ${data_out}, ${size});"

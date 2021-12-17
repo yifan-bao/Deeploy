@@ -25,5 +25,5 @@
 
 from mako.template import Template
 
-referenceTemplate = Template(" type* ${data} = ${shape} ")
+referenceTemplate = " type* ${data} = ${shape} "
 

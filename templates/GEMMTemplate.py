@@ -25,5 +25,5 @@
 
 from mako.template import Template
 
-referenceTemplate = Template("void GEMM(${data_out}, ${A}, ${B}, ${C}, ${alpha}, ${beta}, ${transA}, ${transB});")
+referenceTemplate = "void GEMM(${data_out}, ${A}, ${B}, ${C}, ${alpha}, ${beta}, ${transA}, ${transB});"
 

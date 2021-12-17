@@ -25,6 +25,5 @@
 
 from mako.template import Template
 
-referenceTemplate = Template(
-    "${type}* ${name} = (${type}*) malloc(sizeof(${type}) * ${size});"
-)
+referenceTemplate = "${type}* ${name} = (${type}*) malloc(sizeof(${type}) * ${size});"
+

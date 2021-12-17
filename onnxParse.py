@@ -35,7 +35,7 @@ graph = gs.import_onnx(model)
 def scheduler(graph: gs.Graph):
     return graph.nodes
 
-model = NetworkContainer(graph, BasicMapping, scheduler)
+model = NetworkContainer(graph, BasicPlatform, scheduler)
 model.parse()
 import IPython; IPython.embed()
 print(model.generateInferenceCode())

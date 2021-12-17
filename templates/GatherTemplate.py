@@ -25,5 +25,5 @@
 
 from mako.template import Template
 
-referenceTemplate = Template("void Gather(${data_out}, ${data_in}, ${size}, ${indices}, ${axis});")
+referenceTemplate = "void Gather(${data_out}, ${data_in}, ${size}, ${indices}, ${axis});"
 
