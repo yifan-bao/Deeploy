@@ -29,7 +29,6 @@ from typing import List
 
 from DumpOTypes import *
 from DumpOManglers import *
-from onnxLayers import ONNXLayer
 
 class ReshapeLayer(ONNXLayer):
     def __init__(self, maps : List[NodeMapper]):

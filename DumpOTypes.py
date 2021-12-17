@@ -35,12 +35,6 @@ from enum import Enum
 from DumpOManglers import *
 from Templates.BasicTemplates import AllocateTemplate, FreeTemplate
 
-class DeploymentPlatform():
-    def __init__(self, Mapping: Dict[str, object], DataTypes: Enum, TypeInfer):
-        self.Mapping = Mapping
-        self.DataTypes = DataTypes
-        self.TypeInfer = TypeInfer
-
 class NetworkBuffer():
     def __init__(self, name: str, shape, nLevels: int):
         self.name = name
@@ -141,15 +135,10 @@ class NetworkContext():
             name = mangleVariableName(node.name)
         
         # SCHEREMO: This is currently heuristic, but should be annotated in ONNX
-        try:
-            localBuffer = NetworkBuffer.fromNode(node, 2**(type._value_))
-            globalBuffer = GlobalBuffer.fromNetworkBuffer(localBuffer, values=node.values)
-            globalBuffer._type = type
-            globalBuffer.name = name
-        except Exception as e:
-            print(e)
-            import IPython; IPython.embed()
-
+        localBuffer = NetworkBuffer.fromNode(node, 2**(type._value_))
+        globalBuffer = GlobalBuffer.fromNetworkBuffer(localBuffer, values=node.values)
+        globalBuffer._type = type
+        globalBuffer.name = name
 
         self.add(globalBuffer, 'global')
         return None
@@ -201,7 +190,7 @@ class NetworkContext():
             
     def copy(self):
         return copy.deepcopy(self)
-
+    
 # TYPE CHECKERS ARE ASSUMED TO BE STATELESS!
 class NodeTypeChecker():
     def __init__(self):
@@ -288,6 +277,66 @@ class NodeMapper():
     
     def generate(self) -> List[str]:
         return [self.template.render(**self.parser.parserDict)]
+
+class ONNXLayer():
+    
+    def __init__(self, maps : List[NodeMapper]):
+        self.maps = maps
+        self.mapper = None
+        self.node = None
+
+    def __call__(self, node: gs.ir.node.Node):
+        _copy = copy.deepcopy(self)
+        _copy.node = node
+        return _copy
+
+    # Does not copy the node, so every node in the graph is kept as reference
+    # Also work around the fact that NodeMappers' templates are not deepcopyable
+    def __deepcopy__(self, memo):
+        _copy = type(self)([])
+        memo[id(self)] = _copy
+        _copy.maps = copy.deepcopy(self.maps, memo)
+        _copy.mapper = copy.deepcopy(self.mapper, memo)
+        _copy.node = self.node
+
+        return _copy
+    
+    # Call this, DO NOT override! -> This should assert that all variables required are in the node!
+    def parse(self, ctxt: NetworkContext, typeInfer: Callable) -> (NetworkContext, bool):
+
+        # iterate through all possible mappings and return the first that works
+        for mapper in self.maps:
+            newCtxt = ctxt.copy()
+            newCtxt, ret = mapper.parse(newCtxt, self.node, typeInfer)
+            if ret:
+                self.mapper = mapper
+                return newCtxt, True
+            
+        # If none worked, throw exception
+        raise RuntimeError(f'Did not find adequate mapping for node {self.node.name}!')
+        
+    # Do not override unless you know what you're doin - this generates code + buffer allocation / de-allocation
+    # parseIO has to be called in advance!
+    def generate(self, ctxt: NetworkContext) -> (NetworkContext, List[str]):
+
+        outputs = [node for node in self.node.outputs]
+        inputs = [node for node in self.node.inputs]
+
+        outputNames = [mangleVariableName(node.name) for node in outputs]
+        inputNames = [mangleVariableName(node.name) for node in inputs]
+        
+        alloc = ctxt.allocLocal(self.node.name, outputNames)
+        call = self.mapper.generate()
+        dealloc = ctxt.freeLocal(self.node.name, inputNames)
+
+        generated_code = [alloc, call, dealloc]
+        return (ctxt, generated_code)
+
+class DeploymentPlatform():
+    def __init__(self, Mapping: Dict[str, ONNXLayer], DataTypes: Enum, TypeInfer: Callable):
+        self.Mapping = Mapping
+        self.DataTypes = DataTypes
+        self.TypeInfer = TypeInfer
     
 class NetworkContainer():
     def __init__(self, graph: gs.Graph, platform: DeploymentPlatform, scheduler: Callable = lambda x: x):
