@@ -24,6 +24,7 @@
 # limitations under the License.
 
 import copy
+import mako
 from mako.template import Template
 import numpy as np
 from typing import List, Callable, Iterable, Union, Tuple, Dict, Callable
@@ -204,8 +205,13 @@ class NodeTemplate():
 
     # Don't override this
     def generate(self, **kwargs) -> str:
-        return self.template.render(**kwargs)
-        
+        #print(kwargs)
+        try:
+            return self.template.render(**kwargs)
+        except:
+            print(kwargs)
+            print(mako.exceptions.text_error_template().render())
+            raise KeyError("Template failed!")
 # TYPE CHECKERS ARE ASSUMED TO BE STATELESS!
 class NodeTypeChecker():
     def __init__(self):
