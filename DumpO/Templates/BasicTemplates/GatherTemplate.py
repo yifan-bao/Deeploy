@@ -25,5 +25,7 @@
 
 from DumpO.DumpOTypes import NodeTemplate
 
-referenceTemplate = NodeTemplate("void Gather(${data_out}, ${data_in}, ${size}, ${indices}, ${axis});")
+referenceTemplate = NodeTemplate("\
+${type}* ${data_out} = ${data_in} + (*(${indices}) * ${offset});\
+")
 

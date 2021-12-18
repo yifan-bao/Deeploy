@@ -55,6 +55,12 @@ class VariableBuffer():
     def dealloc(self) -> str:
         return ''
     
+    def __str__(self) -> str:
+        return f'VariableBuffer: name: {self.name}, type: {self._type}, levels: {self.nLevels}'
+
+    def __repr__(self) -> str:
+        return f'VariableBuffer: name: {self.name}, type: {self._type}, levels: {self.nLevels}'
+    
     def fromNode(self, node: gs.ir.node.Node, nLevels:int):
         return(
             type(self)(
@@ -66,7 +72,7 @@ class VariableBuffer():
     
 class ConstantBuffer(VariableBuffer):
     def __init__(self, name : str = '', shape = [1], nLevels : int = 1, values = [1]):
-        super().__init__(name,shape,nLevels)
+        super().__init__(name, shape, nLevels)
         self.values = values
 
     # Allocation code. Choose your Template, might want to override aswell!
@@ -77,6 +83,12 @@ class ConstantBuffer(VariableBuffer):
     def dealloc(self) -> str:
         return ''
 
+    def __str__(self) -> str:
+        return f'ConstantBuffer: name: {self.name}, type: {self._type}, levels: {self.nLevels}'
+
+    def __repr__(self) -> str:
+        return f'ConstantBuffer: name: {self.name}, type: {self._type}, levels: {self.nLevels}'
+    
     def fromVariableBuffer(self, buffer: VariableBuffer, values):
         return type(self)(name = buffer.name,
                           nLevels = buffer.nLevels,
@@ -124,7 +136,7 @@ class NetworkContext():
         else:
             False
 
-    def hoistConstant(self, node: gs.ir.node.Node, type, name = ''):
+    def hoistConstant(self, node: gs.ir.node.Node, name = ''):
 
         assert len(node.outputs) <= 1, "Constant has more than one output"
 
@@ -132,18 +144,13 @@ class NetworkContext():
             name = mangleVariableName(node.name)
         
         # SCHEREMO: This is currently heuristic, but should be annotated in ONNX
-        localBuffer = self.VariableBuffer().fromNode(node = node, nLevels = 2**(type._value_))
+        localBuffer = self.VariableBuffer().fromNode(node = node, nLevels = int(node.values.max() - node.values.min()))
         globalBuffer = self.ConstantBuffer().fromVariableBuffer(localBuffer, values=node.values)
-        globalBuffer._type = type
         globalBuffer.name = name
 
         self.add(globalBuffer, 'global')
         return None
 
-    def hoistParameter(self, buffer: ConstantBuffer):
-    
-        self.add(buffer, 'global')
-    
     def addUser(self, name:str, node):
         _buffer = self.lookup(name)
         if node not in _buffer._users:
@@ -152,7 +159,20 @@ class NetworkContext():
             self.localObjects[_buffer.name] = _buffer
         else:
             self.globalObjects[_buffer.name] = _buffer
-            
+
+    def annotateType(self, name: str, nLevels: int, _type: Enum):
+        obj = self.lookup(name)
+        if 2**(_type._value_) < nLevels:
+            raise ValueError(f'Tried to annotate {name} with {_type}, but {name} has {nLevels} nLevels!')
+        if self.is_global(name):
+            self.globalObjects[name]._type = _type
+            self.globalObjects[name].nLevels = nLevels
+        elif self.is_local(name):
+            self.localObjects[name]._type = _type
+            self.localObjects[name].nLevels = nLevels
+        else:
+            raise KeyError(f'Tried to annotate {name}, but it is in no Context')
+        
     def allocLocal(self, nodeName: str, outBuffers: List[str]) -> List[str]:
 
         allocCode = []
@@ -204,42 +224,91 @@ class NodeTemplate():
         return _copy
 
     # Don't override this
-    def generate(self, **kwargs) -> str:
+    def generate(self, **parserDict) -> str:
         #print(kwargs)
         try:
-            return self.template.render(**kwargs)
+            return self.template.render(**parserDict)
         except:
             print(kwargs)
             print(mako.exceptions.text_error_template().render())
             raise KeyError("Template failed!")
-# TYPE CHECKERS ARE ASSUMED TO BE STATELESS!
+        
 class NodeTypeChecker():
-    def __init__(self):
-        pass
+    def __init__(self, input_types: List[Enum], output_types: List[Enum]):
+        self.input_types = input_types
+        self.output_types = output_types
 
-    # Override this. This should check that the input n_levels are appropriate for the kernel
+    # Override this. This should compute the nLevels of each output node of the Layer
+    def inferNumLevels(self, ctxt: NetworkContext, node: gs.ir.node.Node) -> List[int]:
+        return [2**64 for type in self.output_types]
+        
+    # Don't override this. This should check that the input n_levels are appropriate for the kernel
     def typeCheckNode(self, ctxt: NetworkContext, node: gs.ir.node.Node) -> bool:
-        return True
+        inputName = [mangleVariableName(i.name) for i in node.inputs]
+        inputs = [ctxt.lookup(name) for name in inputName]
 
-    # Override this. This should check add the output node to the context with the correct n_levels
-    def typeInferOutput(self, ctxt: NetworkContext, node: gs.ir.node.Node, **kwargs) -> NetworkContext:
-        return ctxt, True, 2**32
+        return all([node.nLevels <= 2**(input_type._value_) for node, input_type in zip(inputs, self.input_types)])
+
+
+    # Don't override this. This should annotate the output node with the correct data type
+    def typeInferOutput(self, ctxt: NetworkContext, node: gs.ir.node.Node, parserDict) -> NetworkContext:
+        newCtxt = ctxt.copy()
+
+        inputName = [mangleVariableName(i.name) for i in node.inputs]
+        inputs = [newCtxt.lookup(name) for name in inputName]
+        
+        nLevelsList = self.inferNumLevels(newCtxt, node, **parserDict)
+        
+        outputNodes = node.outputs
+        outputNames = [mangleVariableName(node.name) for node in outputNodes]
+        for name, nLevels, output_type in zip(outputNames, nLevelsList, self.output_types):
+            newCtxt.annotateType(name, nLevels, output_type)
+            
+        return newCtxt
+
+    # Don't override this. Automated annotation of global buffer
+    def typeInferGlobalCtxt(self, ctxt: NetworkContext, node: gs.ir.node.Node, typeInfer: Callable) -> NetworkContext:
+        ctxt = ctxt.copy()
+        
+        # Find all input Nodes in global Context
+        globalInputNodes = [inputNode for inputNode in node.inputs if ctxt.is_global(mangleVariableName(inputNode.name))]
+
+        # Don't override previous annotations
+        nodesToAnnotate = [inputNode for inputNode in globalInputNodes if ctxt.lookup(mangleVariableName(inputNode.name))._type == None]
+        
+        for node in nodesToAnnotate:
+            _buffer = ctxt.globalObjects[mangleVariableName(node.name)]
+            _type = typeInfer(node)
+            # Check the actual numLevels
+            nLevels = _buffer.values.max() - _buffer.values.min()
+            ctxt.annotateType(mangleVariableName(node.name), nLevels, _type)
+        
+        return ctxt
+
+    # Don't override this. Automated type checking
+    def typeCheck(self, ctxt: NetworkContext, node: gs.ir.node.Node, typeInfer: Callable, parserDict) -> (NetworkContext, bool):
+        newCtxt = ctxt.copy()
+        newCtxt = self.typeInferGlobalCtxt(newCtxt, node, typeInfer)
+        if self.typeCheckNode(newCtxt, node):
+            return (self.typeInferOutput(newCtxt, node, parserDict), True)
+        else:
+            return ctxt, False
     
 class NodeParser():
     def __init__(self):
         self.parserDict = {}
 
     # Change this
-    def nodeParse(self, node) -> bool:
+    def parseNode(self, node) -> bool:
         return True
 
     # Change this
-    def nodeCtxtParse(self, ctxt: NetworkContext, node: gs.ir.node.Node) -> (NetworkContext, bool):
+    def parseNodeCtxt(self, ctxt: NetworkContext, node: gs.ir.node.Node) -> (NetworkContext, bool):
         return ctxt, True
     
     # Don't override this, it checks for consistency (all inputs are available, no outputs are defined)
     # Also hoists inputs that are parameters
-    def parseInputs(self, ctxt: NetworkContext, node: gs.ir.node.Node, typeInfer: Callable) -> (NetworkContext, bool):
+    def parseInputs(self, ctxt: NetworkContext, node: gs.ir.node.Node) -> (NetworkContext, bool):
         ctxt = ctxt.copy()
         
         data_in_buffers = []
@@ -248,7 +317,7 @@ class NodeParser():
             
             # Hoist constant inputs
             if type(inputNode) == gs.ir.tensor.Constant and not ctxt.is_global(data_in):
-                ctxt.hoistConstant(inputNode, typeInfer(inputNode))
+                ctxt.hoistConstant(inputNode)
             else:
                 localBuffer = ctxt.lookup(data_in)
                 ctxt.addUser(data_in, node.name)
@@ -256,13 +325,34 @@ class NodeParser():
     
         return ctxt, True
 
+    # Don't touch this unless you have MULTIPLE outputs you NEED:
+    def parseOutputs(self, ctxt: NetworkContext, node: gs.ir.node.Node) -> (NetworkContext, bool):
+        newCtxt = ctxt.copy()
+        outputNodes = node.outputs
+        outputNames = [mangleVariableName(node.name) for node in outputNodes]
+        
+        for node, name in zip(outputNodes, outputNames):
+            if not newCtxt.is_global(name):
+                nb = newCtxt.VariableBuffer(
+                    name = name,
+                    shape = node.shape,
+                    nLevels = None
+                )
+                newCtxt.add(nb, 'local')
+            else:
+                nb = newCtxt.lookup(name)
+                
+        return newCtxt, True
+    
     # Don't touch this
-    def parse(self, ctxt: NetworkContext, node: gs.ir.node.Node, typeInfer: Callable) -> (NetworkContext, bool):
+    def parse(self, ctxt: NetworkContext, node: gs.ir.node.Node) -> (NetworkContext, bool):
+        newCtxt = ctxt.copy()
         self.parserDict = {}
-        ret1 = self.nodeParse(node)
+        ret1 = self.parseNode(node)
         if ret1:
-            ctxt, ret2 = self.parseInputs(ctxt, node, typeInfer)
-            return (ctxt, ret1 and ret2)
+            newCtxt, ret2 = self.parseInputs(newCtxt, node)
+            newCtxt, ret3 = self.parseOutputs(newCtxt, node)
+            return (newCtxt, ret1 and ret2 and ret3)
         else:
             return ctxt, False
 
@@ -273,18 +363,24 @@ class NodeMapper():
         self.typeChecker = typeChecker
         self.template = template
         self.parserDict = {}
-    
-    def parse(self, ctxt: NetworkContext, node: gs.ir.node.Node, typeInfer: Callable) -> (NetworkContext, bool):
-        hoistedCtxt, parseable = self.parser.parse(ctxt, node, typeInfer)
+
+    # Don't override this. Parses the networks with the correct data type
+    def parse(self, ctxt: NetworkContext, node: gs.ir.node.Node) -> (NetworkContext, bool):
+        hoistedCtxt, parseable = self.parser.parse(ctxt, node)
         if parseable:
-            if( self.typeChecker.typeCheckNode(ctxt = hoistedCtxt, node = node)):
-                typedCtxt = self.typeChecker.typeInferOutput(hoistedCtxt, node, **self.parser.parserDict)
-                return self.parser.nodeCtxtParse(typedCtxt, node)
-            else:
-                return (ctxt, False)
+            return self.parser.parseNodeCtxt(hoistedCtxt, node)
+        else:
+            raise ValueError(f'Parser {self.parser} failed - Layer is NOT parseable')
+        
+    # Don't override this. This should annotate the output node with the correct data type
+    def bind(self, ctxt: NetworkContext, node:gs.ir.node.Node, typeInfer: Callable) -> (NetworkContext, bool):
+        newCtxt = ctxt.copy()
+        newCtxt, ret = self.typeChecker.typeCheck(newCtxt, node, typeInfer, self.parser.parserDict)
+        if ret:
+            return (newCtxt, True)
         else:
             return (ctxt, False)
-    
+        
     def generate(self) -> List[str]:
         return [self.template.generate(**self.parser.parserDict)]
 
@@ -312,19 +408,19 @@ class ONNXLayer():
         return _copy
     
     # Call this, DO NOT override! -> This should assert that all variables required are in the node!
-    def parse(self, ctxt: NetworkContext, typeInfer: Callable) -> (NetworkContext, bool):
+    def parse(self, ctxt: NetworkContext) -> (NetworkContext, bool):
 
         # iterate through all possible mappings and return the first that works
         for mapper in self.maps:
             newCtxt = ctxt.copy()
-            newCtxt, ret = mapper.parse(newCtxt, self.node, typeInfer)
+            newCtxt, ret = mapper.parse(newCtxt, self.node)
             if ret:
                 self.mapper = mapper
                 return newCtxt, True
             
         # If none worked, throw exception
         raise RuntimeError(f'Did not find adequate mapping for node {self.node.name}!')
-        
+    
     # Do not override unless you know what you're doin - this generates code + buffer allocation / de-allocation
     # parseIO has to be called in advance!
     def generate(self, ctxt: NetworkContext) -> (NetworkContext, List[str]):
@@ -358,8 +454,12 @@ class NetworkContainer():
         self.layerBinding = []
         self.parsed = False
         self.Platform = platform
-        self.Platform.Mapping['Constant'] = lambda x: self.ctxt.hoistConstant(x.attrs['value'], self.Platform.TypeInfer(x), mangleVariableName(x.outputs[0].name))
+        self.Platform.Mapping['Constant'] = lambda x: self.ctxt.hoistConstant(x.attrs['value'], mangleVariableName(x.outputs[0].name))
 
+        self.parsed = False
+        self.bound = False
+        
+    # Don't override this
     def _createIOBindings(self, ctxt: NetworkContext, graph):
 
         ctxt = ctxt.copy()
@@ -383,9 +483,37 @@ class NetworkContainer():
             ctxt.add(nb, 'global')
 
         return ctxt
-        
-    def parse(self) -> bool:
 
+    #Don't override this
+    def bind(self) -> bool:
+        if not self.parsed:
+            raise ValueError('You need to parse the network before binding!')
+
+        # SCHEREMO: Implement backtracking here!
+
+        newCtxt = self.ctxt.copy()
+        
+        NetworkBindSuccess = True
+        for name,layer in self.layerBinding:
+            #import IPython; IPython.embed()
+            
+            LayerBindSuccess = False
+            for mapper in layer.maps:
+                newCtxt, TemplateBindSuccess = mapper.bind(newCtxt, layer.node, self.Platform.TypeInfer)
+                if TemplateBindSuccess:
+                    LayerBindSuccess = True
+                    break
+
+            NetworkBindSuccess = NetworkBindSuccess and LayerBindSuccess
+            
+        if not NetworkBindSuccess:
+            raise RuntimeError(f'Could not find a valid binding for the graph')
+        else:
+            self.bound = True
+            self.ctxt = newCtxt
+            
+    # Don't override this        
+    def parse(self) -> bool:
         # Reset context
         self.ctxt = self._createIOBindings(NetworkContext(self.Platform.VariableBuffer, self.Platform.ConstantBuffer), self.graph)
         
@@ -395,26 +523,26 @@ class NetworkContainer():
         for i in self.scheduler(self.graph):
             
             # Create binding
-            assert i.op in list(self.Platform.Mapping.keys()), "Layer not in layer dict!"
+            assert i.op in list(self.Platform.Mapping.keys()), f'Layer {i.op} not in layer dict!'
             layer = self.Platform.Mapping[i.op](i)
             if layer is not None:
                 self.layerBinding += [(layer.node.name, layer)]
 
         parseSuccess = True
         for (name, node) in self.layerBinding:
-            self.ctxt, parsePass = node.parse(self.ctxt, self.Platform.TypeInfer)
+            self.ctxt, parsePass = node.parse(self.ctxt)
             parseSuccess = parseSuccess and parsePass
 
         if parseSuccess:
             self.parsed = True
             return True
         else:
-            self.parsed = False
-            return False
-    
+            raise RuntimeError(f'Could not parse the graph!')
+        
+    # Don't override this
     def generateInferenceCode(self) -> str:
-        if not self.parsed:
-            raise ValueError('You need to parse the network before generating code!')
+        if not self.parsed or not self.bound:
+            raise ValueError('You need to parse and bind the network before generating code!')
         
         callStack = ''
         for name, node in self.layerBinding:
@@ -428,27 +556,30 @@ class NetworkContainer():
                         import IPython; IPython.embed()
 
         return callStack
-
+    
+    # Don't override this
     def generateBufferInitializationCode(self) -> str:
-        if not self.parsed:
-            raise ValueError('You need to parse the network before generating code!')
+        if not self.parsed or not self.bound:
+            raise ValueError('You need to parse and bind the network before generating code!')
         
         callStack = ''
         for node in self.ctxt.globalObjects.values():
             callStack += node.alloc() + '\n'
         return callStack
-
+    
+    # Don't override this
     def generateBufferDeAllocCode(self) -> str:
-        if not self.parsed:
-            raise ValueError('You need to parse the network before generating code!')
+        if not self.parsed or not self.bound:
+            raise ValueError('You need to parse and bind the network before generating code!')
         
         callStack = ''
         for node in self.ctxt.globalObjects.values():
             callStack += node.dealloc() + '\n'
         return callStack
     
+    # Don't override this
     def getParameterSize(self) -> int:
-        if not self.parsed:
-            raise ValueError('You need to parse the network before getting RAM Size!')
+        if not self.parsed or not self.bound:
+            raise ValueError('You need to parse and bind the network before getting RAM Size!')
         
         import IPython; IPython.embed()

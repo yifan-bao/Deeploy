@@ -43,22 +43,25 @@ class CMSISDataTypes(Enum):
     int16_t = 16
     int32_t = 32
 
-GELU_int8_Mapper = NodeMapper(GELUParser(), GELUChecker(CMSISDataTypes.int8_t, CMSISDataTypes.int8_t), iGELUTemplate.referenceTemplate)
-iLayerNorm_int8_Mapper = NodeMapper(iLayerNormParser(), iLayerNormChecker(CMSISDataTypes.int8_t, CMSISDataTypes.int8_t), DummyTemplate.referenceTemplate)
-MatMul_int8_Mapper = NodeMapper(CMSISMatMulParser(), GEMMChecker(CMSISDataTypes.int8_t, CMSISDataTypes.int32_t), GEMMTemplate.referenceTemplate)
-GEMM_int8_Mapper = NodeMapper(GEMMParser(), GEMMChecker(CMSISDataTypes.int8_t, CMSISDataTypes.int32_t), GEMMTemplate.referenceTemplate)
-MHSA_int8_Mapper = NodeMapper(MHSAParser(), MHSAChecker(CMSISDataTypes.int8_t, CMSISDataTypes.int32_t), MHSATemplate.referenceTemplate)
-GatherMappers = [NodeMapper(GatherParser(), GatherChecker(type), GatherTemplate.referenceTemplate) for type in CMSISDataTypes]
-RequantShiftMappers = [NodeMapper(RequantShiftParser(), RequantShiftChecker(type, CMSISDataTypes.int8_t), RequantShiftTemplate.referenceTemplate) for type in CMSISDataTypes]
+GELU_int8_Mapper = NodeMapper(GELUParser(), GELUChecker([CMSISDataTypes.int8_t], [CMSISDataTypes.int8_t]), iGELUTemplate.referenceTemplate)
+iLayerNorm_int8_Mapper = NodeMapper(iLayerNormParser(), iLayerNormChecker([CMSISDataTypes.int8_t,CMSISDataTypes.int32_t,CMSISDataTypes.int32_t], [CMSISDataTypes.int8_t]), DummyTemplate.referenceTemplate)
+MatMul_int8_Mapper = NodeMapper(MatMulParser(), GEMMChecker([CMSISDataTypes.int8_t, CMSISDataTypes.int8_t], [CMSISDataTypes.int32_t]), GEMMTemplate.referenceTemplate)
+GEMM_int8_Mapper = NodeMapper(GEMMParser(), GEMMChecker([CMSISDataTypes.int8_t, CMSISDataTypes.int8_t, CMSISDataTypes.int32_t], [CMSISDataTypes.int32_t]), GEMMTemplate.referenceTemplate)
+Conv_int8_Mapper = NodeMapper(Conv2DParser(), ConvChecker([CMSISDataTypes.int8_t, CMSISDataTypes.int8_t], [CMSISDataTypes.int32_t]), DummyTemplate.referenceTemplate)
+MHSA_int8_Mapper = NodeMapper(MHSAParser(), MHSAChecker([CMSISDataTypes.int8_t], [CMSISDataTypes.int32_t]), MHSATemplate.referenceTemplate)
 
-ReshapeMappers = [NodeMapper(ReshapeParser(), ReshapeChecker(type), SkipTemplate.referenceTemplate) for type in CMSISDataTypes]
-Conv_int8_Mapper = NodeMapper(CMSISConv2DParser(), ConvChecker(CMSISDataTypes.int8_t, CMSISDataTypes.int32_t), ConvTemplate.conv2DBasicTemplate)
+GatherMappers = [NodeMapper(GatherParser(), GatherChecker([type],[type]), GatherTemplate.referenceTemplate) for type in CMSISDataTypes]
+ReshapeMappers = [NodeMapper(ReshapeParser(), ReshapeChecker([type],[type]), SkipTemplate.referenceTemplate) for type in CMSISDataTypes]
+FlattenMappers = [NodeMapper(FlattenParser(), ReshapeChecker([type],[type]), SkipTemplate.referenceTemplate) for type in CMSISDataTypes]
+RequantShiftMappers = [NodeMapper(RequantShiftParser(), RequantShiftChecker([type,CMSISDataTypes.int32_t,CMSISDataTypes.int32_t], [CMSISDataTypes.int8_t]), RequantShiftTemplate.referenceTemplate) for type in CMSISDataTypes]
+
+Conv_int8_Mapper = NodeMapper(CMSISConv2DParser(), ConvChecker([CMSISDataTypes.int8_t,CMSISDataTypes.int8_t], [CMSISDataTypes.int32_t]), ConvTemplate.conv2DBasicTemplate)
 AddMappers = [
-    NodeMapper(AddParser(), CMSISSaturatingAddChecker(CMSISDataTypes.int8_t), AddTemplate.AddInt8Template),
-    NodeMapper(AddParser(), CMSISSaturatingAddChecker(CMSISDataTypes.int16_t), AddTemplate.AddInt16Template),
-    NodeMapper(AddParser(), CMSISSaturatingAddChecker(CMSISDataTypes.int32_t), AddTemplate.AddInt32Template) ]
+    NodeMapper(AddParser(), CMSISSaturatingAddChecker([CMSISDataTypes.int8_t],[CMSISDataTypes.int8_t]), AddTemplate.AddInt8Template),
+    NodeMapper(AddParser(), CMSISSaturatingAddChecker([CMSISDataTypes.int16_t],[CMSISDataTypes.int16_t]), AddTemplate.AddInt16Template),
+    NodeMapper(AddParser(), CMSISSaturatingAddChecker([CMSISDataTypes.int32_t],[CMSISDataTypes.int32_t]), AddTemplate.AddInt32Template) ]
 
-DummyMapper = NodeMapper(DummyParser(), DummyChecker(CMSISDataTypes.int8_t), DummyTemplate.referenceTemplate)
+DummyMapper = NodeMapper(DummyParser(), DummyChecker([CMSISDataTypes.int8_t],[CMSISDataTypes.int8_t]), DummyTemplate.referenceTemplate)
 
 CMSISMapping = {
     'Conv' : ConvLayer([Conv_int8_Mapper]),
@@ -72,7 +75,7 @@ CMSISMapping = {
     'Add': AddLayer(AddMappers),
     'RequantShift' : RequantShiftLayer(RequantShiftMappers),
     'Reshape': ReshapeLayer(ReshapeMappers),
-#     'Flatten': ConvLayer([DummyMapper]),
+    'Flatten': ReshapeLayer(FlattenMappers),
 #     'GlobalAveragePool': ConvLayer([DummyMapper]),
 }
 
@@ -84,11 +87,19 @@ def CMSISTypeInfer(node):
         outNode = node
     else:
         raise ValueError("TypeInfer was given a wring type of node!")
+
+    if hasattr(outNode, 'signed') and outNode.attrs['signed']:
+        signed = True
+    else:
+        signed = False
     
     for _type in CMSISDataTypes:
-        if outNode.values.max() < 2**(_type._value_): #and outNode.values.min() >= -2**(_type._value_-1):
+        if signed and outNode.values.max() < 2**(_type._value_-1) and outNode.values.min() >= -2**(_type._value_-1): 
             return _type
-
+        # For nor we only have signed kernels :(
+        elif not signed and outNode.values.max() < 2**(_type._value_-1): 
+            return _type
+            
     raise TypeError(f'Could not infer type of node {node.name}')
 
 class SimpleNetworkBuffer(VariableBuffer):
@@ -109,7 +120,11 @@ class SimpleGlobalBuffer(ConstantBuffer):
         values = list(self.values.reshape(-1))
         strValues = [str(value) for value in values]
         valueString = ', '.join(strValues)
-        return AllocateTemplate.referenceGlobalTemplate.generate(type = self._type._name_, name=self.name, size = np.prod(self.shape), values = valueString)
+        try:
+            return AllocateTemplate.referenceGlobalTemplate.generate(type = self._type._name_, name=self.name, size = np.prod(self.shape), values = valueString)
+        except Exception as e:
+            print(e)
+            import IPython; IPython.embed()
 
     def dealloc(self):
         return FreeTemplate.referenceGlobalTemplate.generate(name = self.name)

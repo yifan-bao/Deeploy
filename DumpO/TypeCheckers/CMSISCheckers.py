@@ -28,40 +28,18 @@ from DumpO.DumpOManglers import *
 from enum import Enum
 
 class CMSISSaturatingAddChecker(NodeTypeChecker):
-    def __init__(self, input_type: Enum):
-        super().__init__()
-        self.input_type = input_type
-        
-    def typeCheckNode(self, ctxt: NetworkContext, node: gs.ir.node.Node) -> bool:
-        inputName = [mangleVariableName(i.name) for i in node.inputs]
-        inputs = [ctxt.lookup(name) for name in inputName]
+    def __init__(self, input_types: List[Enum], output_types: List[Enum]):
+        super().__init__(input_types, output_types)
 
-        #SCHEREMO: Use this once global buffers get typed correctly
-        #return all([node.nLevels <= 2**31 for node in inputs]) and all([node._type == inputs[0]._type for node in inputs])
-        return all([node.nLevels <= 2**(self.input_type._value_) for node in inputs]) 
+    def inferNumLevels(self, ctxt: NetworkContext, node: gs.ir.node.Node, **kwargs) -> List[int]:
+        inputs = [ctxt.lookup(mangleVariableName(inputNode.name)) for inputNode in node.inputs]
         
-    def typeInferOutput(self, ctxt: NetworkContext, node: gs.ir.node.Node, **kwargs) -> NetworkContext:
-        newCtxt = ctxt.copy()
+        return [min(inputs[0].nLevels + inputs[1].nLevels, 2**(self.input_type._value_))]    
+        
+class CMSISLinearChecker(NodeTypeChecker):
+    def __init__(self, input_types: List[Enum], output_types: List[Enum]):
+        super().__init__(input_types, output_types)
 
-        inputName = [mangleVariableName(i.name) for i in node.inputs]
-        inputs = [newCtxt.lookup(name) for name in inputName]        
-        
-        nLevels = min(inputs[0].nLevels + inputs[1].nLevels, 2**(self.input_type._value_))
-        
-        outputNodes = node.outputs
-        outputNames = [mangleVariableName(node.name) for node in outputNodes]
-        for node, name in zip(outputNodes, outputNames):
-            if not newCtxt.is_global(name):
-                nb = newCtxt.VariableBuffer(
-                    name = name,
-                    shape = node.shape,
-                    nLevels = nLevels
-                )
-                nb._type = self.input_type
-                newCtxt.add(nb, 'local')
-            else:
-                nb = newCtxt.globalObjects[name]
-                assert nb.nLevels >= nLevels, f'Type mismatch at output node of {node.name}'
-                newCtxt.globalObjects[name]._type = self.input_type
-                
-        return newCtxt
+    def inferNumLevels(self, ctxt: NetworkContext, node: gs.ir.node.Node, **kwargs) -> List[int]:
+        return [2**(self.input_type._value_)]
+    

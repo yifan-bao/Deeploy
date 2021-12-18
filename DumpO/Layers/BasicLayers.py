@@ -46,7 +46,24 @@ class ReshapeLayer(ONNXLayer):
         dealloc = ctxt.freeLocal(self.node.name, inputNames)
         
         return (ctxt, [call])
+
+class GatherLayer(ONNXLayer):
+    def __init__(self, maps : List[NodeMapper]):
+        super().__init__(maps)
+
+    def generate(self, ctxt: NetworkContext) -> (NetworkContext, List[str]):        
+        outputs = [node for node in self.node.outputs]
+        inputs = [node for node in self.node.inputs]
         
+        outputNames = [mangleVariableName(node.name) for node in outputs]
+        inputNames = [mangleVariableName(node.name) for node in inputs]
+        
+        alloc = ctxt.allocLocal(self.node.name, outputNames)
+        call = self.mapper.generate()
+        dealloc = ctxt.freeLocal(self.node.name, inputNames)
+        
+        return (ctxt, [call])
+    
 class iGELULayer(ONNXLayer):
     def __init__(self, maps : List[NodeMapper]):
         super().__init__(maps)
@@ -72,10 +89,6 @@ class iLayerNormLayer(ONNXLayer):
         super().__init__(maps)
 
 class TransposeLayer(ONNXLayer):
-    def __init__(self, maps : List[NodeMapper]):
-        super().__init__(maps)
-
-class GatherLayer(ONNXLayer):
     def __init__(self, maps : List[NodeMapper]):
         super().__init__(maps)
 

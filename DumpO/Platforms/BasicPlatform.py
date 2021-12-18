@@ -38,19 +38,19 @@ class DataTypes(Enum):
     int16_t = 16
     int32_t = 32
 
-GELU_int8_Mapper = NodeMapper(GELUParser(), GELUChecker(DataTypes.int8_t, DataTypes.int8_t), iGELUTemplate.referenceTemplate)
-iLayerNorm_int8_Mapper = NodeMapper(iLayerNormParser(), iLayerNormChecker(DataTypes.int8_t, DataTypes.int8_t), DummyTemplate.referenceTemplate)
-MatMul_int8_Mapper = NodeMapper(MatMulParser(), GEMMChecker(DataTypes.int8_t, DataTypes.int32_t), GEMMTemplate.referenceTemplate)
-GEMM_int8_Mapper = NodeMapper(GEMMParser(), GEMMChecker(DataTypes.int8_t, DataTypes.int32_t), GEMMTemplate.referenceTemplate)
-Conv_int8_Mapper = NodeMapper(Conv2DParser(), ConvChecker(DataTypes.int8_t, DataTypes.int32_t), DummyTemplate.referenceTemplate)
-MHSA_int8_Mapper = NodeMapper(MHSAParser(), MHSAChecker(DataTypes.int8_t, DataTypes.int32_t), MHSATemplate.referenceTemplate)
+GELU_int8_Mapper = NodeMapper(GELUParser(), GELUChecker([DataTypes.int8_t], [DataTypes.int8_t]), iGELUTemplate.referenceTemplate)
+iLayerNorm_int8_Mapper = NodeMapper(iLayerNormParser(), iLayerNormChecker([DataTypes.int8_t,DataTypes.int32_t,DataTypes.int32_t], [DataTypes.int8_t]), DummyTemplate.referenceTemplate)
+MatMul_int8_Mapper = NodeMapper(MatMulParser(), GEMMChecker([DataTypes.int8_t, DataTypes.int8_t], [DataTypes.int32_t]), GEMMTemplate.referenceTemplate)
+GEMM_int8_Mapper = NodeMapper(GEMMParser(), GEMMChecker([DataTypes.int8_t, DataTypes.int8_t, DataTypes.int32_t], [DataTypes.int32_t]), GEMMTemplate.referenceTemplate)
+Conv_int8_Mapper = NodeMapper(Conv2DParser(), ConvChecker([DataTypes.int8_t, DataTypes.int8_t], [DataTypes.int32_t]), DummyTemplate.referenceTemplate)
+MHSA_int8_Mapper = NodeMapper(MHSAParser(), MHSAChecker([DataTypes.int8_t], [DataTypes.int32_t]), MHSATemplate.referenceTemplate)
 
-GatherMappers = [NodeMapper(GatherParser(), GatherChecker(type), GatherTemplate.referenceTemplate) for type in DataTypes]
-ReshapeMappers = [NodeMapper(ReshapeParser(), ReshapeChecker(type), SkipTemplate.referenceTemplate) for type in DataTypes]
-RequantShiftMappers = [NodeMapper(RequantShiftParser(), RequantShiftChecker(type, DataTypes.int8_t), RequantShiftTemplate.referenceTemplate) for type in DataTypes]
-AddMappers = [NodeMapper(AddParser(), AddChecker(type, DataTypes.int32_t), AddTemplate.referenceTemplate) for type in DataTypes]
+GatherMappers = [NodeMapper(GatherParser(), GatherChecker([type],[type]), GatherTemplate.referenceTemplate) for type in DataTypes]
+ReshapeMappers = [NodeMapper(ReshapeParser(), ReshapeChecker([type],[type]), SkipTemplate.referenceTemplate) for type in DataTypes]
+RequantShiftMappers = [NodeMapper(RequantShiftParser(), RequantShiftChecker([type,DataTypes.int32_t,DataTypes.int32_t], [DataTypes.int8_t]), RequantShiftTemplate.referenceTemplate) for type in DataTypes]
+AddMappers = [NodeMapper(AddParser(), AddChecker([type], [DataTypes.int32_t]), AddTemplate.referenceTemplate) for type in DataTypes]
 
-DummyMapper = NodeMapper(DummyParser(), DummyChecker(DataTypes.int8_t), DummyTemplate.referenceTemplate)
+DummyMapper = NodeMapper(DummyParser(), DummyChecker([DataTypes.int8_t],[DataTypes.int8_t]), DummyTemplate.referenceTemplate)
 
 BasicMapping = {
     'Conv' : ConvLayer([Conv_int8_Mapper]),
