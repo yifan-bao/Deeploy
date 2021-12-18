@@ -25,5 +25,5 @@
 
 from DumpO.DumpOTypes import NodeTemplate
 
-referenceTemplate = NodeTemplate("${type}* ${data_out} = ${data_in};")
+referenceTemplate = NodeTemplate("${data_out_type}* ${data_out} = ${data_in};")
 

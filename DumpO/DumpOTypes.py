@@ -224,12 +224,12 @@ class NodeTemplate():
         return _copy
 
     # Don't override this
-    def generate(self, **parserDict) -> str:
+    def generate(self, **nodeRep) -> str:
         #print(kwargs)
         try:
-            return self.template.render(**parserDict)
+            return self.template.render(**nodeRep)
         except:
-            print(kwargs)
+            print(nodeRep)
             print(mako.exceptions.text_error_template().render())
             raise KeyError("Template failed!")
         
@@ -237,7 +237,8 @@ class NodeTypeChecker():
     def __init__(self, input_types: List[Enum], output_types: List[Enum]):
         self.input_types = input_types
         self.output_types = output_types
-
+        self.typeDict = {}
+        
     # Override this. This should compute the nLevels of each output node of the Layer
     def inferNumLevels(self, ctxt: NetworkContext, node: gs.ir.node.Node) -> List[int]:
         return [2**64 for type in self.output_types]
@@ -249,20 +250,21 @@ class NodeTypeChecker():
 
         return all([node.nLevels <= 2**(input_type._value_) for node, input_type in zip(inputs, self.input_types)])
 
-
     # Don't override this. This should annotate the output node with the correct data type
     def typeInferOutput(self, ctxt: NetworkContext, node: gs.ir.node.Node, parserDict) -> NetworkContext:
         newCtxt = ctxt.copy()
 
+        outputTypeDict = {}
+        
         inputName = [mangleVariableName(i.name) for i in node.inputs]
         inputs = [newCtxt.lookup(name) for name in inputName]
         
         nLevelsList = self.inferNumLevels(newCtxt, node, **parserDict)
         
         outputNodes = node.outputs
-        outputNames = [mangleVariableName(node.name) for node in outputNodes]
-        for name, nLevels, output_type in zip(outputNames, nLevelsList, self.output_types):
-            newCtxt.annotateType(name, nLevels, output_type)
+        outputMangledNames = [mangleVariableName(node.name) for node in outputNodes]
+        for mangledName, nLevels, output_type in zip(outputMangledNames, nLevelsList, self.output_types):
+            newCtxt.annotateType(mangledName, nLevels, output_type)
             
         return newCtxt
 
@@ -285,12 +287,23 @@ class NodeTypeChecker():
         
         return ctxt
 
+    # Don't override this.
+    def annotateDict(self, ctxt: NetworkContext, node: gs.ir.node.Node, parserDict: Dict):
+        env = [mangleVariableName(node.name) for node in node.inputs + node.outputs]
+        for key, value in parserDict.items():
+            # check if the referenced buffer is in the environment
+            if value in env:
+                _buffer = ctxt.lookup(value)
+                self.typeDict[key + '_type'] = _buffer._type._name_
+    
     # Don't override this. Automated type checking
     def typeCheck(self, ctxt: NetworkContext, node: gs.ir.node.Node, typeInfer: Callable, parserDict) -> (NetworkContext, bool):
         newCtxt = ctxt.copy()
         newCtxt = self.typeInferGlobalCtxt(newCtxt, node, typeInfer)
         if self.typeCheckNode(newCtxt, node):
-            return (self.typeInferOutput(newCtxt, node, parserDict), True)
+            newCtxt = self.typeInferOutput(newCtxt, node, parserDict)
+            self.annotateDict(newCtxt, node, parserDict)
+            return (newCtxt, True)
         else:
             return ctxt, False
     
@@ -322,7 +335,7 @@ class NodeParser():
                 localBuffer = ctxt.lookup(data_in)
                 ctxt.addUser(data_in, node.name)
                 data_in_buffers.append(localBuffer.name)
-    
+                
         return ctxt, True
 
     # Don't touch this unless you have MULTIPLE outputs you NEED:
@@ -362,13 +375,13 @@ class NodeMapper():
         self.parser = parser
         self.typeChecker = typeChecker
         self.template = template
-        self.parserDict = {}
-
+        
     # Don't override this. Parses the networks with the correct data type
     def parse(self, ctxt: NetworkContext, node: gs.ir.node.Node) -> (NetworkContext, bool):
         hoistedCtxt, parseable = self.parser.parse(ctxt, node)
         if parseable:
-            return self.parser.parseNodeCtxt(hoistedCtxt, node)
+            newCtxt, ret = self.parser.parseNodeCtxt(hoistedCtxt, node)
+            return (newCtxt, ret)
         else:
             raise ValueError(f'Parser {self.parser} failed - Layer is NOT parseable')
         
@@ -382,12 +395,15 @@ class NodeMapper():
             return (ctxt, False)
         
     def generate(self) -> List[str]:
-        return [self.template.generate(**self.parser.parserDict)]
+        return [self.template.generate(**{**self.parser.parserDict, **self.typeChecker.typeDict})]
 
 class ONNXLayer():
     
     def __init__(self, maps : List[NodeMapper]):
         self.maps = maps
+        
+        self.parsedMaps = []
+        self.boundMaps = []
         self.mapper = None
         self.node = None
 
@@ -409,17 +425,41 @@ class ONNXLayer():
     
     # Call this, DO NOT override! -> This should assert that all variables required are in the node!
     def parse(self, ctxt: NetworkContext) -> (NetworkContext, bool):
-
+        retCtxt = None
         # iterate through all possible mappings and return the first that works
         for mapper in self.maps:
             newCtxt = ctxt.copy()
             newCtxt, ret = mapper.parse(newCtxt, self.node)
             if ret:
-                self.mapper = mapper
-                return newCtxt, True
+                self.parsedMaps += [mapper]
+                if retCtxt is None:
+                    retCtxt = newCtxt.copy()
+                
+        if len(self.parsedMaps) > 0:
+            return retCtxt, True
             
         # If none worked, throw exception
         raise RuntimeError(f'Did not find adequate mapping for node {self.node.name}!')
+
+    def bind(self, ctxt: NetworkContext, typeInfer: Callable):
+        retCtxt = None
+        for mapper in self.parsedMaps:
+            newCtxt = ctxt.copy()
+            newCtxt, ret = mapper.bind(newCtxt, self.node, typeInfer)
+            if ret:
+                self.boundMaps += [mapper]
+                if retCtxt is None:
+                    self.mapper = mapper
+                    retCtxt = newCtxt.copy()
+                    
+        if len(self.parsedMaps) > 0:
+            return retCtxt, True
+            
+        # If none worked, throw exception
+        raise RuntimeError(f'Did not find adequate mapping for node {self.node.name}!')
+        
+    def bindIterator(self):
+        return iter(self.boundMaps)
     
     # Do not override unless you know what you're doin - this generates code + buffer allocation / de-allocation
     # parseIO has to be called in advance!
@@ -446,7 +486,7 @@ class DeploymentPlatform():
         self.VariableBuffer = VariableBuffer
         self.ConstantBuffer = ConstantBuffer
     
-class NetworkContainer():
+class NetworkContainer(): 
     def __init__(self, graph: gs.Graph, platform: DeploymentPlatform, scheduler: Callable = lambda x: x):
         self.graph = graph
         self.scheduler = scheduler
@@ -489,23 +529,17 @@ class NetworkContainer():
         if not self.parsed:
             raise ValueError('You need to parse the network before binding!')
 
-        # SCHEREMO: Implement backtracking here!
-
+        # SCHEREMO: Implement backtracking here! Currently tries the cheapest branch only!
         newCtxt = self.ctxt.copy()
+
+        backTrackList = []
         
         NetworkBindSuccess = True
-        for name,layer in self.layerBinding:
-            #import IPython; IPython.embed()
+        for name, layer in self.layerBinding:
             
-            LayerBindSuccess = False
-            for mapper in layer.maps:
-                newCtxt, TemplateBindSuccess = mapper.bind(newCtxt, layer.node, self.Platform.TypeInfer)
-                if TemplateBindSuccess:
-                    LayerBindSuccess = True
-                    break
-
+            newCtxt, LayerBindSuccess = layer.bind(newCtxt, self.Platform.TypeInfer)
             NetworkBindSuccess = NetworkBindSuccess and LayerBindSuccess
-            
+                
         if not NetworkBindSuccess:
             raise RuntimeError(f'Could not find a valid binding for the graph')
         else:

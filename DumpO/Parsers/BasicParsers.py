@@ -23,10 +23,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from DumpO.DumpOTypes import *
-from DumpO.DumpOManglers import *
 import numpy as np
 import math
+import onnx_graphsurgeon as gs
+
+from DumpO.DumpOTypes import *
+from DumpO.DumpOManglers import *
 
 class AddParser(NodeParser):
     def __init__(self):
@@ -127,7 +129,6 @@ class GatherParser(NodeParser):
         axis = self.parserDict['axis']
         self.parserDict['index'] = np.prod(ctxt.lookup(mangleVariableName(node.inputs[0].name)).shape)
         self.parserDict['offset'] = np.prod(ctxt.lookup(mangleVariableName(node.inputs[0].name)).shape)
-        #self.parserDict['type'] = ctxt.lookup(mangleVariableName(inputNode.name))._type._name_
         self.parserDict['size'] = np.prod(ctxt.lookup(mangleVariableName(node.inputs[0].name)).shape)
 
         return ctxt, True
@@ -161,7 +162,6 @@ class FlattenParser(NodeParser):
         for idx, outputNode in enumerate(node.outputs):
             self.parserDict[outputs[idx]] = ctxt.lookup(mangleVariableName(outputNode.name)).name
 
-        #self.parserDict['type'] = ctxt.lookup(mangleVariableName(inputNode.name))._type._name_
 
         return ctxt, True    
 
@@ -191,7 +191,6 @@ class ReshapeParser(NodeParser):
         for idx, outputNode in enumerate(node.outputs):
             self.parserDict[outputs[idx]] = ctxt.lookup(mangleVariableName(outputNode.name)).name
 
-        #self.parserDict['type'] = ctxt.lookup(mangleVariableName(inputNode.name))._type._name_
         self.parserDict['size'] = np.prod(ctxt.lookup(mangleVariableName(node.inputs[0].name)).shape)
 
         return ctxt, True    
@@ -373,8 +372,6 @@ class MHSAParser(NodeParser):
 
         return ctxt, True
 
-    
-
 class iLayerNormParser(NodeParser):
     def __init__(self):
         super().__init__()
@@ -445,7 +442,12 @@ class MatMulParser(NodeParser):
         for idx, outputNode in enumerate(node.outputs):
             self.parserDict[outputs[idx]] = ctxt.lookup(mangleVariableName(outputNode.name)).name
 
-        # Create fake C node for GEMM-compatibility
+        # Create fake C node for GEMM-compatibility and hoist it
+        values = np.zeros((1))
+        zeroTensor = gs.Constant(f'{node.name}_C_Tensor', values=values)
+        Cnode = gs.ir.node.Node('Constant', f'{node.name}_C', [], [zeroTensor])
+
+        self.ctxt.hoistConstant(Cnode)
         self.parserDict['C'] = 'NULL'
             
         self.parserDict['size'] = np.prod(ctxt.lookup(mangleVariableName(node.inputs[0].name)).shape)
@@ -460,7 +462,7 @@ class GEMMParser(MatMulParser):
     def parseNode(self, node: gs.ir.node.Node) -> (bool):
         
         ret = all([
-            len(node.inputs) == 3,
+            len(node.inputs) >= 2,
             len(node.outputs) == 1,
             'alpha' in node.attrs,
             'beta' in node.attrs,
