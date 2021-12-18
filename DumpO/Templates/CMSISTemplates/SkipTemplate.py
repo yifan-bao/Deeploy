@@ -1,8 +1,8 @@
 # ----------------------------------------------------------------------
 #
-# File: ConvTemplate.py
+# File: SkipTemplate.py
 #
-# Last edited: 17.12.2021        
+# Last edited: 18.12.2021        
 # 
 # Copyright (C) 2021, ETH Zurich and University of Bologna.
 #
@@ -25,4 +25,4 @@
 
 from DumpO.DumpOTypes import NodeTemplate
 
-conv2DBasicTemplate = NodeTemplate("arm_convolve_HWC_q7_basic_nonsquare(${data_in}, ${dim_im_in_x}, ${dim_im_in_y}, ${ch_im_in}, ${weight}, ${ch_im_out}, ${dim_kernel_x}, ${dim_kernel_y}, ${padding_x}, ${padding_y}, ${stride_x}, ${stride_y}, ${bias}, ${bias_shift}, ${out_shift}, ${data_out}, ${dim_im_out_x}, ${dim_im_out_y}, ${bufferA}, ${bufferB});")
+

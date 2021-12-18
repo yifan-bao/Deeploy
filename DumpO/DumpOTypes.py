@@ -192,7 +192,7 @@ class NodeTemplate():
     def __init__(self, templateStr):
         self.template = Template(templateStr)
         
-    #Override this. Reports internal size of the tool (buffer size allocated in template) to the tool
+    #Override this. Reports internal size of the template (buffer size allocated in template) to the tool
     def internalSize(self) -> int:
         return 0
     

@@ -23,10 +23,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from DumpO.DumpOTypes import *
-from DumpO.DumpOManglers import *
 import numpy as np
 import math
+
+from DumpO.DumpOTypes import *
+from DumpO.DumpOManglers import *
 from DumpO.Parsers.BasicParsers import *
 
 class CMSISConv2DParser(Conv2DParser):
@@ -36,17 +37,34 @@ class CMSISConv2DParser(Conv2DParser):
     def nodeParse(self, node: gs.ir.node.Node) -> (bool):
 
         wellFormed = super().nodeParse(node)
-
         return wellFormed
     
     def nodeCtxtParse(self, ctxt: NetworkContext, node: gs.ir.node.Node) -> (NetworkContext, bool):
 
         ctxt = ctxt.copy()
-
         newCtxt, ret = super().nodeCtxtParse(ctxt, node)
         
         if ret:
             return newCtxt, True
-            
         return ctxt, False
 
+class CMSISMatMulParser(MatMulParser):
+
+    def __init__(self):
+        super().__init__()
+    
+    def nodeParse(self, node: gs.ir.node.Node) -> (bool):
+
+        wellFormed = super().nodeParse(node)
+        return wellFormed
+    
+    def nodeCtxtParse(self, ctxt: NetworkContext, node: gs.ir.node.Node) -> (NetworkContext, bool):
+
+        ctxt = ctxt.copy()
+        newCtxt, ret = super().nodeCtxtParse(ctxt, node)
+        
+        if ret:
+            
+            return newCtxt, True
+        return ctxt, False
+    

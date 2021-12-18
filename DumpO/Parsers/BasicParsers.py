@@ -151,7 +151,8 @@ class ReshapeParser(NodeParser):
             self.parserDict[inputs[idx]] = ctxt.lookup(mangleVariableName(inputNode.name)).name
         for idx, outputNode in enumerate(node.outputs):
             self.parserDict[outputs[idx]] = ctxt.lookup(mangleVariableName(outputNode.name)).name
-            
+
+        self.parserDict['type'] = ctxt.lookup(mangleVariableName(inputNode.name))._type._name_
         self.parserDict['size'] = np.prod(ctxt.lookup(mangleVariableName(node.inputs[0].name)).shape)
 
         return ctxt, True    

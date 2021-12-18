@@ -1,8 +1,8 @@
 # ----------------------------------------------------------------------
 #
-# File: BasicPlatform.py
+# File: CMSISPlatform.py
 #
-# Last edited: 15.12.2021        
+# Last edited: 18.12.2021        
 # 
 # Copyright (C) 2021, ETH Zurich and University of Bologna.
 #
@@ -23,18 +23,20 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from functools import partial
 from enum import Enum
 import mako
 import onnx_graphsurgeon as gs
 
 from DumpO.Parsers.BasicParsers import *
 from DumpO.Parsers.CMSISParsers import *
+
 from DumpO.TypeCheckers.BasicCheckers import *
+from DumpO.TypeCheckers.CMSISCheckers import *
+
 from DumpO.Layers.BasicLayers import *
 from DumpO.Templates.BasicTemplates import *
 
-from DumpO.Templates.CMSISTemplates import ConvTemplate
+from DumpO.Templates.CMSISTemplates import ConvTemplate, AddTemplate
 
 class CMSISDataTypes(Enum):
     int8_t = 8
@@ -43,15 +45,18 @@ class CMSISDataTypes(Enum):
 
 GELU_int8_Mapper = NodeMapper(GELUParser(), GELUChecker(CMSISDataTypes.int8_t, CMSISDataTypes.int8_t), iGELUTemplate.referenceTemplate)
 iLayerNorm_int8_Mapper = NodeMapper(iLayerNormParser(), iLayerNormChecker(CMSISDataTypes.int8_t, CMSISDataTypes.int8_t), DummyTemplate.referenceTemplate)
-MatMul_int8_Mapper = NodeMapper(MatMulParser(), GEMMChecker(CMSISDataTypes.int8_t, CMSISDataTypes.int32_t), GEMMTemplate.referenceTemplate)
+MatMul_int8_Mapper = NodeMapper(CMSISMatMulParser(), GEMMChecker(CMSISDataTypes.int8_t, CMSISDataTypes.int32_t), GEMMTemplate.referenceTemplate)
 GEMM_int8_Mapper = NodeMapper(GEMMParser(), GEMMChecker(CMSISDataTypes.int8_t, CMSISDataTypes.int32_t), GEMMTemplate.referenceTemplate)
-Conv_int8_Mapper = NodeMapper(CMSISConv2DParser(), ConvChecker(CMSISDataTypes.int8_t, CMSISDataTypes.int32_t), ConvTemplate.conv2DBasicTemplate)
 MHSA_int8_Mapper = NodeMapper(MHSAParser(), MHSAChecker(CMSISDataTypes.int8_t, CMSISDataTypes.int32_t), MHSATemplate.referenceTemplate)
-
 GatherMappers = [NodeMapper(GatherParser(), GatherChecker(type), GatherTemplate.referenceTemplate) for type in CMSISDataTypes]
-ReshapeMappers = [NodeMapper(ReshapeParser(), ReshapeChecker(type), SkipTemplate.referenceTemplate) for type in CMSISDataTypes]
 RequantShiftMappers = [NodeMapper(RequantShiftParser(), RequantShiftChecker(type, CMSISDataTypes.int8_t), RequantShiftTemplate.referenceTemplate) for type in CMSISDataTypes]
-AddMappers = [NodeMapper(AddParser(), AddChecker(type, CMSISDataTypes.int32_t), AddTemplate.referenceTemplate) for type in CMSISDataTypes]
+
+ReshapeMappers = [NodeMapper(ReshapeParser(), ReshapeChecker(type), SkipTemplate.referenceTemplate) for type in CMSISDataTypes]
+Conv_int8_Mapper = NodeMapper(CMSISConv2DParser(), ConvChecker(CMSISDataTypes.int8_t, CMSISDataTypes.int32_t), ConvTemplate.conv2DBasicTemplate)
+AddMappers = [
+    NodeMapper(AddParser(), CMSISSaturatingAddChecker(CMSISDataTypes.int8_t), AddTemplate.AddInt8Template),
+    NodeMapper(AddParser(), CMSISSaturatingAddChecker(CMSISDataTypes.int16_t), AddTemplate.AddInt16Template),
+    NodeMapper(AddParser(), CMSISSaturatingAddChecker(CMSISDataTypes.int32_t), AddTemplate.AddInt32Template) ]
 
 DummyMapper = NodeMapper(DummyParser(), DummyChecker(CMSISDataTypes.int8_t), DummyTemplate.referenceTemplate)
 
