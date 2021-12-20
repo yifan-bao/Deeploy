@@ -78,10 +78,31 @@ class AddLayer(ONNXLayer):
 class GEMMLayer(ONNXLayer):
     def __init__(self, maps : List[NodeMapper]):
         super().__init__(maps)
+
+    def computeShapes(self, inputShapes: List[np.shape], outputShapes: List[np.shape], parserDict) -> (List[np.shape], List[np.shape]):
+        if parserDict['transA']:
+            M = inputShapes[0][-1]
+        else:
+            M = inputShapes[0][-2]
+
+        if parserDict['transB']:
+            N = inputShapes[1][-1]
+        else:
+            N = inputShapes[1][-2]
+
+        if len(inputShapes) == 3:
+            inputShapes[2] = [M,N]
+            
+        return (inputShapes, outputShapes)
     
 class ConvLayer(ONNXLayer):
     def __init__(self, maps : List[NodeMapper]):
         super().__init__(maps)
+
+    def computeShapes(self, inputShapes: List[np.shape], outputShapes: List[np.shape], parserDict) -> (List[np.shape], List[np.shape]):
+        if len(inputShapes) == 3:
+            inputShapes[2] = inputShapes[1][-1]
+        return (inputShapes, outputShapes)
         
 class iLayerNormLayer(ONNXLayer):
     def __init__(self, maps : List[NodeMapper]):

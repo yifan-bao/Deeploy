@@ -26,11 +26,11 @@
 from DumpO.DumpOTypes import NodeTemplate
 
 conv2DBasicTemplate = NodeTemplate("\
-int8_t* bias = int8_t* malloc(sizeof(int8_t) * ${ch_im_in}); \n\
 int8_t bufferB[1]; \n\
 int16_t bufferA[2*${ch_im_in}*${dim_kernel_x}*${dim_kernel_y}]; \n\
-arm_convolve_HWC_q7_basic_nonsquare(${data_in}, ${dim_im_in_x}, ${dim_im_in_y}, ${ch_im_in}, ${weight}, ${ch_im_out}, ${dim_kernel_x}, ${dim_kernel_y}, ${padding_x}, ${padding_y}, ${stride_x}, ${stride_y}, bias, ${bias_shift}, ${out_shift}, ${data_out}, ${dim_im_out_x}, ${dim_im_out_y}, bufferA, bufferB); \n\
+arm_convolve_HWC_q7_basic_nonsquare(${data_in}, ${dim_im_in_x}, ${dim_im_in_y}, ${ch_im_in}, ${weight}, ${ch_im_out}, ${dim_kernel_x}, ${dim_kernel_y}, ${padding_x}, ${padding_y}, ${stride_x}, ${stride_y}, ${bias}, ${bias_shift}, ${out_shift}, ${data_out}, ${dim_im_out_x}, ${dim_im_out_y}, bufferA, bufferB); \n\
 free(bufferA); \n\
 free(bufferB); \n\
-free(bias); \
 ")
+# int8_t* bias = int8_t* malloc(sizeof(int8_t) * ${ch_im_in}); \n\
+#                free(bias); \

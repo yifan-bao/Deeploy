@@ -245,7 +245,7 @@ class ConvParser(NodeParser):
             'pads' in node.attrs,
             'strides' in node.attrs,
             #SCHEREMO: While ONNX allows for 3 inputs (BIAS), we only accept 2, the input and the weight
-            len(node.inputs) == 2,
+            len(node.inputs) >= 2,
             len(node.outputs) == 1
         ])
         
@@ -266,9 +266,19 @@ class ConvParser(NodeParser):
         outputs = ['data_out']
         
         for idx, inputNode in enumerate(node.inputs):
-            self.parserDict[inputs[idx]] = ctxt.lookup(inputNode.name).name
+            if idx < len(inputs):
+                self.parserDict[inputs[idx]] = ctxt.lookup(inputNode.name).name
         for idx, outputNode in enumerate(node.outputs):
             self.parserDict[outputs[idx]] = ctxt.lookup(outputNode.name).name
+
+        if len(node.inputs) == 3:
+            self.parserDict['bias'] = ctxt.lookup(node.inputs[2].name).name
+        else:
+            values = np.zeros((1))
+            zeroTensor = gs.Constant(f'{node.name}_Bias_Tensor', values=values)
+            ctxt.hoistConstant(zeroTensor)
+            node.inputs.append(zeroTensor)
+            self.parserDict['bias'] = f'{node.name}_Bias_Tensor'
             
         self.parserDict['size'] = np.prod(ctxt.lookup(node.inputs[0].name).shape)
 
@@ -445,7 +455,8 @@ class MatMulParser(NodeParser):
         values = np.zeros((1))
         zeroTensor = gs.Constant(f'{node.name}_C_Tensor', values=values)
         ctxt.hoistConstant(zeroTensor)
-        self.parserDict['C'] = 0
+        node.inputs.append(zeroTensor)
+        self.parserDict['C'] = f'{node.name}_C_Tensor'
             
         self.parserDict['size'] = np.prod(ctxt.lookup(node.inputs[0].name).shape)
 
@@ -493,14 +504,23 @@ class GEMMParser(MatMulParser):
 
         # We are a true GEMM
         if wellFormed:
-            inputs = ['A', 'B', 'C']
+            inputs = ['A', 'B']
             outputs = ['data_out']
 
             for idx, inputNode in enumerate(node.inputs):
-                self.parserDict[inputs[idx]] = ctxt.lookup(inputNode.name).name
+                if idx < len(inputs):
+                    self.parserDict[inputs[idx]] = ctxt.lookup(inputNode.name).name
             for idx, outputNode in enumerate(node.outputs):
                 self.parserDict[outputs[idx]] = ctxt.lookup(outputNode.name).name
 
+            if len(node.inputs) == 3:
+                self.parserDict['C'] = ctxt.lookup(node.inputs[2].name).name
+            else:
+                values = np.zeros((1))
+                zeroTensor = gs.Constant(f'{node.name}_C_Tensor', values=values)
+                ctxt.hoistConstant(zeroTensor)
+                self.parserDict['C'] = f'{node.name}_C_Tensor'
+                
             self.parserDict['size'] = np.prod(ctxt.lookup(node.inputs[0].name).shape)
 
             return ctxt, True

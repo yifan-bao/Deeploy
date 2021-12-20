@@ -470,7 +470,7 @@ class ONNXLayer():
 
     # Override this for broadcasting support
     # Returns a tuple of new, broadcasted inputShapes and outputShapes
-    def computeShapes(self, inputShapes: List[np.shape], outputShapes: List[np.shape]) -> (List[np.shape], List[np.shape]):
+    def computeShapes(self, inputShapes: List[np.shape], outputShapes: List[np.shape], parserDict: Dict) -> (List[np.shape], List[np.shape]):
         return (inputShapes, outputShapes)
         
     def broadcast(self, ctxt: NetworkContext) -> (NetworkContext):
@@ -479,7 +479,7 @@ class ONNXLayer():
         inputShapes = [ctxt.lookup(node.name).shape for node in self.node.inputs]
         outputShapes = [ctxt.lookup(node.name).shape for node in self.node.outputs]
 
-        newInputShapes, newOutputShapes = self.computeShapes(inputShapes, outputShapes)
+        newInputShapes, newOutputShapes = self.computeShapes(inputShapes, outputShapes, self.mapper.parser.parserDict)
 
         for node, shape in zip(self.node.inputs + self.node.outputs, newInputShapes + newOutputShapes):
             if ctxt.is_local(node.name):
@@ -720,8 +720,8 @@ class NetworkDeployer(NetworkContainer):
 
     def prepare(self):
         self.parse()
-        self.broadcast()
         self.bind()
+        self.broadcast()
         self.prepared = True
         
     def generateFunction(self) -> str:
