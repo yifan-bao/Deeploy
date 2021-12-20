@@ -25,8 +25,8 @@
 
 import re
 
-def mangleVariableName(name:str) -> str:
-    return '_DumpO_BUFFER__' + re.sub('\.','_',name)
+def mangleVariableName(name:str, scope='') -> str:
+    return '_DumpO_BUFFER__' + re.sub('\.','_',scope) + '_' + re.sub('\.','_',name)
 
-def mangleParameterName(nodeName:str, parameterName:str) -> str:
-    return '_DumpO_PARAMETER__' + re.sub('.','_',nodeName) + '_' + re.sub('.','_',parameterName)
+def mangleParameterName(nodeName:str, parameterName:str, scope='') -> str:
+    return '_DumpO_PARAMETER__' + re.sub('\.','_',scope) +'_' + re.sub('.','_',nodeName) + '_' + re.sub('.','_',parameterName)

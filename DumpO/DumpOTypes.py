@@ -240,15 +240,26 @@ class NodeTypeChecker():
         self.typeDict = {}
         
     # Override this. This should compute the nLevels of each output node of the Layer
-    def inferNumLevels(self, ctxt: NetworkContext, node: gs.ir.node.Node) -> List[int]:
+    def inferNumLevels(self, ctxt: NetworkContext, node: gs.ir.node.Node, parserDict: Dict) -> List[int]:
         return [2**64 for type in self.output_types]
         
     # Don't override this. This should check that the input n_levels are appropriate for the kernel
-    def typeCheckNode(self, ctxt: NetworkContext, node: gs.ir.node.Node) -> bool:
+    def typeCheckNodeInputs(self, ctxt: NetworkContext, node: gs.ir.node.Node) -> bool:
         inputName = [mangleVariableName(i.name) for i in node.inputs]
         inputs = [ctxt.lookup(name) for name in inputName]
 
-        return all([node.nLevels <= 2**(input_type._value_) for node, input_type in zip(inputs, self.input_types)])
+        return all(
+            [node.nLevels <= 2**(input_type._value_) for node, input_type in zip(inputs, self.input_types)]
+        )
+
+    # Don't override this. This should check that the output n_levels are appropriate for the kernel
+    def typeCheckNodeOutputs(self, ctxt: NetworkContext, node: gs.ir.node.Node, parserDict) -> bool:
+        newCtxt = ctxt.copy()
+        nLevelsList = self.inferNumLevels(newCtxt, node, **parserDict)
+            
+        return all(
+            [nLevels <= 2**(output_type._value_) for nLevels, output_type in zip(nLevelsList, self.output_types)]
+        )
 
     # Don't override this. This should annotate the output node with the correct data type
     def typeInferOutput(self, ctxt: NetworkContext, node: gs.ir.node.Node, parserDict) -> NetworkContext:
@@ -299,11 +310,14 @@ class NodeTypeChecker():
     # Don't override this. Automated type checking
     def typeCheck(self, ctxt: NetworkContext, node: gs.ir.node.Node, typeInfer: Callable, parserDict) -> (NetworkContext, bool):
         newCtxt = ctxt.copy()
-        newCtxt = self.typeInferGlobalCtxt(newCtxt, node, typeInfer)
-        if self.typeCheckNode(newCtxt, node):
-            newCtxt = self.typeInferOutput(newCtxt, node, parserDict)
-            self.annotateDict(newCtxt, node, parserDict)
-            return (newCtxt, True)
+        if self.typeCheckNodeInputs(newCtxt, node):
+            newCtxt = self.typeInferGlobalCtxt(newCtxt, node, typeInfer)
+            if self.typeCheckNodeOutputs(newCtxt, node, parserDict):
+                newCtxt = self.typeInferOutput(newCtxt, node, parserDict)
+                self.annotateDict(newCtxt, node, parserDict)
+                return (newCtxt, True)
+            else:
+                return ctxt, False
         else:
             return ctxt, False
     
@@ -452,10 +466,11 @@ class ONNXLayer():
                     self.mapper = mapper
                     retCtxt = newCtxt.copy()
                     
-        if len(self.parsedMaps) > 0:
+        if len(self.boundMaps) > 0:
             return retCtxt, True
-            
+        
         # If none worked, throw exception
+        #import IPython; IPython.embed()
         raise RuntimeError(f'Did not find adequate mapping for node {self.node.name}!')
         
     def bindIterator(self):
@@ -617,3 +632,21 @@ class NetworkContainer():
             raise ValueError('You need to parse and bind the network before getting RAM Size!')
         
         import IPython; IPython.embed()
+
+class NetworkDeployer(NetworkContainer):
+    def __init__(self, graph: gs.Graph, platform: DeploymentPlatform, scheduler: Callable = lambda x: x, name: str = "DumpONetwork", memoryScope : str = 'L0'):
+        super().__init__(graph, platform, scheduler)
+        self.name = name
+        self.memoryScope = memoryScope
+        self.prepared = False
+
+    def prepare(self):
+        self.parse()
+        self.bind()
+        self.prepared = True
+        
+    def generateFunction(self):
+        if not self.prepared:
+            self.prepare()
+    
+        return self.generateInferenceCode()

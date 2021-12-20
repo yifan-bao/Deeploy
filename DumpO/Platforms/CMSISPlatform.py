@@ -48,6 +48,7 @@ iLayerNorm_int8_Mapper = NodeMapper(iLayerNormParser(), iLayerNormChecker([CMSIS
 MatMul_int8_Mapper = NodeMapper(MatMulParser(), GEMMChecker([CMSISDataTypes.int8_t, CMSISDataTypes.int8_t], [CMSISDataTypes.int32_t]), GEMMTemplate.referenceTemplate)
 GEMM_int8_Mapper = NodeMapper(GEMMParser(), GEMMChecker([CMSISDataTypes.int8_t, CMSISDataTypes.int8_t, CMSISDataTypes.int32_t], [CMSISDataTypes.int32_t]), GEMMTemplate.referenceTemplate)
 Conv_int8_Mapper = NodeMapper(Conv2DParser(), ConvChecker([CMSISDataTypes.int8_t, CMSISDataTypes.int8_t], [CMSISDataTypes.int32_t]), DummyTemplate.referenceTemplate)
+#Conv_int8_Mapper_testo = NodeMapper(Conv2DParser(), ConvChecker([CMSISDataTypes.int8_t, CMSISDataTypes.int8_t], [CMSISDataTypes.int16_t]), DummyTemplate.referenceTemplate)
 MHSA_int8_Mapper = NodeMapper(MHSAParser(), MHSAChecker([CMSISDataTypes.int8_t], [CMSISDataTypes.int32_t]), MHSATemplate.referenceTemplate)
 
 GatherMappers = [NodeMapper(GatherParser(), GatherChecker([type],[type]), GatherTemplate.referenceTemplate) for type in CMSISDataTypes]
@@ -65,6 +66,7 @@ DummyMapper = NodeMapper(DummyParser(), DummyChecker([CMSISDataTypes.int8_t],[CM
 
 CMSISMapping = {
     'Conv' : ConvLayer([Conv_int8_Mapper]),
+    #'Conv' : ConvLayer([Conv_int8_Mapper_testo, Conv_int8_Mapper]),
     'iLayerNorm': iLayerNormLayer([iLayerNorm_int8_Mapper]),
     'MultiHeadSelfAttention': MHSALayer([MHSA_int8_Mapper]),
     'iGELU' : iGELULayer([GELU_int8_Mapper]),
