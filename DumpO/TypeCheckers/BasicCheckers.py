@@ -23,16 +23,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from DumpO.DumpOTypes import *
-from DumpO.DumpOManglers import *
 from enum import Enum
+
+from DumpO.DumpOTypes import *
 
 class AddChecker(NodeTypeChecker):
     def __init__(self, input_types: List[Enum], output_types: List[Enum]):
         super().__init__(input_types, output_types)
 
     def inferNumLevels(self, ctxt: NetworkContext, node: gs.ir.node.Node, **kwargs) -> List[int]:
-        inputs = [ctxt.lookup(mangleVariableName(inputNode.name)) for inputNode in node.inputs]
+        inputs = [ctxt.lookup(inputNode.name) for inputNode in node.inputs]
         return [inputs[0].nLevels + inputs[1].nLevels]
         
 class GatherChecker(NodeTypeChecker):
@@ -40,7 +40,7 @@ class GatherChecker(NodeTypeChecker):
         super().__init__(input_types, output_types)
         
     def inferNumLevels(self, ctxt: NetworkContext, node: gs.ir.node.Node, **kwargs) -> List[int]:
-        inputs = [ctxt.lookup(mangleVariableName(inputNode.name)) for inputNode in node.inputs]
+        inputs = [ctxt.lookup(inputNode.name) for inputNode in node.inputs]
         return [inputs[0].nLevels]
 
 
@@ -49,7 +49,7 @@ class ReshapeChecker(NodeTypeChecker):
         super().__init__(input_types, output_types)
         
     def inferNumLevels(self, ctxt: NetworkContext, node: gs.ir.node.Node, **kwargs) -> List[int]:
-        inputs = [ctxt.lookup(mangleVariableName(inputNode.name)) for inputNode in node.inputs]
+        inputs = [ctxt.lookup(inputNode.name) for inputNode in node.inputs]
         return [inputs[0].nLevels]
 
 #SCHEREMO: Fix this
@@ -58,7 +58,7 @@ class MHSAChecker(NodeTypeChecker):
         super().__init__(input_types, output_types)
         
     def inferNumLevels(self, ctxt: NetworkContext, node: gs.ir.node.Node, **kwargs) -> List[int]:
-        inputs = [ctxt.lookup(mangleVariableName(inputNode.name)) for inputNode in node.inputs]
+        inputs = [ctxt.lookup(inputNode.name) for inputNode in node.inputs]
         return [2**16 * wo_weight.shape[-1]]
 
 class GEMMChecker(NodeTypeChecker):
@@ -66,7 +66,7 @@ class GEMMChecker(NodeTypeChecker):
         super().__init__(input_types, output_types)
         
     def inferNumLevels(self, ctxt: NetworkContext, node: gs.ir.node.Node, **kwargs) -> List[int]:
-        inputs = [ctxt.lookup(mangleVariableName(inputNode.name)) for inputNode in node.inputs]
+        inputs = [ctxt.lookup(inputNode.name) for inputNode in node.inputs]
         return [2**((self.input_types[0]._value_)*2) * inputs[0].shape[-1 - kwargs['transA']]]
 
 class iLayerNormChecker(NodeTypeChecker):
@@ -74,7 +74,7 @@ class iLayerNormChecker(NodeTypeChecker):
         super().__init__(input_types, output_types)
         
     def inferNumLevels(self, ctxt: NetworkContext, node: gs.ir.node.Node, **kwargs) -> List[int]:
-        inputs = [ctxt.lookup(mangleVariableName(inputNode.name)) for inputNode in node.inputs]
+        inputs = [ctxt.lookup(inputNode.name) for inputNode in node.inputs]
         return [2**(self.input_types[0]._value_)]
 
 class GELUChecker(NodeTypeChecker):
@@ -82,7 +82,7 @@ class GELUChecker(NodeTypeChecker):
         super().__init__(input_types, output_types)
         
     def inferNumLevels(self, ctxt: NetworkContext, node: gs.ir.node.Node, **kwargs) -> List[int]:
-        inputs = [ctxt.lookup(mangleVariableName(inputNode.name)) for inputNode in node.inputs]
+        inputs = [ctxt.lookup(inputNode.name) for inputNode in node.inputs]
         return [2**(self.input_types[0]._value_)]
 
 class ConvChecker(NodeTypeChecker):
@@ -90,7 +90,7 @@ class ConvChecker(NodeTypeChecker):
         super().__init__(input_types, output_types)
         
     def inferNumLevels(self, ctxt: NetworkContext, node: gs.ir.node.Node, **kwargs) -> List[int]:
-        inputs = [ctxt.lookup(mangleVariableName(inputNode.name)) for inputNode in node.inputs]
+        inputs = [ctxt.lookup(inputNode.name) for inputNode in node.inputs]
         weight = ctxt.lookup(kwargs['weight'])
         return [np.prod(kwargs['kernel_shape']) * weight.shape[1] * 2**(self.input_types[0]._value_)]
 
@@ -99,7 +99,7 @@ class RequantShiftChecker(NodeTypeChecker):
         super().__init__(input_types, output_types)
         
     def inferNumLevels(self, ctxt: NetworkContext, node: gs.ir.node.Node, **kwargs) -> List[int]:
-        inputs = [ctxt.lookup(mangleVariableName(inputNode.name)) for inputNode in node.inputs]
+        inputs = [ctxt.lookup(inputNode.name) for inputNode in node.inputs]
         return [2**8]
         
 class DummyChecker(NodeTypeChecker):
@@ -107,6 +107,6 @@ class DummyChecker(NodeTypeChecker):
         super().__init__(input_types, output_types)
         
     def inferNumLevels(self, ctxt: NetworkContext, node: gs.ir.node.Node, **kwargs) -> List[int]:
-        inputs = [ctxt.lookup(mangleVariableName(inputNode.name)) for inputNode in node.inputs]
+        inputs = [ctxt.lookup(inputNode.name) for inputNode in node.inputs]
         return [2**(self.input_types[0]._value_)]
         

@@ -27,7 +27,6 @@ import numpy as np
 import math
 
 from DumpO.DumpOTypes import *
-from DumpO.DumpOManglers import *
 from DumpO.Parsers.BasicParsers import *
 
 class CMSISConv2DParser(Conv2DParser):

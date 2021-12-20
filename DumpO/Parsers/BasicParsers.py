@@ -28,7 +28,6 @@ import math
 import onnx_graphsurgeon as gs
 
 from DumpO.DumpOTypes import *
-from DumpO.DumpOManglers import *
 
 class AddParser(NodeParser):
     def __init__(self):
@@ -47,9 +46,9 @@ class AddParser(NodeParser):
 
         ctxt = ctxt.copy()
         
-        data_in_1 = ctxt.lookup(mangleVariableName(node.inputs[0].name))
-        data_in_2 = ctxt.lookup(mangleVariableName(node.inputs[1].name))
-        data_out = ctxt.lookup(mangleVariableName(node.outputs[0].name))
+        data_in_1 = ctxt.lookup(node.inputs[0].name)
+        data_in_2 = ctxt.lookup(node.inputs[1].name)
+        data_out = ctxt.lookup(node.outputs[0].name)
         self.parserDict['data_in_1'] = data_in_1.name
         self.parserDict['data_in_2'] = data_in_2.name
         self.parserDict['data_out'] = data_out.name
@@ -87,8 +86,8 @@ class GELUParser(NodeParser):
 
         ctxt = ctxt.copy()
         
-        data_in = ctxt.lookup(mangleVariableName(node.inputs[0].name))
-        data_out = ctxt.lookup(mangleVariableName(node.outputs[0].name))
+        data_in = ctxt.lookup(node.inputs[0].name)
+        data_out = ctxt.lookup(node.outputs[0].name)
         self.parserDict['data_in'] = data_in.name
         self.parserDict['data_out'] = data_out.name
         self.parserDict['size'] = np.prod(data_in.shape)
@@ -121,15 +120,15 @@ class GatherParser(NodeParser):
         outputs = ['data_out']
         
         for idx, inputNode in enumerate(node.inputs):
-            self.parserDict[inputs[idx]] = ctxt.lookup(mangleVariableName(inputNode.name)).name
+            self.parserDict[inputs[idx]] = ctxt.lookup(inputNode.name).name
         for idx, outputNode in enumerate(node.outputs):
-            self.parserDict[outputs[idx]] = ctxt.lookup(mangleVariableName(outputNode.name)).name
+            self.parserDict[outputs[idx]] = ctxt.lookup(outputNode.name).name
 
 
         axis = self.parserDict['axis']
-        self.parserDict['index'] = np.prod(ctxt.lookup(mangleVariableName(node.inputs[0].name)).shape)
-        self.parserDict['offset'] = np.prod(ctxt.lookup(mangleVariableName(node.inputs[0].name)).shape)
-        self.parserDict['size'] = np.prod(ctxt.lookup(mangleVariableName(node.inputs[0].name)).shape)
+        self.parserDict['index'] = np.prod(ctxt.lookup(node.inputs[0].name).shape)
+        self.parserDict['offset'] = np.prod(ctxt.lookup(node.inputs[0].name).shape)
+        self.parserDict['size'] = np.prod(ctxt.lookup(node.inputs[0].name).shape)
 
         return ctxt, True
 
@@ -158,9 +157,9 @@ class FlattenParser(NodeParser):
         outputs = ['data_out']
         
         for idx, inputNode in enumerate(node.inputs):
-            self.parserDict[inputs[idx]] = ctxt.lookup(mangleVariableName(inputNode.name)).name
+            self.parserDict[inputs[idx]] = ctxt.lookup(inputNode.name).name
         for idx, outputNode in enumerate(node.outputs):
-            self.parserDict[outputs[idx]] = ctxt.lookup(mangleVariableName(outputNode.name)).name
+            self.parserDict[outputs[idx]] = ctxt.lookup(outputNode.name).name
 
 
         return ctxt, True    
@@ -187,11 +186,11 @@ class ReshapeParser(NodeParser):
         outputs = ['data_out']
         
         for idx, inputNode in enumerate(node.inputs):
-            self.parserDict[inputs[idx]] = ctxt.lookup(mangleVariableName(inputNode.name)).name
+            self.parserDict[inputs[idx]] = ctxt.lookup(inputNode.name).name
         for idx, outputNode in enumerate(node.outputs):
-            self.parserDict[outputs[idx]] = ctxt.lookup(mangleVariableName(outputNode.name)).name
+            self.parserDict[outputs[idx]] = ctxt.lookup(outputNode.name).name
 
-        self.parserDict['size'] = np.prod(ctxt.lookup(mangleVariableName(node.inputs[0].name)).shape)
+        self.parserDict['size'] = np.prod(ctxt.lookup(node.inputs[0].name).shape)
 
         return ctxt, True    
     
@@ -225,11 +224,11 @@ class RequantShiftParser(NodeParser):
         outputs = ['data_out']
         
         for idx, inputNode in enumerate(node.inputs):
-            self.parserDict[inputs[idx]] = ctxt.lookup(mangleVariableName(inputNode.name)).name
+            self.parserDict[inputs[idx]] = ctxt.lookup(inputNode.name).name
         for idx, outputNode in enumerate(node.outputs):
-            self.parserDict[outputs[idx]] = ctxt.lookup(mangleVariableName(outputNode.name)).name
+            self.parserDict[outputs[idx]] = ctxt.lookup(outputNode.name).name
             
-        self.parserDict['size'] = np.prod(ctxt.lookup(mangleVariableName(node.inputs[0].name)).shape)
+        self.parserDict['size'] = np.prod(ctxt.lookup(node.inputs[0].name).shape)
 
         return ctxt, True
 
@@ -267,11 +266,11 @@ class ConvParser(NodeParser):
         outputs = ['data_out']
         
         for idx, inputNode in enumerate(node.inputs):
-            self.parserDict[inputs[idx]] = ctxt.lookup(mangleVariableName(inputNode.name)).name
+            self.parserDict[inputs[idx]] = ctxt.lookup(inputNode.name).name
         for idx, outputNode in enumerate(node.outputs):
-            self.parserDict[outputs[idx]] = ctxt.lookup(mangleVariableName(outputNode.name)).name
+            self.parserDict[outputs[idx]] = ctxt.lookup(outputNode.name).name
             
-        self.parserDict['size'] = np.prod(ctxt.lookup(mangleVariableName(node.inputs[0].name)).shape)
+        self.parserDict['size'] = np.prod(ctxt.lookup(node.inputs[0].name).shape)
 
         return ctxt, True
 
@@ -364,11 +363,11 @@ class MHSAParser(NodeParser):
         outputs = ['data_out']
         
         for idx, inputNode in enumerate(node.inputs):
-            self.parserDict[inputs[idx]] = ctxt.lookup(mangleVariableName(inputNode.name)).name
+            self.parserDict[inputs[idx]] = ctxt.lookup(inputNode.name).name
         for idx, outputNode in enumerate(node.outputs):
-            self.parserDict[outputs[idx]] = ctxt.lookup(mangleVariableName(outputNode.name)).name
+            self.parserDict[outputs[idx]] = ctxt.lookup(outputNode.name).name
             
-        self.parserDict['size'] = np.prod(ctxt.lookup(mangleVariableName(node.inputs[0].name)).shape)
+        self.parserDict['size'] = np.prod(ctxt.lookup(node.inputs[0].name).shape)
 
         return ctxt, True
 
@@ -402,11 +401,11 @@ class iLayerNormParser(NodeParser):
         outputs = ['data_out']
         
         for idx, inputNode in enumerate(node.inputs):
-            self.parserDict[inputs[idx]] = ctxt.lookup(mangleVariableName(inputNode.name)).name
+            self.parserDict[inputs[idx]] = ctxt.lookup(inputNode.name).name
         for idx, outputNode in enumerate(node.outputs):
-            self.parserDict[outputs[idx]] = ctxt.lookup(mangleVariableName(outputNode.name)).name
+            self.parserDict[outputs[idx]] = ctxt.lookup(outputNode.name).name
             
-        self.parserDict['size'] = np.prod(ctxt.lookup(mangleVariableName(node.inputs[0].name)).shape)
+        self.parserDict['size'] = np.prod(ctxt.lookup(node.inputs[0].name).shape)
 
         return ctxt, True
 
@@ -438,9 +437,9 @@ class MatMulParser(NodeParser):
         outputs = ['data_out']
         
         for idx, inputNode in enumerate(node.inputs):
-            self.parserDict[inputs[idx]] = ctxt.lookup(mangleVariableName(inputNode.name)).name
+            self.parserDict[inputs[idx]] = ctxt.lookup(inputNode.name).name
         for idx, outputNode in enumerate(node.outputs):
-            self.parserDict[outputs[idx]] = ctxt.lookup(mangleVariableName(outputNode.name)).name
+            self.parserDict[outputs[idx]] = ctxt.lookup(outputNode.name).name
 
         # Create fake C node for GEMM-compatibility and hoist it
         values = np.zeros((1))
@@ -450,7 +449,7 @@ class MatMulParser(NodeParser):
         self.ctxt.hoistConstant(Cnode)
         self.parserDict['C'] = 'NULL'
             
-        self.parserDict['size'] = np.prod(ctxt.lookup(mangleVariableName(node.inputs[0].name)).shape)
+        self.parserDict['size'] = np.prod(ctxt.lookup(node.inputs[0].name).shape)
 
         return ctxt, True    
 
@@ -500,11 +499,11 @@ class GEMMParser(MatMulParser):
             outputs = ['data_out']
 
             for idx, inputNode in enumerate(node.inputs):
-                self.parserDict[inputs[idx]] = ctxt.lookup(mangleVariableName(inputNode.name)).name
+                self.parserDict[inputs[idx]] = ctxt.lookup(inputNode.name).name
             for idx, outputNode in enumerate(node.outputs):
-                self.parserDict[outputs[idx]] = ctxt.lookup(mangleVariableName(outputNode.name)).name
+                self.parserDict[outputs[idx]] = ctxt.lookup(outputNode.name).name
 
-            self.parserDict['size'] = np.prod(ctxt.lookup(mangleVariableName(node.inputs[0].name)).shape)
+            self.parserDict['size'] = np.prod(ctxt.lookup(node.inputs[0].name).shape)
 
             return ctxt, True
         
@@ -523,9 +522,9 @@ class DummyParser(NodeParser):
         inputs = []
         outputs = []
         for i in node.inputs:
-            inputs.append(ctxt.lookup(mangleVariableName(i.name)))
+            inputs.append(ctxt.lookup(i.name))
         for i in node.outputs:
-            outputs.append(ctxt.lookup(mangleVariableName(i.name)))
+            outputs.append(ctxt.lookup(i.name))
             
         self.parserDict['data_in'] = inputs[0].name
         self.parserDict['data_out'] = outputs[0].name

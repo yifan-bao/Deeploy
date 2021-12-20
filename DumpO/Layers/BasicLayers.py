@@ -28,7 +28,6 @@ import onnx_graphsurgeon as gs
 from typing import List
 
 from DumpO.DumpOTypes import *
-from DumpO.DumpOManglers import *
 
 class ReshapeLayer(ONNXLayer):
     def __init__(self, maps : List[NodeMapper]):
@@ -38,8 +37,8 @@ class ReshapeLayer(ONNXLayer):
         outputs = [node for node in self.node.outputs]
         inputs = [node for node in self.node.inputs]
         
-        outputNames = [mangleVariableName(node.name) for node in outputs]
-        inputNames = [mangleVariableName(node.name) for node in inputs]
+        outputNames = [node.name for node in outputs]
+        inputNames = [node.name for node in inputs]
         
         alloc = ctxt.allocLocal(self.node.name, outputNames)
         call = self.mapper.generate()
@@ -55,8 +54,8 @@ class GatherLayer(ONNXLayer):
         outputs = [node for node in self.node.outputs]
         inputs = [node for node in self.node.inputs]
         
-        outputNames = [mangleVariableName(node.name) for node in outputs]
-        inputNames = [mangleVariableName(node.name) for node in inputs]
+        outputNames = [node.name for node in outputs]
+        inputNames = [node.name for node in inputs]
         
         alloc = ctxt.allocLocal(self.node.name, outputNames)
         call = self.mapper.generate()

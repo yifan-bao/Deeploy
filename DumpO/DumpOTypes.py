@@ -23,6 +23,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import re
 import copy
 import mako
 from mako.template import Template
@@ -32,8 +33,6 @@ import onnx
 import onnx_graphsurgeon as gs
 import math
 from enum import Enum
-
-from DumpO.DumpOManglers import *
 
 class VariableBuffer():
     def __init__(self, name: str = '', shape = [1], nLevels: int = 1):
@@ -48,11 +47,11 @@ class VariableBuffer():
         self._type = None
 
     # Allocation code. Choose your Template, might want to override aswell!
-    def alloc(self) -> str:
+    def alloc(self, name: str) -> str:
         return ''
     
     # Deallocation code. Choose your Template!
-    def dealloc(self) -> str:
+    def dealloc(self, name: str) -> str:
         return ''
     
     def __str__(self) -> str:
@@ -64,7 +63,7 @@ class VariableBuffer():
     def fromNode(self, node: gs.ir.node.Node, nLevels:int):
         return(
             type(self)(
-                name = mangleVariableName(node.name),
+                name = node.name,
                 shape = node.shape,
                 nLevels = nLevels
             )
@@ -76,11 +75,11 @@ class ConstantBuffer(VariableBuffer):
         self.values = values
 
     # Allocation code. Choose your Template, might want to override aswell!
-    def alloc(self) -> str:
+    def alloc(self, name: str) -> str:
         return ''
     
     # Deallocation code. Choose your Template!
-    def dealloc(self) -> str:
+    def dealloc(self, name: str) -> str:
         return ''
 
     def __str__(self) -> str:
@@ -96,42 +95,46 @@ class ConstantBuffer(VariableBuffer):
                           values = values)
 
 class NetworkContext():
-    def __init__(self, variableBuffer: VariableBuffer, constantBuffer: ConstantBuffer, globalObjects = {}, localObjects = {}):
+    def __init__(self, variableBuffer: VariableBuffer, constantBuffer: ConstantBuffer, globalObjects = {}, localObjects = {}, name: str = 'DumpONetwork'):
         self.globalObjects = {}
         self.localObjects = {}
         self.VariableBuffer = variableBuffer
         self.ConstantBuffer = constantBuffer
+        self.name = name
+
+    def mangle(self, name: str) -> str:
+        return '_DumpO_BUFFER__'  + re.sub('\.','_',self.name) + '_' + re.sub('\.','_',name)
         
     def add(self, obj : VariableBuffer, ctxt = 'local'):
         if ctxt == 'local':
-            if obj.name not in self.localObjects.keys():
-                self.localObjects[obj.name] = obj
+            if self.mangle(obj.name) not in self.localObjects.keys():
+                self.localObjects[self.mangle(obj.name)] = obj
             else:
                 raise KeyError(f'Buffername {obj.name} was already in the local context!')
         elif ctxt == 'global':
-            if obj.name not in self.localObjects.keys():
-                self.globalObjects[obj.name] = obj
+            if self.mangle(obj.name) not in self.localObjects.keys():
+                self.globalObjects[self.mangle(obj.name)] = obj
             else:
                 raise KeyError(f'Buffername {obj.name} was already in the global context!')
         else:
             raise ValueError("Expected either local or global context")
 
     def lookup(self, name):
-        if name in self.localObjects.keys():
-            return self.localObjects[name]
-        elif name in self.globalObjects.keys():
-            return self.globalObjects[name]
+        if self.mangle(name) in self.localObjects.keys():
+            return self.localObjects[self.mangle(name)]
+        elif self.mangle(name) in self.globalObjects.keys():
+            return self.globalObjects[self.mangle(name)]
         else:
             raise KeyError(f'Expected key {name} to be in either local of global context!')
 
     def is_global(self, name) -> bool:
-        if name in self.globalObjects.keys():
+        if self.mangle(name) in self.globalObjects.keys():
             return True
         else:
             False
 
     def is_local(self, name) -> bool:
-        if name in self.localObjects.keys():
+        if self.mangle(name) in self.localObjects.keys():
             return True
         else:
             False
@@ -141,7 +144,7 @@ class NetworkContext():
         assert len(node.outputs) <= 1, "Constant has more than one output"
 
         if name == "":
-            name = mangleVariableName(node.name)
+            name = node.name
         
         # SCHEREMO: This is currently heuristic, but should be annotated in ONNX
         localBuffer = self.VariableBuffer().fromNode(node = node, nLevels = int(node.values.max() - node.values.min()))
@@ -155,21 +158,21 @@ class NetworkContext():
         _buffer = self.lookup(name)
         if node not in _buffer._users:
             _buffer._users.append(node)
-        if _buffer.name in self.localObjects.keys():
-            self.localObjects[_buffer.name] = _buffer
+        if self.is_local(_buffer.name):
+            self.localObjects[self.mangle(_buffer.name)] = _buffer
         else:
-            self.globalObjects[_buffer.name] = _buffer
+            self.globalObjects[self.mangle(_buffer.name)] = _buffer
 
     def annotateType(self, name: str, nLevels: int, _type: Enum):
         obj = self.lookup(name)
         if 2**(_type._value_) < nLevels:
             raise ValueError(f'Tried to annotate {name} with {_type}, but {name} has {nLevels} nLevels!')
         if self.is_global(name):
-            self.globalObjects[name]._type = _type
-            self.globalObjects[name].nLevels = nLevels
+            self.globalObjects[self.mangle(name)]._type = _type
+            self.globalObjects[self.mangle(name)].nLevels = nLevels
         elif self.is_local(name):
-            self.localObjects[name]._type = _type
-            self.localObjects[name].nLevels = nLevels
+            self.localObjects[self.mangle(name)]._type = _type
+            self.localObjects[self.mangle(name)].nLevels = nLevels
         else:
             raise KeyError(f'Tried to annotate {name}, but it is in no Context')
         
@@ -180,7 +183,7 @@ class NetworkContext():
         for buffer in outBuffers:
             if self.is_local(buffer):
                 nb = self.lookup(buffer)
-                allocCode.append(nb.alloc())
+                allocCode.append(nb.alloc(self.mangle(nb.name)))
             elif self.is_global(buffer):
                 pass
             else:
@@ -197,7 +200,7 @@ class NetworkContext():
                 nb = self.lookup(buffer)
                 # If we are the last user in the list, we can safely free
                 if nodeName == nb._users[-1]:
-                    allocCode.append(nb.dealloc())
+                    allocCode.append(nb.dealloc(self.mangle(nb.name)))
             elif self.is_global(buffer):
                 pass
             else:
@@ -245,7 +248,7 @@ class NodeTypeChecker():
         
     # Don't override this. This should check that the input n_levels are appropriate for the kernel
     def typeCheckNodeInputs(self, ctxt: NetworkContext, node: gs.ir.node.Node) -> bool:
-        inputName = [mangleVariableName(i.name) for i in node.inputs]
+        inputName = [i.name for i in node.inputs]
         inputs = [ctxt.lookup(name) for name in inputName]
 
         return all(
@@ -267,15 +270,15 @@ class NodeTypeChecker():
 
         outputTypeDict = {}
         
-        inputName = [mangleVariableName(i.name) for i in node.inputs]
+        inputName = [i.name for i in node.inputs]
         inputs = [newCtxt.lookup(name) for name in inputName]
         
         nLevelsList = self.inferNumLevels(newCtxt, node, **parserDict)
         
         outputNodes = node.outputs
-        outputMangledNames = [mangleVariableName(node.name) for node in outputNodes]
-        for mangledName, nLevels, output_type in zip(outputMangledNames, nLevelsList, self.output_types):
-            newCtxt.annotateType(mangledName, nLevels, output_type)
+        outputNames = [node.name for node in outputNodes]
+        for name, nLevels, output_type in zip(outputNames, nLevelsList, self.output_types):
+            newCtxt.annotateType(name, nLevels, output_type)
             
         return newCtxt
 
@@ -284,23 +287,23 @@ class NodeTypeChecker():
         ctxt = ctxt.copy()
         
         # Find all input Nodes in global Context
-        globalInputNodes = [inputNode for inputNode in node.inputs if ctxt.is_global(mangleVariableName(inputNode.name))]
+        globalInputNodes = [inputNode for inputNode in node.inputs if ctxt.is_global(inputNode.name)]
 
         # Don't override previous annotations
-        nodesToAnnotate = [inputNode for inputNode in globalInputNodes if ctxt.lookup(mangleVariableName(inputNode.name))._type == None]
+        nodesToAnnotate = [inputNode for inputNode in globalInputNodes if ctxt.lookup(inputNode.name)._type == None]
         
         for node in nodesToAnnotate:
-            _buffer = ctxt.globalObjects[mangleVariableName(node.name)]
+            _buffer = ctxt.lookup(node.name)
             _type = typeInfer(node)
             # Check the actual numLevels
             nLevels = _buffer.values.max() - _buffer.values.min()
-            ctxt.annotateType(mangleVariableName(node.name), nLevels, _type)
+            ctxt.annotateType(node.name, nLevels, _type)
         
         return ctxt
 
     # Don't override this.
     def annotateDict(self, ctxt: NetworkContext, node: gs.ir.node.Node, parserDict: Dict):
-        env = [mangleVariableName(node.name) for node in node.inputs + node.outputs]
+        env = [node.name for node in node.inputs + node.outputs]
         for key, value in parserDict.items():
             # check if the referenced buffer is in the environment
             if value in env:
@@ -340,7 +343,7 @@ class NodeParser():
         
         data_in_buffers = []
         for inputNode in node.inputs:
-            data_in = mangleVariableName(inputNode.name)
+            data_in = inputNode.name
             
             # Hoist constant inputs
             if type(inputNode) == gs.ir.tensor.Constant and not ctxt.is_global(data_in):
@@ -356,7 +359,7 @@ class NodeParser():
     def parseOutputs(self, ctxt: NetworkContext, node: gs.ir.node.Node) -> (NetworkContext, bool):
         newCtxt = ctxt.copy()
         outputNodes = node.outputs
-        outputNames = [mangleVariableName(node.name) for node in outputNodes]
+        outputNames = [node.name for node in outputNodes]
         
         for node, name in zip(outputNodes, outputNames):
             if not newCtxt.is_global(name):
@@ -483,8 +486,8 @@ class ONNXLayer():
         outputs = [node for node in self.node.outputs]
         inputs = [node for node in self.node.inputs]
 
-        outputNames = [mangleVariableName(node.name) for node in outputs]
-        inputNames = [mangleVariableName(node.name) for node in inputs]
+        outputNames = [node.name for node in outputs]
+        inputNames = [node.name for node in inputs]
         
         alloc = ctxt.allocLocal(self.node.name, outputNames)
         call = self.mapper.generate()
@@ -502,25 +505,25 @@ class DeploymentPlatform():
         self.ConstantBuffer = ConstantBuffer
     
 class NetworkContainer(): 
-    def __init__(self, graph: gs.Graph, platform: DeploymentPlatform, scheduler: Callable = lambda x: x):
+    def __init__(self, graph: gs.Graph, platform: DeploymentPlatform, scheduler: Callable = lambda x: x, name: str = 'DumpONetwork'):
         self.graph = graph
         self.scheduler = scheduler
-        self.ctxt = NetworkContext(platform.VariableBuffer, platform.ConstantBuffer)
+        self.ctxt = NetworkContext(platform.VariableBuffer, platform.ConstantBuffer, name = name)
         self.layerBinding = []
         self.parsed = False
         self.Platform = platform
-        self.Platform.Mapping['Constant'] = lambda x: self.ctxt.hoistConstant(x.attrs['value'], mangleVariableName(x.outputs[0].name))
+        self.Platform.Mapping['Constant'] = lambda x: self.ctxt.hoistConstant(x.attrs['value'], x.outputs[0].name)
 
         self.parsed = False
         self.bound = False
-        
+    
     # Don't override this
-    def _createIOBindings(self, ctxt: NetworkContext, graph):
+    def _createIOBindings(self, ctxt: NetworkContext, graph: gs.Graph):
 
         ctxt = ctxt.copy()
 
         for node in graph.inputs:
-            data_name = mangleVariableName(node.name)
+            data_name = node.name
             data_size = node.shape
             # SCHEREMO: Should be parsed from graph
             data_type = 2**8
@@ -529,7 +532,7 @@ class NetworkContainer():
             ctxt.add(nb, 'global')
 
         for node in graph.outputs:
-            data_name = mangleVariableName(node.name)
+            data_name = node.name
             data_size = node.shape
             # SCHEREMO: Should be parsed from graph
             data_type = 2**32
@@ -634,10 +637,9 @@ class NetworkContainer():
         import IPython; IPython.embed()
 
 class NetworkDeployer(NetworkContainer):
-    def __init__(self, graph: gs.Graph, platform: DeploymentPlatform, scheduler: Callable = lambda x: x, name: str = "DumpONetwork", memoryScope : str = 'L0'):
-        super().__init__(graph, platform, scheduler)
+    def __init__(self, graph: gs.Graph, platform: DeploymentPlatform, scheduler: Callable = lambda x: x, name: str = "DumpONetwork"):
+        super().__init__(graph, platform, scheduler, name)
         self.name = name
-        self.memoryScope = memoryScope
         self.prepared = False
 
     def prepare(self):

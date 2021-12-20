@@ -108,27 +108,27 @@ class SimpleNetworkBuffer(VariableBuffer):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         
-    def alloc(self):
-        return AllocateTemplate.referenceLocalTemplate.generate(type = self._type._name_, name=self.name, size = np.prod(self.shape))
+    def alloc(self, name: str):
+        return AllocateTemplate.referenceLocalTemplate.generate(type = self._type._name_, name=name, size = np.prod(self.shape))
 
-    def dealloc(self):
-        return FreeTemplate.referenceLocalTemplate.generate(name = self.name)
+    def dealloc(self, name: str):
+        return FreeTemplate.referenceLocalTemplate.generate(name = name)
 
 class SimpleGlobalBuffer(ConstantBuffer):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         
-    def alloc(self):
+    def alloc(self, name: str):
         values = list(self.values.reshape(-1))
         strValues = [str(value) for value in values]
         valueString = ', '.join(strValues)
         try:
-            return AllocateTemplate.referenceGlobalTemplate.generate(type = self._type._name_, name=self.name, size = np.prod(self.shape), values = valueString)
+            return AllocateTemplate.referenceGlobalTemplate.generate(type = self._type._name_, name=name, size = np.prod(self.shape), values = valueString)
         except Exception as e:
             print(e)
             import IPython; IPython.embed()
 
-    def dealloc(self):
-        return FreeTemplate.referenceGlobalTemplate.generate(name = self.name)
+    def dealloc(self, name: str):
+        return FreeTemplate.referenceGlobalTemplate.generate(name = name)
     
 CMSISPlatform = DeploymentPlatform(CMSISMapping, CMSISDataTypes, CMSISTypeInfer, SimpleNetworkBuffer, SimpleGlobalBuffer)

@@ -23,16 +23,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from DumpO.DumpOTypes import *
-from DumpO.DumpOManglers import *
 from enum import Enum
+
+from DumpO.DumpOTypes import *
 
 class CMSISSaturatingAddChecker(NodeTypeChecker):
     def __init__(self, input_types: List[Enum], output_types: List[Enum]):
         super().__init__(input_types, output_types)
 
     def inferNumLevels(self, ctxt: NetworkContext, node: gs.ir.node.Node, **kwargs) -> List[int]:
-        inputs = [ctxt.lookup(mangleVariableName(inputNode.name)) for inputNode in node.inputs]
+        inputs = [ctxt.lookup(inputNode.name) for inputNode in node.inputs]
         
         return [min(inputs[0].nLevels + inputs[1].nLevels, 2**(self.input_type._value_))]    
         
