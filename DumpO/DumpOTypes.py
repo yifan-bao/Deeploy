@@ -190,10 +190,11 @@ class NetworkContext():
             if self.is_local(buffer):
                 nb = self.lookup(buffer)
                 
-                assert self.localObjects[self.mangle(nb.name)]._live == False, "Tried to allocate live buffer!"
+                assert self.localObjects[self.mangle(nb.name)]._live == False, "Tried to allocate already live buffer {nb.name}"
                 
                 allocCode.append(nb.alloc(self.mangle(nb.name)))
                 self.localObjects[self.mangle(nb.name)]._live = True
+                
             elif self.is_global(buffer):
                 pass
             else:
@@ -211,7 +212,7 @@ class NetworkContext():
                 # If we are the last user in the list, we can safely free
                 if nodeName == nb._users[-1]:
 
-                    assert self.localObjects[self.mangle(nb.name)]._live == True, "Tried to deAllocate non-live buffer!"
+                    assert self.localObjects[self.mangle(nb.name)]._live == True, "Tried to deallocate already non-live buffer {nb.name}"
                     
                     allocCode.append(nb.dealloc(self.mangle(nb.name)))
                     self.localObjects[self.mangle(nb.name)]._live = False
@@ -620,7 +621,7 @@ class NetworkContainer():
                     callStack += substr + '\n'
 
         for _buffer in self.ctxt.localObjects.values():
-            assert _buffer._live == False, "There is a memory leak in the generated forward pass!"
+            assert _buffer._live == False, f'There is a memory leak in buffer {_buffer.name} in the generated forward pass!'
             
         return callStack
     
