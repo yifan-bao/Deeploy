@@ -46,6 +46,9 @@ class VariableBuffer():
         # Do not override - Should be written in the typechecking passes
         self._type = None
 
+        # Do not override - Should be written in the deployment passes
+        self._live = False
+
     # Allocation code. Choose your Template, might want to override aswell!
     def alloc(self, name: str) -> str:
         return ''
@@ -74,6 +77,9 @@ class ConstantBuffer(VariableBuffer):
         super().__init__(name, shape, nLevels)
         self.values = values
 
+        # Do not override - ConstantBuffers are assumed to be always live!
+        self._live = True
+        
     # Allocation code. Choose your Template, might want to override aswell!
     def alloc(self, name: str) -> str:
         return ''
@@ -183,7 +189,11 @@ class NetworkContext():
         for buffer in outBuffers:
             if self.is_local(buffer):
                 nb = self.lookup(buffer)
+                
+                assert self.localObjects[self.mangle(nb.name)]._live == False, "Tried to allocate live buffer!"
+                
                 allocCode.append(nb.alloc(self.mangle(nb.name)))
+                self.localObjects[self.mangle(nb.name)]._live = True
             elif self.is_global(buffer):
                 pass
             else:
@@ -200,7 +210,12 @@ class NetworkContext():
                 nb = self.lookup(buffer)
                 # If we are the last user in the list, we can safely free
                 if nodeName == nb._users[-1]:
+
+                    assert self.localObjects[self.mangle(nb.name)]._live == True, "Tried to deAllocate non-live buffer!"
+                    
                     allocCode.append(nb.dealloc(self.mangle(nb.name)))
+                    self.localObjects[self.mangle(nb.name)]._live = False
+                    
             elif self.is_global(buffer):
                 pass
             else:
@@ -602,12 +617,11 @@ class NetworkContainer():
             self.ctxt, code = node.generate(self.ctxt)
             for section in code:
                 for substr in section:
-                    try:
-                        callStack += substr + '\n'
-                    except Exception as e:
-                        print(e)
-                        import IPython; IPython.embed()
+                    callStack += substr + '\n'
 
+        for _buffer in self.ctxt.localObjects.values():
+            assert _buffer._live == False, "There is a memory leak in the generated forward pass!"
+            
         return callStack
     
     # Don't override this
