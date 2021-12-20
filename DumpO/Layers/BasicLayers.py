@@ -70,11 +70,25 @@ class iGELULayer(ONNXLayer):
 class RequantShiftLayer(ONNXLayer):
     def __init__(self, maps : List[NodeMapper]):
         super().__init__(maps)
+
+    def computeShapes(self, inputShapes: List[np.shape], outputShapes: List[np.shape], parserDict) -> (List[np.shape], List[np.shape]):
+        inputShapes[2]  = inputShapes[0]
+        inputShapes[1] = [inputShapes[0][0], inputShapes[0][1]] + list(inputShapes[1][1:])
+
+        return (inputShapes, outputShapes)
         
 class AddLayer(ONNXLayer):
     def __init__(self, maps : List[NodeMapper]):
         super().__init__(maps)
 
+    def computeShapes(self, inputShapes: List[np.shape], outputShapes: List[np.shape], parserDict) -> (List[np.shape], List[np.shape]):
+        if len(inputShapes[0]) > len(inputShapes[1]):
+            inputShapes[1] = inputShapes[0]
+        else:
+            inputShapes[0] = inputShapes[1]
+
+        return (inputShapes, outputShapes)
+            
 class GEMMLayer(ONNXLayer):
     def __init__(self, maps : List[NodeMapper]):
         super().__init__(maps)
@@ -86,9 +100,9 @@ class GEMMLayer(ONNXLayer):
             M = inputShapes[0][-2]
 
         if parserDict['transB']:
-            N = inputShapes[1][-1]
-        else:
             N = inputShapes[1][-2]
+        else:
+            N = inputShapes[1][-1]
 
         if len(inputShapes) == 3:
             inputShapes[2] = [M,N]

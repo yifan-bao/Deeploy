@@ -75,7 +75,10 @@ class VariableBuffer():
 class ConstantBuffer(VariableBuffer):
     def __init__(self, name : str = '', shape = [1], nLevels : int = 1, values = [1]):
         super().__init__(name, shape, nLevels)
-        self.values = values
+        values = np.asarray(values)
+        intArray = values.astype(int)
+        assert (np.abs(values - intArray)).max() < 0.001, "Constant value {name} is NOT an integer!"
+        self.values = intArray
 
         # Do not override - ConstantBuffers are assumed to be always live!
         self._live = True
@@ -486,6 +489,13 @@ class ONNXLayer():
                 ctxt.localObjects[node.name].shape = shape
             elif ctxt.is_global(node.name):
                 ctxt.globalObjects[node.name].shape = shape
+                if isinstance(ctxt.globalObjects[node.name], ConstantBuffer):
+                    try:
+                        ctxt.globalObjects[node.name].values = np.broadcast_to(ctxt.globalObjects[node.name].values, shape)
+                    except Exception as e:
+                        print(e)
+                        import IPython; IPython.embed()
+                        
             else:
                 raise KeyError(f'Expected node {node.name} to be in context!')
 
@@ -689,28 +699,68 @@ class NetworkContainer():
     def generateBufferInitializationCode(self) -> str:
         if not self.parsed or not self.bound:
             raise ValueError('You need to parse and bind the network before generating code!')
+
+        ctxt = self.ctxt.copy()
         
         callStack = ''
         for node in self.ctxt.globalObjects.values():
+            node.name = ctxt._mangle(node.name)
             callStack += node.alloc() + '\n'
+
+        self.ctxt = ctxt
+        
         return callStack
     
     # Don't override this
     def generateBufferDeAllocCode(self) -> str:
         if not self.parsed or not self.bound:
             raise ValueError('You need to parse and bind the network before generating code!')
+
+        ctxt = self.ctxt.copy()
         
         callStack = ''
         for node in self.ctxt.globalObjects.values():
+            node.name = ctxt._mangle(node.name)
             callStack += node.dealloc() + '\n'
+
+        self.ctxt = ctxt
         return callStack
     
-    # Don't override this
+    # Don't override this - Returns parameter size in bytes
     def getParameterSize(self) -> int:
         if not self.parsed or not self.bound:
             raise ValueError('You need to parse and bind the network before getting RAM Size!')
-        
-        import IPython; IPython.embed()
+
+        size = 0
+        for _buffer in self.ctxt.globalObjects.values():
+            size += np.prod(_buffer.shape)*_buffer._type._value_//8
+
+        return size
+
+    # Don't override this - Returns worst case layer and buffering size in bytes
+    def getWorstCaseBufferSize(self) -> (str, int):
+        if not self.parsed or not self.bound:
+            raise ValueError('You need to parse and bind the network before getting RAM Size!')
+
+        maxSize = 0
+        name = ''
+        for layerName, layer in self.layerBinding:
+            size = 0
+            for edgeNode in layer.node.inputs + layer.node.outputs:
+                _buffer = self.ctxt.lookup(edgeNode.name)
+                size += np.prod(_buffer.shape) * _buffer._type._value_//8
+            if size > maxSize:
+                maxSize = size
+                name = layerName
+
+        return (name, maxSize)
+
+    # Don't override this - Returns worst case layer and buffering size in bytes
+    def getTotalSize(self) -> (str, int):
+        if not self.parsed or not self.bound:
+            raise ValueError('You need to parse and bind the network before getting RAM Size!')
+
+        return self.getParameterSize() + self.getWorstCaseBufferSize()[1]
 
 class NetworkDeployer(NetworkContainer):
     def __init__(self, graph: gs.Graph, platform: DeploymentPlatform, scheduler: Callable = lambda x: x, name: str = "DumpONetwork"):
