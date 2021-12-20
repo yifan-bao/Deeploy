@@ -38,6 +38,8 @@ from DumpO.Templates.BasicTemplates import *
 
 from DumpO.Templates.CMSISTemplates import ConvTemplate, AddTemplate
 
+from DumpO.OptimizationPasses.CMSISPasses import *
+
 class CMSISDataTypes(Enum):
     int8_t = 8
     int16_t = 16
@@ -45,8 +47,8 @@ class CMSISDataTypes(Enum):
 
 GELU_int8_Mapper = NodeMapper(GELUParser(), GELUChecker([CMSISDataTypes.int8_t], [CMSISDataTypes.int8_t]), iGELUTemplate.referenceTemplate)
 iLayerNorm_int8_Mapper = NodeMapper(iLayerNormParser(), iLayerNormChecker([CMSISDataTypes.int8_t,CMSISDataTypes.int32_t,CMSISDataTypes.int32_t], [CMSISDataTypes.int8_t]), DummyTemplate.referenceTemplate)
-MatMul_int8_Mapper = NodeMapper(MatMulParser(), GEMMChecker([CMSISDataTypes.int8_t, CMSISDataTypes.int8_t], [CMSISDataTypes.int32_t]), GEMMTemplate.referenceTemplate)
-GEMM_int8_Mapper = NodeMapper(GEMMParser(), GEMMChecker([CMSISDataTypes.int8_t, CMSISDataTypes.int8_t, CMSISDataTypes.int32_t], [CMSISDataTypes.int32_t]), GEMMTemplate.referenceTemplate)
+MatMul_int8_Mapper = NodeMapper(CMSISLinearParser(), GEMMChecker([CMSISDataTypes.int8_t, CMSISDataTypes.int8_t], [CMSISDataTypes.int32_t]), GEMMTemplate.referenceTemplate)
+GEMM_int8_Mapper = NodeMapper(CMSISLinearParser(), GEMMChecker([CMSISDataTypes.int8_t, CMSISDataTypes.int8_t, CMSISDataTypes.int32_t], [CMSISDataTypes.int32_t]), GEMMTemplate.referenceTemplate)
 Conv_int8_Mapper = NodeMapper(Conv2DParser(), ConvChecker([CMSISDataTypes.int8_t, CMSISDataTypes.int8_t], [CMSISDataTypes.int32_t]), DummyTemplate.referenceTemplate)
 #Conv_int8_Mapper_testo = NodeMapper(Conv2DParser(), ConvChecker([CMSISDataTypes.int8_t, CMSISDataTypes.int8_t], [CMSISDataTypes.int16_t]), DummyTemplate.referenceTemplate)
 MHSA_int8_Mapper = NodeMapper(MHSAParser(), MHSAChecker([CMSISDataTypes.int8_t], [CMSISDataTypes.int32_t]), MHSATemplate.referenceTemplate)
@@ -56,7 +58,7 @@ ReshapeMappers = [NodeMapper(ReshapeParser(), ReshapeChecker([type],[type]), Ski
 FlattenMappers = [NodeMapper(FlattenParser(), ReshapeChecker([type],[type]), SkipTemplate.referenceTemplate) for type in CMSISDataTypes]
 RequantShiftMappers = [NodeMapper(RequantShiftParser(), RequantShiftChecker([type,CMSISDataTypes.int32_t,CMSISDataTypes.int32_t], [CMSISDataTypes.int8_t]), RequantShiftTemplate.referenceTemplate) for type in CMSISDataTypes]
 
-Conv_int8_Mapper = NodeMapper(CMSISConv2DParser(), ConvChecker([CMSISDataTypes.int8_t,CMSISDataTypes.int8_t], [CMSISDataTypes.int32_t]), ConvTemplate.conv2DBasicTemplate)
+Conv_int8_Mapper = NodeMapper(CMSISConv2DParser(), ConvChecker([CMSISDataTypes.int8_t,CMSISDataTypes.int8_t], [CMSISDataTypes.int32_t]), ConvTemplate.conv2DTemplate)
 AddMappers = [
     NodeMapper(AddParser(), CMSISSaturatingAddChecker([CMSISDataTypes.int8_t],[CMSISDataTypes.int8_t]), AddTemplate.AddInt8Template),
     NodeMapper(AddParser(), CMSISSaturatingAddChecker([CMSISDataTypes.int16_t],[CMSISDataTypes.int16_t]), AddTemplate.AddInt16Template),
@@ -126,5 +128,18 @@ class SimpleGlobalBuffer(ConstantBuffer):
 
     def dealloc(self):
         return FreeTemplate.referenceGlobalTemplate.generate(name = self.name)
+
+class SimpleStructBuffer(StructBuffer):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        
+    def alloc(self) -> str:
+        return AllocateTemplate.referenceStructTemplate.generate(type=self._type, name=self.name, structDict=self.structDict)
+
+    def dealloc(self) -> str:
+        return FreeTemplate.referenceLocalTemplate.generate(name=self.name)
     
-CMSISPlatform = DeploymentPlatform(CMSISMapping, CMSISDataTypes, CMSISTypeInfer, SimpleNetworkBuffer, SimpleGlobalBuffer)
+    
+CMSISOptimizer = NetworkOptimizer(passes=[ConvRequantMergePass()])
+    
+CMSISPlatform = DeploymentPlatform(CMSISMapping, CMSISDataTypes, CMSISTypeInfer, CMSISOptimizer, SimpleNetworkBuffer, SimpleGlobalBuffer, SimpleStructBuffer)

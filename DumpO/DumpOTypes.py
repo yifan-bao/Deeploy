@@ -83,14 +83,6 @@ class ConstantBuffer(VariableBuffer):
         # Do not override - ConstantBuffers are assumed to be always live!
         self._live = True
         
-    # Allocation code. Choose your Template, might want to override aswell!
-    def alloc(self) -> str:
-        return ''
-    
-    # Deallocation code. Choose your Template!
-    def dealloc(self) -> str:
-        return ''
-
     def __str__(self) -> str:
         return f'ConstantBuffer: name: {self.name}, type: {self._type}, levels: {self.nLevels}'
 
@@ -103,12 +95,18 @@ class ConstantBuffer(VariableBuffer):
                           shape = buffer.shape,
                           values = values)
 
+class StructBuffer(VariableBuffer):
+    def __init__(self, name: str, shape = None, nLevels = None, structDict: Dict = None):
+        super().__init__(name, shape, nLevels)
+        self.structDict = structDict
+
 class NetworkContext():
-    def __init__(self, variableBuffer: VariableBuffer, constantBuffer: ConstantBuffer, globalObjects = {}, localObjects = {}, name: str = 'DumpONetwork'):
+    def __init__(self, variableBuffer: VariableBuffer, constantBuffer: ConstantBuffer, structBuffer: StructBuffer, globalObjects = {}, localObjects = {}, name: str = 'DumpONetwork'):
         self.globalObjects = {}
         self.localObjects = {}
         self.VariableBuffer = variableBuffer
         self.ConstantBuffer = constantBuffer
+        self.StructBuffer = structBuffer
         self.name = name
 
     def _mangle(self, name: str) -> str:
@@ -140,14 +138,18 @@ class NetworkContext():
         if name in self.globalObjects.keys():
             return True
         else:
-            False
+            return False
 
     def is_local(self, name) -> bool:
         if name in self.localObjects.keys():
             return True
         else:
-            False
+            return False
 
+    def hoistStruct(self, structBuffer: StructBuffer):
+
+        self.add(structBuffer, 'global')
+        
     def hoistConstant(self, node: gs.ir.node.Node, name = ''):
 
         assert len(node.outputs) <= 1, "Constant has more than one output"
@@ -328,10 +330,7 @@ class NodeTypeChecker():
                 typeNode = inputNode
             
             _buffer = ctxt.lookup(inputNode.name)
-            try:
-                _type = typeInfer(typeNode)
-            except:
-                import IPython; IPython.embed()
+            _type = typeInfer(typeNode)
 
             # Check the actual numLevels
             nLevels = _buffer.values.max() - _buffer.values.min()
@@ -482,22 +481,23 @@ class ONNXLayer():
         inputShapes = [ctxt.lookup(node.name).shape for node in self.node.inputs]
         outputShapes = [ctxt.lookup(node.name).shape for node in self.node.outputs]
 
-        newInputShapes, newOutputShapes = self.computeShapes(inputShapes, outputShapes, self.mapper.parser.parserDict)
+        newInputShapes, newOutputShapes = self.computeShapes(inputShapes, outputShapes, self.parsedMaps[0].parser.parserDict)
+        
+        for node, newShape, oldShape in zip(self.node.inputs + self.node.outputs, newInputShapes + newOutputShapes, inputShapes + outputShapes):
+            if newShape != oldShape:
+                if ctxt.is_local(node.name):
+                    ctxt.localObjects[node.name].shape = newShape
+                elif ctxt.is_global(node.name):
+                    ctxt.globalObjects[node.name].shape = newShape
+                    if isinstance(ctxt.globalObjects[node.name], ConstantBuffer):
+                        try:
+                            ctxt.globalObjects[node.name].values = np.broadcast_to(ctxt.globalObjects[node.name].values, newShape)
+                        except Exception as e:
+                            print(e)
+                            import IPython; IPython.embed()
 
-        for node, shape in zip(self.node.inputs + self.node.outputs, newInputShapes + newOutputShapes):
-            if ctxt.is_local(node.name):
-                ctxt.localObjects[node.name].shape = shape
-            elif ctxt.is_global(node.name):
-                ctxt.globalObjects[node.name].shape = shape
-                if isinstance(ctxt.globalObjects[node.name], ConstantBuffer):
-                    try:
-                        ctxt.globalObjects[node.name].values = np.broadcast_to(ctxt.globalObjects[node.name].values, shape)
-                    except Exception as e:
-                        print(e)
-                        import IPython; IPython.embed()
-                        
-            else:
-                raise KeyError(f'Expected node {node.name} to be in context!')
+                else:
+                    raise KeyError(f'Expected node {node.name} to be in context!')
 
         return ctxt
     
@@ -571,13 +571,32 @@ class ONNXLayer():
         generated_code = [alloc, call, dealloc]
         return (ctxt, generated_code)
 
+class NetworkOptimizationPass():
+    def __init__(self):
+        pass
+
+    def run(self, ctxt: NetworkContext, layerBinding : List) -> (NetworkContext, List):
+        return ctxt, layerBinding
+    
+class NetworkOptimizer():
+    def __init__(self, passes: List[NetworkOptimizationPass]):
+        self.passes = passes
+        
+    def optimize(self, ctxt: NetworkContext, layerBinding: List) -> (NetworkContext, List):
+        for _pass in self.passes:
+
+            ctxt, layerBinding = _pass.run(ctxt, layerBinding)
+        return ctxt, layerBinding
+    
 class DeploymentPlatform():
-    def __init__(self, Mapping: Dict[str, ONNXLayer], DataTypes: Enum, TypeInfer: Callable, VariableBuffer: VariableBuffer, ConstantBuffer: ConstantBuffer):
+    def __init__(self, Mapping: Dict[str, ONNXLayer], DataTypes: Enum, TypeInfer: Callable, Optimizer: NetworkOptimizer, VariableBuffer: VariableBuffer, ConstantBuffer: ConstantBuffer, StructBuffer: StructBuffer):
         self.Mapping = Mapping
         self.DataTypes = DataTypes
         self.TypeInfer = TypeInfer
+        self.Optimizer = Optimizer
         self.VariableBuffer = VariableBuffer
         self.ConstantBuffer = ConstantBuffer
+        self.StructBuffer = StructBuffer
     
 class NetworkContainer(): 
     def __init__(self, graph: gs.Graph, platform: DeploymentPlatform, scheduler: Callable = lambda x: x, name: str = 'DumpONetwork'):
@@ -617,6 +636,10 @@ class NetworkContainer():
 
         return ctxt
 
+    # Overrise this -> Platformspecific fusing of layers
+    def optimize(self) -> bool:
+        self.ctxt, self.layerBinding = self.Platform.Optimizer.optimize(ctxt = self.ctxt, layerBinding=self.layerBinding)
+
     # Don't override this
     def broadcast(self) -> bool:
         
@@ -653,7 +676,7 @@ class NetworkContainer():
     # Don't override this        
     def parse(self) -> bool:
         # Reset context
-        self.ctxt = NetworkContext(self.Platform.VariableBuffer, self.Platform.ConstantBuffer, {}, {})
+        self.ctxt = NetworkContext(self.Platform.VariableBuffer, self.Platform.ConstantBuffer, self.Platform.StructBuffer, {}, {})
         self.ctxt = self._createIOBindings(self.ctxt, self.graph)
         
         # Create schedule, binding, then parse resulting program for correctness
@@ -761,7 +784,7 @@ class NetworkContainer():
             raise ValueError('You need to parse and bind the network before getting RAM Size!')
 
         return self.getParameterSize() + self.getWorstCaseBufferSize()[1]
-
+        
 class NetworkDeployer(NetworkContainer):
     def __init__(self, graph: gs.Graph, platform: DeploymentPlatform, scheduler: Callable = lambda x: x, name: str = "DumpONetwork"):
         super().__init__(graph, platform, scheduler, name)
@@ -770,8 +793,9 @@ class NetworkDeployer(NetworkContainer):
 
     def prepare(self):
         self.parse()
-        self.bind()
         self.broadcast()
+        self.bind()
+        self.optimize()
         self.prepared = True
         
     def generateFunction(self) -> str:
@@ -779,3 +803,4 @@ class NetworkDeployer(NetworkContainer):
             self.prepare()
 
         return self.generateInferenceCode()
+

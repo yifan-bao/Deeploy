@@ -30,8 +30,8 @@ from DumpO.DumpOTypes import *
 from DumpO.Parsers.BasicParsers import *
 
 class CMSISConv2DParser(Conv2DParser):
-    def __init__(self):
-        super().__init__()
+    def __init__(self, noBiasHoisting = True):
+        super().__init__(noBiasHoisting)
     
     def parseNode(self, node: gs.ir.node.Node) -> (bool):
 
@@ -73,6 +73,50 @@ class CMSISConv2DParser(Conv2DParser):
             self.parserDict['ch_im_out'] = data_out.shape[1]
             self.parserDict['dim_im_out_x'] = data_out.shape[2]
             self.parserDict['dim_im_out_y'] = data_out.shape[3]
+
+            input_dims = {
+                'n': data_in.shape[0],
+                'h': data_in.shape[1],
+                'w': data_in.shape[2],
+                'c': data_in.shape[3]
+            }
+
+            filter_dims = {
+                'n': weight.shape[0],
+                'h': weight.shape[1],
+                'w': weight.shape[2],
+                'c': weight.shape[3]
+            }
+
+            output_dims = {
+                'n': data_out.shape[0],
+                'h': data_out.shape[1],
+                'w': data_out.shape[2],
+                'c': data_out.shape[3]
+            }
+
+            bias_dims = {
+                'n': weight.shape[0]
+            }
+            
+            biasDims = ctxt.StructBuffer(name = f'{node.name}_bias_dims', structDict=bias_dims)
+            biasDims._type = 'arm_context_nn_dims'
+            outputDims = ctxt.StructBuffer(name = f'{node.name}_output_dims', structDict=output_dims)
+            outputDims._type = 'arm_context_nn_dims'
+            filterDims = ctxt.StructBuffer(name = f'{node.name}_filter_dims', structDict=filter_dims)
+            filterDims._type = 'arm_context_nn_dims'
+            inputDims = ctxt.StructBuffer(name = f'{node.name}_input_dims', structDict=input_dims)
+            inputDims._type = 'arm_context_nn_dims'
+
+            self.parserDict['biasDims'] = f'{node.name}_bias_dims'
+            self.parserDict['outputDims'] = f'{node.name}_output_dims'
+            self.parserDict['filterDims'] = f'{node.name}_filter_dims'
+            self.parserDict['inputDims'] = f'{node.name}_input_dims'
+            
+            newCtxt.hoistStruct(biasDims)
+            newCtxt.hoistStruct(outputDims)
+            newCtxt.hoistStruct(filterDims)
+            newCtxt.hoistStruct(inputDims)
             
             return newCtxt, True
         
@@ -85,18 +129,8 @@ class CMSISLinearParser(GEMMParser):
     
     def parseNode(self, node: gs.ir.node.Node) -> (bool):
 
-        wellFormed = super().parseNode(node)
-        ret = False
-        if wellFormed:
-
-            ret = all([
-                self.parserDict['alpha'] == 1.0,
-                self.parserDict['beta'] == 1.0,
-                self.parserDict['transA'] == 0,
-                self.parserDict['transB'] == 1,
-            ])
-        
-        return ret
+        wellFormed = super().parseNode(node)        
+        return wellFormed
     
     def parseNodeCtxt(self, ctxt: NetworkContext, node: gs.ir.node.Node) -> (NetworkContext, bool):
 
@@ -104,7 +138,57 @@ class CMSISLinearParser(GEMMParser):
         newCtxt, ret = super().parseNodeCtxt(ctxt, node)
         
         if ret:
-            
+            # Try to transpose A offline if possible, else fail
+            if self.parserDict['transA']:
+                nameA = self.parserDict['A']
+                if ctxt.is_global(nameA) and isinstance(ctxt.lookup(nameA), ConstantBuffer):
+                    A = ctxt.lookup(nameA)
+                    npA = np.asarray(A.values).reshape(A.shape)
+                    newA = np.transpose(npA, list(range(len(A.shape)-2)) + [len(A.shape)-1, len(A.shape)-2])
+                    ctxt.globalObjects[nameA].shape = newA.shape
+                    ctxt.globalObjects[nameA].values = newA
+                    self.parserDict['transA'] = 0
+                else:
+                    return ctxt, False    
+
+            # Try to transpose B offline if possible, else fail
+            if self.parserDict['transB']:
+                nameB = self.parserDict['B']
+                if ctxt.is_global(nameB) and isinstance(ctxt.lookup(nameB), ConstantBuffer):
+                    B = ctxt.lookup(nameB)
+                    npB = np.asarray(B.values).reshape(B.shape)
+                    newB = np.transpose(npB, list(range(len(B.shape)-2)) + [len(B.shape)-1, len(B.shape)-2])
+                    ctxt.globalObjects[nameB].values = newB
+                    ctxt.globalObjects[nameB].shape = newB.shape
+                    self.parserDict['transB'] = 0
+                else:
+                    return ctxt, False    
+
+            # Try to scale A offline if possible, else fail
+            if self.parserDict['alpha'] != 1.0:
+                nameA = self.parserDict['A']
+                if ctxt.is_global(nameA) and isinstance(ctxt.lookup(nameA), ConstantBuffer):
+                    A = ctxt.lookup(nameA)
+                    npA = np.asarray(A.values).reshape(A.shape)
+                    newA = npA * alpha
+                    ctxt.globalObjects[nameA].values = newA
+                    self.parserDict['alpha'] = 1.0
+                else:
+                    return ctxt, False
+                
+            # Try to scale B offline if possible, else fail
+            if self.parserDict['beta'] != 1.0:
+                nameB = self.parserDict['B']
+                if ctxt.is_global(nameB) and isinstance(ctxt.lookup(nameB), ConstantBuffer):
+                    B = ctxt.lookup(nameB)
+                    npB = np.asarray(B.values).reshape(B.shape)
+                    newB = npB * beta
+                    ctxt.globalObjects[nameB].values = newB
+                    self.parserDict['beta'] = 1.0
+                else:
+                    return ctxt, False    
+                
             return newCtxt, True
+        
         return ctxt, False
     

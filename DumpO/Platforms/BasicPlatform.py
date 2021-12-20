@@ -108,5 +108,17 @@ class SimpleGlobalBuffer(ConstantBuffer):
     def dealloc(self):
         return FreeTemplate.referenceGlobalTemplate.generate(name = self.name)
 
+class SimpleStructBuffer(StructBuffer):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        
+    def alloc(self) -> str:
+        return AllocateTemplate.referenceStructTemplate.generate(type=type, name=name, structDict=structDict)
 
-BasicPlatform = DeploymentPlatform(BasicMapping, DataTypes, TypeInfer, SimpleNetworkBuffer, SimpleGlobalBuffer)
+    def dealloc(self) -> str:
+        return FreeTemplate.referenceLocalTemplate.generate(name=name)
+
+
+BasicOptimizer = NetworkOptimizer(passes=[])
+
+BasicPlatform = DeploymentPlatform(BasicMapping, DataTypes, TypeInfer, BasicOptimizer, SimpleNetworkBuffer, SimpleGlobalBuffer, SimpleStructBuffer)

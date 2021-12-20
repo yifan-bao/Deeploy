@@ -28,3 +28,9 @@ from DumpO.DumpOTypes import NodeTemplate
 referenceLocalTemplate = NodeTemplate("${type}* ${name} = (${type}*) malloc(sizeof(${type}) * ${size});")
 
 referenceGlobalTemplate = NodeTemplate("${type} ${name}[${size}] = {${values}};")
+
+referenceStructTemplate = NodeTemplate("""${type} ${name} {
+% for key, value in structDict.items(): 
+    .${key} = ${value},
+% endfor 
+};""")

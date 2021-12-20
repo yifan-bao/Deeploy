@@ -233,8 +233,9 @@ class RequantShiftParser(NodeParser):
         return ctxt, True
 
 class ConvParser(NodeParser):
-    def __init__(self):
+    def __init__(self, noBiasHoisting):
         super().__init__()
+        self.noBiasHoisting = noBiasHoisting
 
     def parseNode(self, node: gs.ir.node.Node) -> (bool):
 
@@ -245,9 +246,10 @@ class ConvParser(NodeParser):
             'pads' in node.attrs,
             'strides' in node.attrs,
             #SCHEREMO: While ONNX allows for 3 inputs (BIAS), we only accept 2, the input and the weight
-            len(node.inputs) >= 2,
             len(node.outputs) == 1
         ])
+        if self.noBiasHoisting:
+            wellFormed = wellFormed and (len(node.inputs)==2)
         
         if wellFormed:
             self.parserDict['group'] = node.attrs['group']
@@ -274,19 +276,20 @@ class ConvParser(NodeParser):
         if len(node.inputs) == 3:
             self.parserDict['bias'] = ctxt.lookup(node.inputs[2].name).name
         else:
-            values = np.zeros((1))
-            zeroTensor = gs.Constant(f'{node.name}_Bias_Tensor', values=values)
-            ctxt.hoistConstant(zeroTensor)
-            node.inputs.append(zeroTensor)
-            self.parserDict['bias'] = f'{node.name}_Bias_Tensor'
+            if not self.noBiasHoisting:
+                values = np.zeros((1))
+                zeroTensor = gs.Constant(f'{node.name}_Bias_Tensor', values=values)
+                ctxt.hoistConstant(zeroTensor)
+                node.inputs.append(zeroTensor)
+                self.parserDict['bias'] = f'{node.name}_Bias_Tensor'
             
         self.parserDict['size'] = np.prod(ctxt.lookup(node.inputs[0].name).shape)
 
         return ctxt, True
 
 class Conv2DParser(ConvParser):
-    def __init__(self):
-        super().__init__()
+    def __init__(self, noBiasHoisting = True):
+        super().__init__(noBiasHoisting)
     
     def parseNode(self, node: gs.ir.node.Node) -> (bool):
 
