@@ -81,14 +81,13 @@ CMSISMapping = {
 #     'GlobalAveragePool': ConvLayer([DummyMapper]),
 }
 
-def CMSISTypeInfer(node):
-    if type(node) == gs.ir.node.Node:
-        assert len(node.outputs) == 1, "Expected node for type inference to only have ONE output!"
-        outNode = node.attrs['value']
-    elif hasattr(node, 'values'):
+def CMSISTypeInfer(node: gs.ir.node.Node):
+    if hasattr(node, 'values'):
+        assert len(node.outputs) <= 1, "Expected node for type inference to only have ONE output!"
         outNode = node
     else:
-        raise ValueError("TypeInfer was given a wring type of node!")
+        import IPython; IPython.embed()
+        raise ValueError("TypeInfer was given a wrong type of node!")
 
     if hasattr(outNode, 'signed') and outNode.attrs['signed']:
         signed = True
@@ -108,27 +107,24 @@ class SimpleNetworkBuffer(VariableBuffer):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         
-    def alloc(self, name: str):
-        return AllocateTemplate.referenceLocalTemplate.generate(type = self._type._name_, name=name, size = np.prod(self.shape))
+    def alloc(self):
+        return AllocateTemplate.referenceLocalTemplate.generate(type = self._type._name_, name=self.name, size = np.prod(self.shape))
 
-    def dealloc(self, name: str):
-        return FreeTemplate.referenceLocalTemplate.generate(name = name)
+    def dealloc(self):
+        return FreeTemplate.referenceLocalTemplate.generate(name = self.name)
 
 class SimpleGlobalBuffer(ConstantBuffer):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         
-    def alloc(self, name: str):
+    def alloc(self):
         values = list(self.values.reshape(-1))
         strValues = [str(value) for value in values]
         valueString = ', '.join(strValues)
-        try:
-            return AllocateTemplate.referenceGlobalTemplate.generate(type = self._type._name_, name=name, size = np.prod(self.shape), values = valueString)
-        except Exception as e:
-            print(e)
-            import IPython; IPython.embed()
+        
+        return AllocateTemplate.referenceGlobalTemplate.generate(type = self._type._name_, name=self.name, size = np.prod(self.shape), values = valueString)
 
-    def dealloc(self, name: str):
-        return FreeTemplate.referenceGlobalTemplate.generate(name = name)
+    def dealloc(self):
+        return FreeTemplate.referenceGlobalTemplate.generate(name = self.name)
     
 CMSISPlatform = DeploymentPlatform(CMSISMapping, CMSISDataTypes, CMSISTypeInfer, SimpleNetworkBuffer, SimpleGlobalBuffer)

@@ -41,7 +41,7 @@ class ReshapeLayer(ONNXLayer):
         inputNames = [node.name for node in inputs]
         
         alloc = ctxt.allocLocal(self.node.name, outputNames)
-        call = self.mapper.generate()
+        call = self.mapper.generate(ctxt)
         dealloc = ctxt.freeLocal(self.node.name, inputNames)
         
         return (ctxt, [call])
@@ -58,7 +58,7 @@ class GatherLayer(ONNXLayer):
         inputNames = [node.name for node in inputs]
         
         alloc = ctxt.allocLocal(self.node.name, outputNames)
-        call = self.mapper.generate()
+        call = self.mapper.generate(ctxt)
         dealloc = ctxt.freeLocal(self.node.name, inputNames)
         
         return (ctxt, [call])

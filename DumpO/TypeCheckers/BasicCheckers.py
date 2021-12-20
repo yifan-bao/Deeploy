@@ -55,6 +55,7 @@ class MHSAChecker(NodeTypeChecker):
         super().__init__(input_types, output_types)
         
     def inferNumLevels(self, inputs: List[VariableBuffer], parserDict: Dict) -> List[int]:
+        wo_weight = inputs[9]
         return [2**16 * wo_weight.shape[-1]]
 
 class GEMMChecker(NodeTypeChecker):

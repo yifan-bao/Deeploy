@@ -32,12 +32,12 @@ class CMSISSaturatingAddChecker(NodeTypeChecker):
         super().__init__(input_types, output_types)
 
     def inferNumLevels(self, inputs: List[VariableBuffer], parserDict: Dict) -> List[int]:
-        return [min(inputs[0].nLevels + inputs[1].nLevels, 2**(self.input_type._value_))]    
+        return [min(inputs[0].nLevels + inputs[1].nLevels, 2**(self.input_types[0]._value_))]    
         
 class CMSISLinearChecker(NodeTypeChecker):
     def __init__(self, input_types: List[Enum], output_types: List[Enum]):
         super().__init__(input_types, output_types)
 
     def inferNumLevels(self, inputs: List[VariableBuffer], parserDict: Dict) -> List[int]:
-        return [2**(self.input_type._value_)]
+        return [2**(self.input_types[0]._value_)]
     

@@ -89,24 +89,24 @@ class SimpleNetworkBuffer(VariableBuffer):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         
-    def alloc(self, name):
-        return AllocTemplate.referenceLocalTemplate.generate(type = self._type._name_, name=name, size = np.prod(self.shape))
+    def alloc(self):
+        return AllocTemplate.referenceLocalTemplate.generate(type = self._type._name_, name=self.name, size = np.prod(self.shape))
 
-    def dealloc(self, name):
-        return FreeTemplate.referenceLocalTemplate.generate(name = name)
+    def dealloc(self):
+        return FreeTemplate.referenceLocalTemplate.generate(name = self.name)
 
 class SimpleGlobalBuffer(ConstantBuffer):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         
-    def alloc(self, name):
+    def alloc(self):
         values = list(self.values.reshape(-1))
         strValues = [str(value) for value in values]
         valueString = ', '.join(strValues)
-        return AllocTemplate.referenceGlobalTemplate.generate(type = self._type._name_, name=name, size = np.prod(self.shape), values = valueString)
+        return AllocTemplate.referenceGlobalTemplate.generate(type = self._type._name_, name=self.name, size = np.prod(self.shape), values = valueString)
 
-    def dealloc(self, name):
-        return FreeTemplate.referenceGlobalTemplate.generate(name = name)
+    def dealloc(self):
+        return FreeTemplate.referenceGlobalTemplate.generate(name = self.name)
 
 
 BasicPlatform = DeploymentPlatform(BasicMapping, DataTypes, TypeInfer, SimpleNetworkBuffer, SimpleGlobalBuffer)

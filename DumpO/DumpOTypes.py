@@ -50,11 +50,11 @@ class VariableBuffer():
         self._live = False
 
     # Allocation code. Choose your Template, might want to override aswell!
-    def alloc(self, name: str) -> str:
+    def alloc(self) -> str:
         return ''
     
     # Deallocation code. Choose your Template!
-    def dealloc(self, name: str) -> str:
+    def dealloc(self) -> str:
         return ''
     
     def __str__(self) -> str:
@@ -81,11 +81,11 @@ class ConstantBuffer(VariableBuffer):
         self._live = True
         
     # Allocation code. Choose your Template, might want to override aswell!
-    def alloc(self, name: str) -> str:
+    def alloc(self) -> str:
         return ''
     
     # Deallocation code. Choose your Template!
-    def dealloc(self, name: str) -> str:
+    def dealloc(self) -> str:
         return ''
 
     def __str__(self) -> str:
@@ -108,39 +108,39 @@ class NetworkContext():
         self.ConstantBuffer = constantBuffer
         self.name = name
 
-    def mangle(self, name: str) -> str:
+    def _mangle(self, name: str) -> str:
         return '_DumpO_BUFFER__'  + re.sub('\.','_',self.name) + '_' + re.sub('\.','_',name)
-        
+    
     def add(self, obj : VariableBuffer, ctxt = 'local'):
         if ctxt == 'local':
-            if self.mangle(obj.name) not in self.localObjects.keys():
-                self.localObjects[self.mangle(obj.name)] = obj
+            if obj.name not in self.localObjects.keys():
+                self.localObjects[obj.name] = obj
             else:
                 raise KeyError(f'Buffername {obj.name} was already in the local context!')
         elif ctxt == 'global':
-            if self.mangle(obj.name) not in self.localObjects.keys():
-                self.globalObjects[self.mangle(obj.name)] = obj
+            if obj.name not in self.globalObjects.keys():
+                self.globalObjects[obj.name] = obj
             else:
                 raise KeyError(f'Buffername {obj.name} was already in the global context!')
         else:
             raise ValueError("Expected either local or global context")
 
     def lookup(self, name):
-        if self.mangle(name) in self.localObjects.keys():
-            return self.localObjects[self.mangle(name)]
-        elif self.mangle(name) in self.globalObjects.keys():
-            return self.globalObjects[self.mangle(name)]
+        if name in self.localObjects.keys():
+            return self.localObjects[name]
+        elif name in self.globalObjects.keys():
+            return self.globalObjects[name]
         else:
             raise KeyError(f'Expected key {name} to be in either local of global context!')
 
     def is_global(self, name) -> bool:
-        if self.mangle(name) in self.globalObjects.keys():
+        if name in self.globalObjects.keys():
             return True
         else:
             False
 
     def is_local(self, name) -> bool:
-        if self.mangle(name) in self.localObjects.keys():
+        if name in self.localObjects.keys():
             return True
         else:
             False
@@ -151,13 +151,14 @@ class NetworkContext():
 
         if name == "":
             name = node.name
-        
+            
         # SCHEREMO: This is currently heuristic, but should be annotated in ONNX
         localBuffer = self.VariableBuffer().fromNode(node = node, nLevels = int(node.values.max() - node.values.min()))
         globalBuffer = self.ConstantBuffer().fromVariableBuffer(localBuffer, values=node.values)
         globalBuffer.name = name
 
         self.add(globalBuffer, 'global')
+        
         return None
 
     def addUser(self, name:str, node):
@@ -165,20 +166,20 @@ class NetworkContext():
         if node not in _buffer._users:
             _buffer._users.append(node)
         if self.is_local(_buffer.name):
-            self.localObjects[self.mangle(_buffer.name)] = _buffer
+            self.localObjects[_buffer.name] = _buffer
         else:
-            self.globalObjects[self.mangle(_buffer.name)] = _buffer
+            self.globalObjects[_buffer.name] = _buffer
 
     def annotateType(self, name: str, nLevels: int, _type: Enum):
         obj = self.lookup(name)
         if 2**(_type._value_) < nLevels:
             raise ValueError(f'Tried to annotate {name} with {_type}, but {name} has {nLevels} nLevels!')
         if self.is_global(name):
-            self.globalObjects[self.mangle(name)]._type = _type
-            self.globalObjects[self.mangle(name)].nLevels = nLevels
+            self.globalObjects[name]._type = _type
+            self.globalObjects[name].nLevels = nLevels
         elif self.is_local(name):
-            self.localObjects[self.mangle(name)]._type = _type
-            self.localObjects[self.mangle(name)].nLevels = nLevels
+            self.localObjects[name]._type = _type
+            self.localObjects[name].nLevels = nLevels
         else:
             raise KeyError(f'Tried to annotate {name}, but it is in no Context')
         
@@ -188,12 +189,14 @@ class NetworkContext():
         # We have to allocate the output buffers, unless they are global
         for buffer in outBuffers:
             if self.is_local(buffer):
-                nb = self.lookup(buffer)
+                nb = copy.deepcopy(self.lookup(buffer))
                 
-                assert self.localObjects[self.mangle(nb.name)]._live == False, "Tried to allocate already live buffer {nb.name}"
+                assert self.localObjects[nb.name]._live == False, "Tried to allocate already live buffer {nb.name}"
+                self.localObjects[nb.name]._live = True
                 
-                allocCode.append(nb.alloc(self.mangle(nb.name)))
-                self.localObjects[self.mangle(nb.name)]._live = True
+                nb.name = self._mangle(nb.name)
+                allocCode.append(nb.alloc())
+
                 
             elif self.is_global(buffer):
                 pass
@@ -208,14 +211,16 @@ class NetworkContext():
         # We have to free the input buffers, unless they are global OR we are not the last user
         for buffer in inBuffers:
             if self.is_local(buffer):
-                nb = self.lookup(buffer)
+                nb = copy.deepcopy(self.lookup(buffer))
                 # If we are the last user in the list, we can safely free
                 if nodeName == nb._users[-1]:
 
-                    assert self.localObjects[self.mangle(nb.name)]._live == True, "Tried to deallocate already non-live buffer {nb.name}"
+                    assert self.localObjects[nb.name]._live == True, "Tried to deallocate already non-live buffer {nb.name}"
+                    self.localObjects[nb.name]._live = False
                     
-                    allocCode.append(nb.dealloc(self.mangle(nb.name)))
-                    self.localObjects[self.mangle(nb.name)]._live = False
+                    nb.name = self._mangle(nb.name)
+                    allocCode.append(nb.dealloc())
+
                     
             elif self.is_global(buffer):
                 pass
@@ -302,6 +307,8 @@ class NodeTypeChecker():
     # Don't override this. Automated annotation of global buffer
     def typeInferGlobalCtxt(self, ctxt: NetworkContext, node: gs.ir.node.Node, typeInfer: Callable) -> NetworkContext:
         ctxt = ctxt.copy()
+
+        #import IPython; IPython.embed()
         
         # Find all input Nodes in global Context
         globalInputNodes = [inputNode for inputNode in node.inputs if ctxt.is_global(inputNode.name)]
@@ -309,12 +316,23 @@ class NodeTypeChecker():
         # Don't override previous annotations
         nodesToAnnotate = [inputNode for inputNode in globalInputNodes if ctxt.lookup(inputNode.name)._type == None]
         
-        for node in nodesToAnnotate:
-            _buffer = ctxt.lookup(node.name)
-            _type = typeInfer(node)
+        for inputNode in nodesToAnnotate:
+
+            # SPECIAL CASE HANDLING: CONSTANT WAS NOT FOLDED CORRECTLY
+            if len(inputNode.inputs) == 1 and hasattr(inputNode.inputs[0], 'attrs') and 'value' in list(inputNode.inputs[0].attrs.keys()):
+                typeNode = inputNode.inputs[0].attrs['value']
+            else:
+                typeNode = inputNode
+            
+            _buffer = ctxt.lookup(inputNode.name)
+            try:
+                _type = typeInfer(typeNode)
+            except:
+                import IPython; IPython.embed()
+
             # Check the actual numLevels
             nLevels = _buffer.values.max() - _buffer.values.min()
-            ctxt.annotateType(node.name, nLevels, _type)
+            ctxt.annotateType(inputNode.name, nLevels, _type)
         
         return ctxt
 
@@ -428,8 +446,17 @@ class NodeMapper():
         else:
             return (ctxt, False)
         
-    def generate(self) -> List[str]:
-        return [self.template.generate(**{**self.parser.parserDict, **self.typeChecker.typeDict})]
+    def generate(self, ctxt: NetworkContext) -> List[str]:
+
+        parseDict = {}
+        
+        for key, value in self.parser.parserDict.items():
+            if type(value) == str and (ctxt.is_local(value) or ctxt.is_global(value)):
+                parseDict[key] = ctxt._mangle(value)
+            else:
+                parseDict[key] = value
+        
+        return [self.template.generate(**{**parseDict, **self.typeChecker.typeDict})]
 
 class ONNXLayer():
     
@@ -441,11 +468,36 @@ class ONNXLayer():
         self.mapper = None
         self.node = None
 
+    # Override this for broadcasting support
+    # Returns a tuple of new, broadcasted inputShapes and outputShapes
+    def computeShapes(self, inputShapes: List[np.shape], outputShapes: List[np.shape]) -> (List[np.shape], List[np.shape]):
+        return (inputShapes, outputShapes)
+        
+    def broadcast(self, ctxt: NetworkContext) -> (NetworkContext):
+        ctxt = ctxt.copy()
+        
+        inputShapes = [ctxt.lookup(node.name).shape for node in self.node.inputs]
+        outputShapes = [ctxt.lookup(node.name).shape for node in self.node.outputs]
+
+        newInputShapes, newOutputShapes = self.computeShapes(inputShapes, outputShapes)
+
+        for node, shape in zip(self.node.inputs + self.node.outputs, newInputShapes + newOutputShapes):
+            if ctxt.is_local(node.name):
+                ctxt.localObjects[node.name].shape = shape
+            elif ctxt.is_global(node.name):
+                ctxt.globalObjects[node.name].shape = shape
+            else:
+                raise KeyError(f'Expected node {node.name} to be in context!')
+
+        return ctxt
+    
+    # Don't override - binds the layer to a node
     def __call__(self, node: gs.ir.node.Node):
         _copy = copy.deepcopy(self)
         _copy.node = node
         return _copy
 
+    # Don't override
     # Does not copy the node, so every node in the graph is kept as reference
     # Also work around the fact that NodeMappers' templates are not deepcopyable
     def __deepcopy__(self, memo):
@@ -490,11 +542,7 @@ class ONNXLayer():
             return retCtxt, True
         
         # If none worked, throw exception
-        #import IPython; IPython.embed()
         raise RuntimeError(f'Did not find adequate mapping for node {self.node.name}!')
-        
-    def bindIterator(self):
-        return iter(self.boundMaps)
     
     # Do not override unless you know what you're doin - this generates code + buffer allocation / de-allocation
     # parseIO has to be called in advance!
@@ -507,7 +555,7 @@ class ONNXLayer():
         inputNames = [node.name for node in inputs]
         
         alloc = ctxt.allocLocal(self.node.name, outputNames)
-        call = self.mapper.generate()
+        call = self.mapper.generate(ctxt)
         dealloc = ctxt.freeLocal(self.node.name, inputNames)
 
         generated_code = [alloc, call, dealloc]
@@ -525,7 +573,7 @@ class NetworkContainer():
     def __init__(self, graph: gs.Graph, platform: DeploymentPlatform, scheduler: Callable = lambda x: x, name: str = 'DumpONetwork'):
         self.graph = graph
         self.scheduler = scheduler
-        self.ctxt = NetworkContext(platform.VariableBuffer, platform.ConstantBuffer, name = name)
+        self.ctxt = None
         self.layerBinding = []
         self.parsed = False
         self.Platform = platform
@@ -559,7 +607,18 @@ class NetworkContainer():
 
         return ctxt
 
-    #Don't override this
+    # Don't override this
+    def broadcast(self) -> bool:
+        
+        ctxt = self.ctxt.copy()
+        
+        for name, layer in self.layerBinding:
+            ctxt = layer.broadcast(ctxt)
+
+        self.ctxt = ctxt
+        return True
+            
+    # Don't override this
     def bind(self) -> bool:
         if not self.parsed:
             raise ValueError('You need to parse the network before binding!')
@@ -584,7 +643,8 @@ class NetworkContainer():
     # Don't override this        
     def parse(self) -> bool:
         # Reset context
-        self.ctxt = self._createIOBindings(NetworkContext(self.Platform.VariableBuffer, self.Platform.ConstantBuffer), self.graph)
+        self.ctxt = NetworkContext(self.Platform.VariableBuffer, self.Platform.ConstantBuffer, {}, {})
+        self.ctxt = self._createIOBindings(self.ctxt, self.graph)
         
         # Create schedule, binding, then parse resulting program for correctness
         # Create schedule
@@ -660,11 +720,12 @@ class NetworkDeployer(NetworkContainer):
 
     def prepare(self):
         self.parse()
+        self.broadcast()
         self.bind()
         self.prepared = True
         
-    def generateFunction(self):
+    def generateFunction(self) -> str:
         if not self.prepared:
             self.prepare()
-    
+
         return self.generateInferenceCode()

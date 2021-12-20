@@ -444,10 +444,8 @@ class MatMulParser(NodeParser):
         # Create fake C node for GEMM-compatibility and hoist it
         values = np.zeros((1))
         zeroTensor = gs.Constant(f'{node.name}_C_Tensor', values=values)
-        Cnode = gs.ir.node.Node('Constant', f'{node.name}_C', [], [zeroTensor])
-
-        self.ctxt.hoistConstant(Cnode)
-        self.parserDict['C'] = 'NULL'
+        ctxt.hoistConstant(zeroTensor)
+        self.parserDict['C'] = 0
             
         self.parserDict['size'] = np.prod(ctxt.lookup(node.inputs[0].name).shape)
 
