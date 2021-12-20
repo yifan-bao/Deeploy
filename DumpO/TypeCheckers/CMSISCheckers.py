@@ -31,15 +31,13 @@ class CMSISSaturatingAddChecker(NodeTypeChecker):
     def __init__(self, input_types: List[Enum], output_types: List[Enum]):
         super().__init__(input_types, output_types)
 
-    def inferNumLevels(self, ctxt: NetworkContext, node: gs.ir.node.Node, **kwargs) -> List[int]:
-        inputs = [ctxt.lookup(inputNode.name) for inputNode in node.inputs]
-        
+    def inferNumLevels(self, inputs: List[VariableBuffer], parserDict: Dict) -> List[int]:
         return [min(inputs[0].nLevels + inputs[1].nLevels, 2**(self.input_type._value_))]    
         
 class CMSISLinearChecker(NodeTypeChecker):
     def __init__(self, input_types: List[Enum], output_types: List[Enum]):
         super().__init__(input_types, output_types)
 
-    def inferNumLevels(self, ctxt: NetworkContext, node: gs.ir.node.Node, **kwargs) -> List[int]:
+    def inferNumLevels(self, inputs: List[VariableBuffer], parserDict: Dict) -> List[int]:
         return [2**(self.input_type._value_)]
     

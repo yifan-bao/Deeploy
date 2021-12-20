@@ -243,7 +243,7 @@ class NodeTypeChecker():
         self.typeDict = {}
         
     # Override this. This should compute the nLevels of each output node of the Layer
-    def inferNumLevels(self, ctxt: NetworkContext, node: gs.ir.node.Node, parserDict: Dict) -> List[int]:
+    def inferNumLevels(self, inputs: List[VariableBuffer], parserDict: Dict) -> List[int]:
         return [2**64 for type in self.output_types]
         
     # Don't override this. This should check that the input n_levels are appropriate for the kernel
@@ -258,8 +258,9 @@ class NodeTypeChecker():
     # Don't override this. This should check that the output n_levels are appropriate for the kernel
     def typeCheckNodeOutputs(self, ctxt: NetworkContext, node: gs.ir.node.Node, parserDict) -> bool:
         newCtxt = ctxt.copy()
-        nLevelsList = self.inferNumLevels(newCtxt, node, **parserDict)
-            
+        inputName = [i.name for i in node.inputs]
+        inputs = [ctxt.lookup(name) for name in inputName]
+        nLevelsList = self.inferNumLevels(inputs, parserDict)
         return all(
             [nLevels <= 2**(output_type._value_) for nLevels, output_type in zip(nLevelsList, self.output_types)]
         )
@@ -273,7 +274,7 @@ class NodeTypeChecker():
         inputName = [i.name for i in node.inputs]
         inputs = [newCtxt.lookup(name) for name in inputName]
         
-        nLevelsList = self.inferNumLevels(newCtxt, node, **parserDict)
+        nLevelsList = self.inferNumLevels(inputs, parserDict)
         
         outputNodes = node.outputs
         outputNames = [node.name for node in outputNodes]

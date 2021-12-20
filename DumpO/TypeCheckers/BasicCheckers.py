@@ -31,16 +31,14 @@ class AddChecker(NodeTypeChecker):
     def __init__(self, input_types: List[Enum], output_types: List[Enum]):
         super().__init__(input_types, output_types)
 
-    def inferNumLevels(self, ctxt: NetworkContext, node: gs.ir.node.Node, **kwargs) -> List[int]:
-        inputs = [ctxt.lookup(inputNode.name) for inputNode in node.inputs]
+    def inferNumLevels(self, inputs: List[VariableBuffer], parserDict: Dict) -> List[int]:
         return [inputs[0].nLevels + inputs[1].nLevels]
         
 class GatherChecker(NodeTypeChecker):
     def __init__(self, input_types: List[Enum], output_types: List[Enum]):
         super().__init__(input_types, output_types)
         
-    def inferNumLevels(self, ctxt: NetworkContext, node: gs.ir.node.Node, **kwargs) -> List[int]:
-        inputs = [ctxt.lookup(inputNode.name) for inputNode in node.inputs]
+    def inferNumLevels(self, inputs: List[VariableBuffer], parserDict: Dict) -> List[int]:
         return [inputs[0].nLevels]
 
 
@@ -48,8 +46,7 @@ class ReshapeChecker(NodeTypeChecker):
     def __init__(self, input_types: List[Enum], output_types: List[Enum]):
         super().__init__(input_types, output_types)
         
-    def inferNumLevels(self, ctxt: NetworkContext, node: gs.ir.node.Node, **kwargs) -> List[int]:
-        inputs = [ctxt.lookup(inputNode.name) for inputNode in node.inputs]
+    def inferNumLevels(self, inputs: List[VariableBuffer], parserDict: Dict) -> List[int]:
         return [inputs[0].nLevels]
 
 #SCHEREMO: Fix this
@@ -57,56 +54,49 @@ class MHSAChecker(NodeTypeChecker):
     def __init__(self, input_types: List[Enum], output_types: List[Enum]):
         super().__init__(input_types, output_types)
         
-    def inferNumLevels(self, ctxt: NetworkContext, node: gs.ir.node.Node, **kwargs) -> List[int]:
-        inputs = [ctxt.lookup(inputNode.name) for inputNode in node.inputs]
+    def inferNumLevels(self, inputs: List[VariableBuffer], parserDict: Dict) -> List[int]:
         return [2**16 * wo_weight.shape[-1]]
 
 class GEMMChecker(NodeTypeChecker):
     def __init__(self, input_types: List[Enum], output_types: List[Enum]):
         super().__init__(input_types, output_types)
         
-    def inferNumLevels(self, ctxt: NetworkContext, node: gs.ir.node.Node, **kwargs) -> List[int]:
-        inputs = [ctxt.lookup(inputNode.name) for inputNode in node.inputs]
-        return [2**((self.input_types[0]._value_)*2) * inputs[0].shape[-1 - kwargs['transA']]]
+    def inferNumLevels(self, inputs: List[VariableBuffer], parserDict: Dict) -> List[int]:
+        return [2**((self.input_types[0]._value_)*2) * inputs[0].shape[-1 - parserDict['transA']]]
 
 class iLayerNormChecker(NodeTypeChecker):
     def __init__(self, input_types: List[Enum], output_types: List[Enum]):
         super().__init__(input_types, output_types)
         
-    def inferNumLevels(self, ctxt: NetworkContext, node: gs.ir.node.Node, **kwargs) -> List[int]:
-        inputs = [ctxt.lookup(inputNode.name) for inputNode in node.inputs]
+    def inferNumLevels(self, inputs: List[VariableBuffer], parserDict: Dict) -> List[int]:
         return [2**(self.input_types[0]._value_)]
 
 class GELUChecker(NodeTypeChecker):
     def __init__(self, input_types: List[Enum], output_types: List[Enum]):
         super().__init__(input_types, output_types)
         
-    def inferNumLevels(self, ctxt: NetworkContext, node: gs.ir.node.Node, **kwargs) -> List[int]:
-        inputs = [ctxt.lookup(inputNode.name) for inputNode in node.inputs]
+    def inferNumLevels(self, inputs: List[VariableBuffer], parserDict: Dict) -> List[int]:
         return [2**(self.input_types[0]._value_)]
 
 class ConvChecker(NodeTypeChecker):
     def __init__(self, input_types: List[Enum], output_types: List[Enum]):
         super().__init__(input_types, output_types)
         
-    def inferNumLevels(self, ctxt: NetworkContext, node: gs.ir.node.Node, **kwargs) -> List[int]:
-        inputs = [ctxt.lookup(inputNode.name) for inputNode in node.inputs]
-        weight = ctxt.lookup(kwargs['weight'])
-        return [np.prod(kwargs['kernel_shape']) * weight.shape[1] * 2**(self.input_types[0]._value_)]
+    def inferNumLevels(self, inputs: List[VariableBuffer], parserDict: Dict) -> List[int]:
+        weight = inputs[1]
+        return [np.prod(parserDict['kernel_shape']) * weight.shape[1] * 2**(self.input_types[0]._value_)]
 
 class RequantShiftChecker(NodeTypeChecker):
     def __init__(self, input_types: List[Enum], output_types: List[Enum]):
         super().__init__(input_types, output_types)
         
-    def inferNumLevels(self, ctxt: NetworkContext, node: gs.ir.node.Node, **kwargs) -> List[int]:
-        inputs = [ctxt.lookup(inputNode.name) for inputNode in node.inputs]
+    def inferNumLevels(self, inputs: List[VariableBuffer], parserDict: Dict) -> List[int]:
         return [2**8]
         
 class DummyChecker(NodeTypeChecker):
     def __init__(self, input_types: List[Enum], output_types: List[Enum]):
         super().__init__(input_types, output_types)
         
-    def inferNumLevels(self, ctxt: NetworkContext, node: gs.ir.node.Node, **kwargs) -> List[int]:
-        inputs = [ctxt.lookup(inputNode.name) for inputNode in node.inputs]
+    def inferNumLevels(self, inputs: List[VariableBuffer], parserDict: Dict) -> List[int]:
         return [2**(self.input_types[0]._value_)]
         
