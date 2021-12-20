@@ -3,6 +3,10 @@ requires = [
     "setuptools>=42",
     "wheel",
     "onnx",
-    "mako"
+    "mako",
+    "copy",
+    "re",
+    "numpy",
+    "enum"
 ]
 build-backend = "setuptools.build_meta"
