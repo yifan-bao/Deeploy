@@ -1,1 +1,2 @@
-from . import *
+from .ConvTemplate import *
+from .AddTemplate import *

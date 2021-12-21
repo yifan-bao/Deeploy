@@ -28,29 +28,26 @@ from enum import Enum
 import mako
 import onnx_graphsurgeon as gs
 
-from DumpO.Parsers.BasicParsers import *
-from DumpO.TypeCheckers.BasicCheckers import *
 from DumpO.Layers.BasicLayers import *
-from DumpO.Templates.BasicTemplates import *
+from DumpO.Parsers.BasicParsers import *
+from DumpO.Bindings.BasicBindings import *
 
-class DataTypes(Enum):
-    int8_t = 8
-    int16_t = 16
-    int32_t = 32
+GELU_int8_Mapper = NodeMapper(GELUParser(), [BasicGELUBinding])
+iLayerNorm_int8_Mapper = NodeMapper(iLayerNormParser(), [BasicLayerNormBinding])
+MatMul_int8_Mapper = NodeMapper(GEMMParser(), [BasicGEMMBinding])
+GEMM_int8_Mapper = NodeMapper(GEMMParser(), [BasicGEMMBinding])
+Conv_int8_Mapper = NodeMapper(Conv2DParser(), [BasicConv2DBinding])
+#Conv_int8_Mapper_testo = NodeMapper(Conv2DParser(), ConvChecker([CMSISDataTypes.int8_t, CMSISDataTypes.int8_t], [CMSISDataTypes.int16_t]), DummyTemplate.referenceTemplate)
+MHSA_int8_Mapper = NodeMapper(MHSAParser(), [BasicMHSABinding])
 
-GELU_int8_Mapper = NodeMapper(GELUParser(), GELUChecker([DataTypes.int8_t], [DataTypes.int8_t]), iGELUTemplate.referenceTemplate)
-iLayerNorm_int8_Mapper = NodeMapper(iLayerNormParser(), iLayerNormChecker([DataTypes.int8_t,DataTypes.int32_t,DataTypes.int32_t], [DataTypes.int8_t]), DummyTemplate.referenceTemplate)
-MatMul_int8_Mapper = NodeMapper(MatMulParser(), GEMMChecker([DataTypes.int8_t, DataTypes.int8_t], [DataTypes.int32_t]), GEMMTemplate.referenceTemplate)
-GEMM_int8_Mapper = NodeMapper(GEMMParser(), GEMMChecker([DataTypes.int8_t, DataTypes.int8_t, DataTypes.int32_t], [DataTypes.int32_t]), GEMMTemplate.referenceTemplate)
-Conv_int8_Mapper = NodeMapper(Conv2DParser(), ConvChecker([DataTypes.int8_t, DataTypes.int8_t, DataTypes.int8_t], [DataTypes.int32_t]), DummyTemplate.referenceTemplate)
-MHSA_int8_Mapper = NodeMapper(MHSAParser(), MHSAChecker([DataTypes.int8_t], [DataTypes.int32_t]), MHSATemplate.referenceTemplate)
+GatherMapper = NodeMapper(GatherParser(), BasicGatherBindings)
+ReshapeMapper = NodeMapper(ReshapeParser(), BasicReshapeBindings)
+FlattenMapper = NodeMapper(FlattenParser(), BasicReshapeBindings)
+RequantShiftMapper = NodeMapper(RequantShiftParser(), BasicRQSBindings)
 
-GatherMappers = [NodeMapper(GatherParser(), GatherChecker([type],[type]), GatherTemplate.referenceTemplate) for type in DataTypes]
-ReshapeMappers = [NodeMapper(ReshapeParser(), ReshapeChecker([type],[type]), SkipTemplate.referenceTemplate) for type in DataTypes]
-RequantShiftMappers = [NodeMapper(RequantShiftParser(), RequantShiftChecker([type,DataTypes.int32_t,DataTypes.int32_t], [DataTypes.int8_t]), RequantShiftTemplate.referenceTemplate) for type in DataTypes]
-AddMappers = [NodeMapper(AddParser(), AddChecker([type], [DataTypes.int32_t]), AddTemplate.referenceTemplate) for type in DataTypes]
+AddMapper = NodeMapper(AddParser(), BasicAddBindings)
 
-DummyMapper = NodeMapper(DummyParser(), DummyChecker([DataTypes.int8_t],[DataTypes.int8_t]), DummyTemplate.referenceTemplate)
+DummyMapper = NodeMapper(DummyParser(), [DummyBinding])
 
 BasicMapping = {
     'Conv' : ConvLayer([Conv_int8_Mapper]),
@@ -60,10 +57,10 @@ BasicMapping = {
     'MatMul': GEMMLayer([MatMul_int8_Mapper]),
     'Gemm': GEMMLayer([GEMM_int8_Mapper]),
     
-    'Gather': GatherLayer(GatherMappers),
-    'Add': AddLayer(AddMappers),
-    'RequantShift' : RequantShiftLayer(RequantShiftMappers),
-    'Reshape': ReshapeLayer(ReshapeMappers),
+    'Gather': GatherLayer([GatherMapper]),
+    'Add': AddLayer([AddMapper]),
+    'RequantShift' : RequantShiftLayer([RequantShiftMapper]),
+    'Reshape': ReshapeLayer([ReshapeMapper]),
     'Flatten': ConvLayer([DummyMapper]),
     'GlobalAveragePool': ConvLayer([DummyMapper]),
 }

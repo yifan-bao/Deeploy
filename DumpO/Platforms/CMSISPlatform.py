@@ -30,57 +30,44 @@ import onnx_graphsurgeon as gs
 from DumpO.Parsers.BasicParsers import *
 from DumpO.Parsers.CMSISParsers import *
 
-from DumpO.TypeCheckers.BasicCheckers import *
-from DumpO.TypeCheckers.CMSISCheckers import *
-
 from DumpO.Layers.BasicLayers import *
-from DumpO.Templates.BasicTemplates import *
 
-from DumpO.Templates.CMSISTemplates import ConvTemplate, AddTemplate
+from DumpO.Bindings.BasicBindings import *
+from DumpO.Bindings.CMSISBindings import *
 
 from DumpO.OptimizationPasses.CMSISPasses import *
 
-class CMSISDataTypes(Enum):
-    int8_t = 8
-    int16_t = 16
-    int32_t = 32
-
-GELU_int8_Mapper = NodeMapper(GELUParser(), GELUChecker([CMSISDataTypes.int8_t], [CMSISDataTypes.int8_t]), iGELUTemplate.referenceTemplate)
-iLayerNorm_int8_Mapper = NodeMapper(iLayerNormParser(), iLayerNormChecker([CMSISDataTypes.int8_t,CMSISDataTypes.int32_t,CMSISDataTypes.int32_t], [CMSISDataTypes.int8_t]), DummyTemplate.referenceTemplate)
-MatMul_int8_Mapper = NodeMapper(CMSISLinearParser(), GEMMChecker([CMSISDataTypes.int8_t, CMSISDataTypes.int8_t], [CMSISDataTypes.int32_t]), GEMMTemplate.referenceTemplate)
-GEMM_int8_Mapper = NodeMapper(CMSISLinearParser(), GEMMChecker([CMSISDataTypes.int8_t, CMSISDataTypes.int8_t, CMSISDataTypes.int32_t], [CMSISDataTypes.int32_t]), GEMMTemplate.referenceTemplate)
-Conv_int8_Mapper = NodeMapper(Conv2DParser(), ConvChecker([CMSISDataTypes.int8_t, CMSISDataTypes.int8_t], [CMSISDataTypes.int32_t]), DummyTemplate.referenceTemplate)
+GELU_int8_Mapper = NodeMapper(GELUParser(), [BasicGELUBinding])
+iLayerNorm_int8_Mapper = NodeMapper(iLayerNormParser(), [BasicLayerNormBinding])
+MatMul_int8_Mapper = NodeMapper(CMSISLinearParser(), [BasicGEMMBinding])
+GEMM_int8_Mapper = NodeMapper(CMSISLinearParser(), [BasicGEMMBinding])
+Conv_int8_Mapper = NodeMapper(Conv2DParser(), [BasicConv2DBinding])
 #Conv_int8_Mapper_testo = NodeMapper(Conv2DParser(), ConvChecker([CMSISDataTypes.int8_t, CMSISDataTypes.int8_t], [CMSISDataTypes.int16_t]), DummyTemplate.referenceTemplate)
-MHSA_int8_Mapper = NodeMapper(MHSAParser(), MHSAChecker([CMSISDataTypes.int8_t], [CMSISDataTypes.int32_t]), MHSATemplate.referenceTemplate)
+MHSA_int8_Mapper = NodeMapper(MHSAParser(), [BasicMHSABinding])
 
-GatherMappers = [NodeMapper(GatherParser(), GatherChecker([type],[type]), GatherTemplate.referenceTemplate) for type in CMSISDataTypes]
-ReshapeMappers = [NodeMapper(ReshapeParser(), ReshapeChecker([type],[type]), SkipTemplate.referenceTemplate) for type in CMSISDataTypes]
-FlattenMappers = [NodeMapper(FlattenParser(), ReshapeChecker([type],[type]), SkipTemplate.referenceTemplate) for type in CMSISDataTypes]
-RequantShiftMappers = [NodeMapper(RequantShiftParser(), RequantShiftChecker([type,CMSISDataTypes.int32_t,CMSISDataTypes.int32_t], [CMSISDataTypes.int8_t]), RequantShiftTemplate.referenceTemplate) for type in CMSISDataTypes]
+GatherMapper = NodeMapper(GatherParser(), BasicGatherBindings)
+ReshapeMapper = NodeMapper(ReshapeParser(), BasicReshapeBindings)
+FlattenMapper = NodeMapper(FlattenParser(), BasicReshapeBindings)
+RequantShiftMapper = NodeMapper(RequantShiftParser(), BasicRQSBindings)
 
-Conv_int8_Mapper = NodeMapper(CMSISConv2DParser(), ConvChecker([CMSISDataTypes.int8_t,CMSISDataTypes.int8_t], [CMSISDataTypes.int32_t]), ConvTemplate.conv2DTemplate)
-AddMappers = [
-    NodeMapper(AddParser(), CMSISSaturatingAddChecker([CMSISDataTypes.int8_t],[CMSISDataTypes.int8_t]), AddTemplate.AddInt8Template),
-    NodeMapper(AddParser(), CMSISSaturatingAddChecker([CMSISDataTypes.int16_t],[CMSISDataTypes.int16_t]), AddTemplate.AddInt16Template),
-    NodeMapper(AddParser(), CMSISSaturatingAddChecker([CMSISDataTypes.int32_t],[CMSISDataTypes.int32_t]), AddTemplate.AddInt32Template) ]
+Conv_int8_Mapper = NodeMapper(CMSISConv2DParser(), [CMSISConv2DBinding])
+AddMapper = NodeMapper(AddParser(), CMSISSaturatingAddBindings)
 
-DummyMapper = NodeMapper(DummyParser(), DummyChecker([CMSISDataTypes.int8_t],[CMSISDataTypes.int8_t]), DummyTemplate.referenceTemplate)
+DummyMapper = NodeMapper(DummyParser(), [DummyBinding])
 
 CMSISMapping = {
     'Conv' : ConvLayer([Conv_int8_Mapper]),
-    #'Conv' : ConvLayer([Conv_int8_Mapper_testo, Conv_int8_Mapper]),
     'iLayerNorm': iLayerNormLayer([iLayerNorm_int8_Mapper]),
     'MultiHeadSelfAttention': MHSALayer([MHSA_int8_Mapper]),
     'iGELU' : iGELULayer([GELU_int8_Mapper]),
     'MatMul': GEMMLayer([MatMul_int8_Mapper]),
     'Gemm': GEMMLayer([GEMM_int8_Mapper]),
     
-    'Gather': GatherLayer(GatherMappers),
-    'Add': AddLayer(AddMappers),
-    'RequantShift' : RequantShiftLayer(RequantShiftMappers),
-    'Reshape': ReshapeLayer(ReshapeMappers),
-    'Flatten': ReshapeLayer(FlattenMappers),
-#     'GlobalAveragePool': ConvLayer([DummyMapper]),
+    'Gather': GatherLayer([GatherMapper]),
+    'Add': AddLayer([AddMapper]),
+    'RequantShift' : RequantShiftLayer([RequantShiftMapper]),
+    'Reshape': ReshapeLayer([ReshapeMapper]),
+    'Flatten': ReshapeLayer([FlattenMapper]),
 }
 
 def CMSISTypeInfer(node: gs.ir.node.Node):
