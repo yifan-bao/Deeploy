@@ -41,3 +41,9 @@ class CMSISLinearChecker(NodeTypeChecker):
     def inferNumLevels(self, inputs: List[VariableBuffer], parserDict: Dict) -> List[int]:
         return [2**(self.input_types[0]._value_)]
     
+class CMSISConvChecker(NodeTypeChecker):
+    def __init__(self, input_types: List[Enum], output_types: List[Enum]):
+        super().__init__(input_types, output_types)
+
+    def inferNumLevels(self, inputs: List[VariableBuffer], parserDict: Dict) -> List[int]:
+        return [2**(self.input_types[0]._value_)]

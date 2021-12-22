@@ -169,12 +169,12 @@ class NetworkContext():
     def addUser(self, name:str, node):
         _buffer = self.lookup(name)
         if node not in _buffer._users:
-            _buffer._users.append(node)
+            _buffer._users.append(node.name)
         if self.is_local(_buffer.name):
             self.localObjects[_buffer.name] = _buffer
         else:
             self.globalObjects[_buffer.name] = _buffer
-
+            
     def annotateType(self, name: str, nLevels: int, _type: Enum):
         obj = self.lookup(name)
         if 2**(_type._value_) < nLevels:
@@ -263,12 +263,12 @@ class NodeParser():
                 ctxt.hoistConstant(inputNode)
             else:
                 localBuffer = ctxt.lookup(data_in)
-                ctxt.addUser(data_in, node.name)
+                ctxt.addUser(data_in, node)
                 data_in_buffers.append(localBuffer.name)
                 
         return ctxt, True
 
-    # Don't touch this unless you have MULTIPLE outputs you NEED:
+    # Don't touch this 
     def parseOutputs(self, ctxt: NetworkContext, node: gs.ir.node.Node) -> (NetworkContext, bool):
         newCtxt = ctxt.copy()
         outputNodes = node.outputs
@@ -589,25 +589,23 @@ class NetworkOptimizationPass():
     def __init__(self):
         pass
 
-    def run(self, ctxt: NetworkContext, layerBinding : List) -> (NetworkContext, List):
-        return ctxt, layerBinding
+    def apply(self, ctxt: NetworkContext, graph: gs.Graph) -> gs.Graph :
+        return ctxt, graph
     
 class NetworkOptimizer():
     def __init__(self, passes: List[NetworkOptimizationPass]):
         self.passes = passes
         
-    def optimize(self, ctxt: NetworkContext, layerBinding: List) -> (NetworkContext, List):
+    def optimize(self, ctxt: NetworkContext, graph: gs.Graph) -> gs.Graph:
         for _pass in self.passes:
-
-            ctxt, layerBinding = _pass.run(ctxt, layerBinding)
-        return ctxt, layerBinding
+            ctxt, graph = _pass.apply(ctxt, graph)
+        return graph
     
 class DeploymentPlatform():
-    def __init__(self, Mapping: Dict[str, ONNXLayer], DataTypes: Enum, TypeInfer: Callable, Optimizer: NetworkOptimizer, VariableBuffer: VariableBuffer, ConstantBuffer: ConstantBuffer, StructBuffer: StructBuffer):
+    def __init__(self, Mapping: Dict[str, ONNXLayer], DataTypes: Enum, TypeInfer: Callable, VariableBuffer: VariableBuffer, ConstantBuffer: ConstantBuffer, StructBuffer: StructBuffer):
         self.Mapping = Mapping
         self.DataTypes = DataTypes
         self.TypeInfer = TypeInfer
-        self.Optimizer = Optimizer
         self.VariableBuffer = VariableBuffer
         self.ConstantBuffer = ConstantBuffer
         self.StructBuffer = StructBuffer
@@ -635,7 +633,7 @@ class NetworkContainer():
             data_size = node.shape
             # SCHEREMO: Should be parsed from graph
             data_type = 2**8
-            nb = self.ctxt.VariableBuffer(data_name, data_size, data_type)
+            nb = ctxt.VariableBuffer(data_name, data_size, data_type)
             nb._type = self.Platform.DataTypes.int8_t
             ctxt.add(nb, 'global')
 
@@ -644,15 +642,11 @@ class NetworkContainer():
             data_size = node.shape
             # SCHEREMO: Should be parsed from graph
             data_type = 2**32
-            nb = self.ctxt.VariableBuffer(data_name, data_size, data_type)
+            nb = ctxt.VariableBuffer(data_name, data_size, data_type)
             nb._type = self.Platform.DataTypes.int32_t
             ctxt.add(nb, 'global')
 
         return ctxt
-
-    # Overrise this -> Platformspecific fusing of layers
-    def optimize(self) -> bool:
-        self.ctxt, self.layerBinding = self.Platform.Optimizer.optimize(ctxt = self.ctxt, layerBinding=self.layerBinding)
 
     # Don't override this
     def broadcast(self) -> bool:
@@ -800,21 +794,54 @@ class NetworkContainer():
         return self.getParameterSize() + self.getWorstCaseBufferSize()[1]
         
 class NetworkDeployer(NetworkContainer):
-    def __init__(self, graph: gs.Graph, platform: DeploymentPlatform, scheduler: Callable = lambda x: x, name: str = "DumpONetwork"):
-        super().__init__(graph, platform, scheduler, name)
+    def __init__(self, graph: gs.Graph, deploymentPlatform: DeploymentPlatform, loweringOptimizer: NetworkOptimizer, scheduler: Callable = lambda x: x, name: str = "DumpONetwork"):
+        super().__init__(graph, deploymentPlatform, scheduler, name)
         self.name = name
         self.prepared = False
+        self.baseParser = NodeParser()
+        self.optimizer = loweringOptimizer
+        
+    # Don't override this
+    def lower(self, ctxt: NetworkContext, graph: gs.Graph) -> (gs.Graph, bool):
+        return (self.optimizer.optimize(ctxt, graph), True)
 
-    def prepare(self):
-        self.parse()
-        self.broadcast()
-        self.bind()
-        self.optimize()
+    # Don't override this
+    def baseParse(self) -> (NetworkContext, bool):
+        newCtxt = NetworkContext(VariableBuffer, ConstantBuffer, StructBuffer, {}, {})
+        newCtxt = self._createIOBindings(newCtxt, self.graph)
+
+        for node in self.graph.nodes:
+            newCtxt, ret = self.baseParser.parse(newCtxt, node)
+
+        return newCtxt, ret
+
+    def middleEnd(self):
+        baseCtxt, ret = self.baseParse() # This sanity checks the graph and generates a base context for lowering/optimization
+        if not ret:
+            raise RuntimeError("The given graph was not valid - check that it is acyclic!")
+        self.graph, ret = self.lower(baseCtxt, self.graph) # This lowers the graph to a deployable format
+        if not ret:
+            raise RuntimeError("Lowering of the graph failed!")
+
+    def exportGraph(self, f):
+        onnx.save(gs.export_onnx(self.graph), f)
+        
+    def backEnd(self):
+        self.parse() # This reparses the lowered graph
+        import IPython; IPython.embed()
+        self.broadcast() # This broadcasts all tensors offline
+        self.bind() # This binds the graph to the node templates
         self.prepared = True
+        
+    # Don't override this
+    def prepare(self):
+        # MIDDLE END
+        self.middleEnd()
+        # BACK END - Inherited from NetworkContainer
+        self.backEnd()
         
     def generateFunction(self) -> str:
         if not self.prepared:
             self.prepare()
 
         return self.generateInferenceCode()
-

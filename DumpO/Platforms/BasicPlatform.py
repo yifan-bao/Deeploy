@@ -118,4 +118,4 @@ class SimpleStructBuffer(StructBuffer):
 
 BasicOptimizer = NetworkOptimizer(passes=[])
 
-BasicPlatform = DeploymentPlatform(BasicMapping, DataTypes, TypeInfer, BasicOptimizer, SimpleNetworkBuffer, SimpleGlobalBuffer, SimpleStructBuffer)
+BasicPlatform = DeploymentPlatform(BasicMapping, DataTypes, TypeInfer, SimpleNetworkBuffer, SimpleGlobalBuffer, SimpleStructBuffer)

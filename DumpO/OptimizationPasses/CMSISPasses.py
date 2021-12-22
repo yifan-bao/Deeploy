@@ -7,6 +7,7 @@
 # Copyright (C) 2021, ETH Zurich and University of Bologna.
 #
 # Author: Moritz Scherer, ETH Zurich
+# Author: Georg Rutishauser, ETH Zurich
 #
 # ----------------------------------------------------------------------
 # SPDX-License-Identifier: Apache-2.0
@@ -27,62 +28,33 @@ import copy
 
 from DumpO.DumpOTypes import *
 from DumpO.Layers.BasicLayers import *
+from DumpO.OptimizationPasses.BasicPasses import *
 
-class ConvRequantMergePass(NetworkOptimizationPass):
+import onnx_graphsurgeon as gs
+
+def merge_conv_rq_fun(ctxt: NetworkContext, graph: gs.Graph, match: Match, name: str):
+    matched_nodes = [m for k, m in match.nodes_map.items()]
+    conv = matched_nodes[0]
+    rqs = matched_nodes[1]
+
+    _inputs = conv.inputs + rqs.inputs[1:]
+    _outputs = rqs.outputs
+
+    rqsConv = gs.Node(op='RequantizedConv', name=name, attrs={**conv.attrs, **rqs.attrs})
+    graph.replaceInsertNode(_inputs, _outputs, rqsConv)
+
+
+class ConvRequantMergePass(ReplaceSequentialPatternPass):
     def __init__(self):
-        super().__init__()
-
-    def merge(self, ctxt: NetworkContext, layerBinding : List, idx: int) -> (NetworkContext, List):
-        newCtxt = ctxt.copy()
-        convLayer = layerBinding[idx][1]
-        RQSLayer = layerBinding[idx+1][1]
-        # Binding was already done -> we know the data types work
-
-        # Check that RQS is only user of convLayer:
-        convOut = convLayer.mapper.parser.parserDict['data_out']
-        convOutBuffer = newCtxt.lookup(convOut)
-
-        #import IPython; IPython.embed()
-        if len(convOutBuffer._users) == 1:
-            
-            # we can safely merge if parameters are constant:
-            if newCtxt.is_global(RQSLayer.mapper.parser.parserDict['add']):
-
-                convLayer.mapper.parser.parserDict['mul'] = RQSLayer.mapper.parser.parserDict['mul']
-                convLayer.mapper.parser.parserDict['bias'] = RQSLayer.mapper.parser.parserDict['add']
-                convLayer.mapper.parser.parserDict['log2D'] = RQSLayer.mapper.parser.parserDict['log2D']
-
-                # now we clean up the context
-                # remove RQS add 
-                #del newCtxt.globalObjects[RQSLayer.mapper.parser.parserDict['add']]
-
-                # set convLayer's output to RQSLayer's output
-                old_data_out = convLayer.mapper.parser.parserDict['data_out']
-                convLayer.mapper.parser.parserDict['data_out'] = RQSLayer.mapper.parser.parserDict['data_out']
-
-                convLayer.node.outputs = RQSLayer.node.outputs
-                
-                # delete middle node
-                del newCtxt.localObjects[old_data_out]
-
-                # Now delete RQSLayer entirely from the layerBinding
-                del layerBinding[idx+1]
-                layerBinding[idx] = (layerBinding[idx][0], convLayer)
-                
-                return newCtxt, layerBinding
-                
-        return ctxt, layerBinding
+        passes = []
+        graph = gs.Graph()
+        _input = gs.Variable(name='input_1')
+        output = graph.layer(inputs=[_input], outputs=['conv_out'], op='Conv', name='conv1')
+        output = graph.layer(inputs=output, outputs=['rqs'], op='RequantShift', name='rqs1')
+        graph.outputs.append(output)
+        graph.inputs.append(_input)
     
-    def run(self, ctxt: NetworkContext, layerBinding : List) -> (NetworkContext, List):
-        newLayerBinding = copy.deepcopy(layerBinding)
-        newCtxt = ctxt.copy()
-        
-        layers = [layer for name, layer in layerBinding]
-        convLayers = [idx for idx, layer in enumerate(layerBinding) if isinstance(layer[1], ConvLayer)]
-        requantShiftLayers = [idx for idx, layer in enumerate(layerBinding) if isinstance(layer[1], RequantShiftLayer)]
-        
-        for idx in reversed(convLayers):
-            if (idx+1) in requantShiftLayers:
-                newCtxt, newLayerBinding = self.merge(newCtxt, newLayerBinding, idx)
-                
-        return newCtxt, newLayerBinding
+        name = f"_MERGE_CONVRQ_PASS"
+        super().__init__(graph, merge_conv_rq_fun, name)
+
+    

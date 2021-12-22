@@ -37,18 +37,17 @@ from DumpO.Bindings.CMSISBindings import *
 
 from DumpO.OptimizationPasses.CMSISPasses import *
 
-GELU_int8_Mapper = NodeMapper(GELUParser(), [BasicGELUBinding])
-iLayerNorm_int8_Mapper = NodeMapper(iLayerNormParser(), [BasicLayerNormBinding])
+GELU_int8_Mapper = NodeMapper(GELUParser(), None)
+iLayerNorm_int8_Mapper = NodeMapper(iLayerNormParser(), None)
 MatMul_int8_Mapper = NodeMapper(CMSISLinearParser(), [BasicGEMMBinding])
 GEMM_int8_Mapper = NodeMapper(CMSISLinearParser(), [BasicGEMMBinding])
-Conv_int8_Mapper = NodeMapper(Conv2DParser(), [BasicConv2DBinding])
 #Conv_int8_Mapper_testo = NodeMapper(Conv2DParser(), ConvChecker([CMSISDataTypes.int8_t, CMSISDataTypes.int8_t], [CMSISDataTypes.int16_t]), DummyTemplate.referenceTemplate)
-MHSA_int8_Mapper = NodeMapper(MHSAParser(), [BasicMHSABinding])
+MHSA_int8_Mapper = NodeMapper(MHSAParser(), None)
 
 GatherMapper = NodeMapper(GatherParser(), BasicGatherBindings)
 ReshapeMapper = NodeMapper(ReshapeParser(), BasicReshapeBindings)
 FlattenMapper = NodeMapper(FlattenParser(), BasicReshapeBindings)
-RequantShiftMapper = NodeMapper(RequantShiftParser(), BasicRQSBindings)
+RequantShiftMapper = NodeMapper(RequantShiftParser(), None)
 
 Conv_int8_Mapper = NodeMapper(CMSISConv2DParser(), [CMSISConv2DBinding])
 AddMapper = NodeMapper(AddParser(), CMSISSaturatingAddBindings)
@@ -56,7 +55,8 @@ AddMapper = NodeMapper(AddParser(), CMSISSaturatingAddBindings)
 DummyMapper = NodeMapper(DummyParser(), [DummyBinding])
 
 CMSISMapping = {
-    'Conv' : ConvLayer([Conv_int8_Mapper]),
+    #'Conv' : ConvLayer([Conv_int8_Mapper]),
+    'RequantizedConv' : ConvLayer([Conv_int8_Mapper]),
     'iLayerNorm': iLayerNormLayer([iLayerNorm_int8_Mapper]),
     'MultiHeadSelfAttention': MHSALayer([MHSA_int8_Mapper]),
     'iGELU' : iGELULayer([GELU_int8_Mapper]),
@@ -127,6 +127,6 @@ class SimpleStructBuffer(StructBuffer):
         return FreeTemplate.referenceLocalTemplate.generate(name=self.name)
     
     
-CMSISOptimizer = NetworkOptimizer(passes=[ConvRequantMergePass()])
+CMSISOptimizer = NetworkOptimizer([ConvRequantMergePass()])
     
-CMSISPlatform = DeploymentPlatform(CMSISMapping, CMSISDataTypes, CMSISTypeInfer, CMSISOptimizer, SimpleNetworkBuffer, SimpleGlobalBuffer, SimpleStructBuffer)
+CMSISPlatform = DeploymentPlatform(CMSISMapping, CMSISDataTypes, CMSISTypeInfer, SimpleNetworkBuffer, SimpleGlobalBuffer, SimpleStructBuffer)

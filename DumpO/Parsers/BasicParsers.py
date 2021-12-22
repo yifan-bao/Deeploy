@@ -245,11 +245,10 @@ class ConvParser(NodeParser):
             'kernel_shape' in node.attrs,
             'pads' in node.attrs,
             'strides' in node.attrs,
-            #SCHEREMO: While ONNX allows for 3 inputs (BIAS), we only accept 2, the input and the weight
             len(node.outputs) == 1
         ])
         if self.noBiasHoisting:
-            wellFormed = wellFormed and (len(node.inputs)==2)
+            wellFormed = wellFormed
         
         if wellFormed:
             self.parserDict['group'] = node.attrs['group']
