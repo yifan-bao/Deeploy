@@ -31,6 +31,7 @@ from DumpO.Parsers.BasicParsers import *
 from DumpO.Parsers.CMSISParsers import *
 
 from DumpO.Layers.BasicLayers import *
+from DumpO.Layers.CMSISLayers import *
 
 from DumpO.Bindings.BasicBindings import *
 from DumpO.Bindings.CMSISBindings import *
@@ -54,8 +55,8 @@ AddMapper = NodeMapper(AddParser(), CMSISSaturatingAddBindings)
 DummyMapper = NodeMapper(DummyParser(), [DummyBinding])
 
 CMSISMapping = {
-    'RequantizedConv' : ConvLayer([Conv_int8_Mapper]),
-    'RequantizedGemm': GEMMLayer([GEMM_int8_Mapper]),
+    'RequantizedConv' : RQSConvLayer([Conv_int8_Mapper]),
+    'RequantizedGemm': RQSGEMMLayer([GEMM_int8_Mapper]),
     'iLayerNorm': iLayerNormLayer([iLayerNorm_int8_Mapper]),
     'MultiHeadSelfAttention': MHSALayer([MHSA_int8_Mapper]),
     'iGELU' : iGELULayer([GELU_int8_Mapper]),

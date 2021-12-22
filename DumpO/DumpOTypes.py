@@ -766,7 +766,9 @@ class NetworkContainer():
 
         size = 0
         for _buffer in self.ctxt.globalObjects.values():
-            size += np.prod(_buffer.shape)*_buffer._type._value_//8
+            # We do not count structs for now, since they are not properly modeled
+            if not isinstance(_buffer, StructBuffer):
+                size += np.prod(_buffer.shape)*_buffer._type._value_//8
 
         return size
 
