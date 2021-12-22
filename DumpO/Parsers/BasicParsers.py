@@ -207,7 +207,6 @@ class RequantShiftParser(NodeParser):
             len(node.inputs) == 3,
             len(node.outputs) == 1
         ])
-        
 
         if ret:
             self.parserDict['n_levels'] = int(node.attrs['n_levels'].values)
@@ -422,13 +421,13 @@ class iLayerNormParser(NodeParser):
         return ctxt, True
 
 class MatMulParser(NodeParser):
-    def __init__(self):
+    def __init__(self, noBiasHoisting = True):
         super().__init__()
-
+        self.noBiasHoisting = noBiasHoisting
     def parseNode(self, node: gs.ir.node.Node) -> (bool):
 
         ret = all([
-            len(node.inputs) == 2,
+            len(node.inputs) >= 2,
             len(node.outputs) == 1
         ])
 
@@ -454,11 +453,12 @@ class MatMulParser(NodeParser):
             self.parserDict[outputs[idx]] = ctxt.lookup(outputNode.name).name
 
         # Create fake C node for GEMM-compatibility and hoist it
-        values = np.zeros((1))
-        zeroTensor = gs.Constant(f'{node.name}_C_Tensor', values=values)
-        ctxt.hoistConstant(zeroTensor)
-        node.inputs.append(zeroTensor)
-        self.parserDict['C'] = f'{node.name}_C_Tensor'
+        if not self.noBiasHoisting:
+            values = np.zeros((1))
+            zeroTensor = gs.Constant(f'{node.name}_C_Tensor', values=values)
+            ctxt.hoistConstant(zeroTensor)
+            node.inputs.append(zeroTensor)
+            self.parserDict['C'] = f'{node.name}_C_Tensor'
             
         self.parserDict['size'] = np.prod(ctxt.lookup(node.inputs[0].name).shape)
 
@@ -466,11 +466,12 @@ class MatMulParser(NodeParser):
 
 # This parser combines Matmul nodes and GEMM nodes to the more general GEMM nodes
 class GEMMParser(MatMulParser):
-    def __init__(self):
+    def __init__(self, noBiasHoisting = True):
+        self.noBiasHoisting = noBiasHoisting
         super().__init__()
 
     def parseNode(self, node: gs.ir.node.Node) -> (bool):
-        
+
         ret = all([
             len(node.inputs) >= 2,
             len(node.outputs) == 1,
@@ -517,7 +518,7 @@ class GEMMParser(MatMulParser):
 
             if len(node.inputs) == 3:
                 self.parserDict['C'] = ctxt.lookup(node.inputs[2].name).name
-            else:
+            elif not self.noBiasHoisting:
                 values = np.zeros((1))
                 zeroTensor = gs.Constant(f'{node.name}_C_Tensor', values=values)
                 ctxt.hoistConstant(zeroTensor)

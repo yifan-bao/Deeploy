@@ -35,7 +35,9 @@ class CMSISDataTypes(Enum):
     int16_t = 16
     int32_t = 32
 
-CMSISConv2DBinding = NodeBinding(CMSISConvChecker([CMSISDataTypes.int8_t, CMSISDataTypes.int8_t], [CMSISDataTypes.int8_t]), ConvTemplate.conv2DTemplate)
+CMSISConv2DBinding = NodeBinding(CMSISConvChecker([CMSISDataTypes.int8_t, CMSISDataTypes.int8_t, CMSISDataTypes.int32_t, CMSISDataTypes.int32_t], [CMSISDataTypes.int8_t]), ConvTemplate.conv2DTemplate)
+CMSISGEMMBinding = NodeBinding(CMSISLinearChecker([CMSISDataTypes.int8_t, CMSISDataTypes.int8_t, CMSISDataTypes.int32_t, CMSISDataTypes.int32_t], [CMSISDataTypes.int8_t]), GEMMTemplate.LinearTemplate)
+
 CMSISSaturatingAddBindings = [NodeBinding(CMSISSaturatingAddChecker([CMSISDataTypes.int8_t],[CMSISDataTypes.int8_t]), AddTemplate.AddInt8Template),
                               NodeBinding(CMSISSaturatingAddChecker([CMSISDataTypes.int16_t],[CMSISDataTypes.int16_t]), AddTemplate.AddInt16Template),
                               NodeBinding(CMSISSaturatingAddChecker([CMSISDataTypes.int32_t],[CMSISDataTypes.int32_t]), AddTemplate.AddInt32Template)] 

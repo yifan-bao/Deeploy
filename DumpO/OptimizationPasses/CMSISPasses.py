@@ -25,18 +25,20 @@
 # limitations under the License.
 
 import copy
+import numpy as np
+import onnx_graphsurgeon as gs
 
 from DumpO.DumpOTypes import *
 from DumpO.Layers.BasicLayers import *
 from DumpO.OptimizationPasses.BasicPasses import *
-
-import onnx_graphsurgeon as gs
 
 def merge_conv_rq_fun(ctxt: NetworkContext, graph: gs.Graph, match: Match, name: str):
     matched_nodes = [m for k, m in match.nodes_map.items()]
     conv = matched_nodes[0]
     rqs = matched_nodes[1]
 
+    rqs.inputs[-1].values = np.round(rqs.inputs[-1].values / rqs.inputs[-2].values) # normalize add
+    
     _inputs = conv.inputs + rqs.inputs[1:]
     _outputs = rqs.outputs
 
@@ -57,4 +59,42 @@ class ConvRequantMergePass(ReplaceSequentialPatternPass):
         name = f"_MERGE_CONVRQ_PASS"
         super().__init__(graph, merge_conv_rq_fun, name)
 
+def merge_gemm_rq_fun(ctxt: NetworkContext, graph: gs.Graph, match: Match, name: str):
+    matched_nodes = [m for k, m in match.nodes_map.items()]
+    gemm = matched_nodes[0]
+    rqs = matched_nodes[1]
+
+    rqs.inputs[-1].values = np.round(rqs.inputs[-1].values / rqs.inputs[-2].values) # normalize add
     
+    _inputs = gemm.inputs + rqs.inputs[1:]
+    _outputs = rqs.outputs
+
+    rqsGemm = gs.Node(op='RequantizedGemm', name=name, attrs={**gemm.attrs, **rqs.attrs})
+    graph.replaceInsertNode(_inputs, _outputs, rqsGemm)
+
+
+class GEMMRequantMergePass(ReplaceSequentialPatternPass):
+    def __init__(self):
+        passes = []
+        graph = gs.Graph()
+        _input = gs.Variable(name='input_1')
+        output = graph.layer(inputs=[_input], outputs=['gemm_out'], op='Gemm', name='gemm')
+        output = graph.layer(inputs=output, outputs=['rqs'], op='RequantShift', name='rqs1')
+        graph.outputs.append(output)
+        graph.inputs.append(_input)
+    
+        name = f"_MERGE_GEMMRQ_PASS"
+        super().__init__(graph, merge_gemm_rq_fun, name)
+
+class MatMulRequantMergePass(ReplaceSequentialPatternPass):
+    def __init__(self):
+        passes = []
+        graph = gs.Graph()
+        _input = gs.Variable(name='input_1')
+        output = graph.layer(inputs=[_input], outputs=['gemm_out'], op='MatMul', name='gemm')
+        output = graph.layer(inputs=output, outputs=['rqs'], op='RequantShift', name='rqs1')
+        graph.outputs.append(output)
+        graph.inputs.append(_input)
+    
+        name = f"_MERGE_GEMMRQ_PASS"
+        super().__init__(graph, merge_gemm_rq_fun, name)    

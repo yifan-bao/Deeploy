@@ -26,11 +26,10 @@
 from DumpO.DumpOTypes import NodeTemplate
 
 conv2DTemplate = NodeTemplate("\
-int8_t bufferB[1]; \n\
-int16_t bufferA[2*${ch_im_in}*${dim_kernel_x}*${dim_kernel_y}]; \n\
-arm_convolve_s8(${data_in}, ${dim_im_in_x}, ${dim_im_in_y}, ${ch_im_in}, ${weight}, ${ch_im_out}, ${dim_kernel_x}, ${dim_kernel_y}, ${padding_x}, ${padding_y}, ${stride_x}, ${stride_y}, ${bias}, ${bias_shift}, ${out_shift}, ${data_out}, ${dim_im_out_x}, ${dim_im_out_y}, bufferA, bufferB); \n\
-free(bufferA); \n\
-free(bufferB); \n\
+void* _DumpO__ctxtBuffer = malloc(sizeof(int8_t)*${ctxt}.size)\n\
+${ctxt}.buffer = _DumpO__ctxtBuffer\n\
+arm_convolve_s8(${ctxt}, ${conv_params}, ${quant_params}, ${input_dims}, ${data_in}, ${filter_dims}, ${weight}, ${bias_dims}, ${add}, ${output_dims}, ${data_out}); \n\
+free(_DumpO__ctxtBuffer);\
 ")
 # int8_t* bias = int8_t* malloc(sizeof(int8_t) * ${ch_im_in}); \n\
 #                free(bias); \

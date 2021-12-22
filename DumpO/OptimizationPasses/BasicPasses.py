@@ -198,6 +198,9 @@ class SequentialMatcher:
     
         # otherwise we are on a "matching track", so move one node down in
         # pattern and graph. We know that gn has only 1 input!
+        if len(pn.outputs[0].outputs) < 1 or len(gn.outputs[0].outputs) < 1:
+            return None
+        
         return self._match_nodes(ctxt, pn.outputs[0].outputs[0], gn.outputs[0].outputs[0], remaining_pattern_length-1, nodes_map)
 
     def match_graph(self, ctxt: NetworkContext, graph: gs.Graph):

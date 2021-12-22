@@ -39,8 +39,6 @@ from DumpO.OptimizationPasses.CMSISPasses import *
 
 GELU_int8_Mapper = NodeMapper(GELUParser(), None)
 iLayerNorm_int8_Mapper = NodeMapper(iLayerNormParser(), None)
-MatMul_int8_Mapper = NodeMapper(CMSISLinearParser(), [BasicGEMMBinding])
-GEMM_int8_Mapper = NodeMapper(CMSISLinearParser(), [BasicGEMMBinding])
 #Conv_int8_Mapper_testo = NodeMapper(Conv2DParser(), ConvChecker([CMSISDataTypes.int8_t, CMSISDataTypes.int8_t], [CMSISDataTypes.int16_t]), DummyTemplate.referenceTemplate)
 MHSA_int8_Mapper = NodeMapper(MHSAParser(), None)
 
@@ -49,23 +47,21 @@ ReshapeMapper = NodeMapper(ReshapeParser(), BasicReshapeBindings)
 FlattenMapper = NodeMapper(FlattenParser(), BasicReshapeBindings)
 RequantShiftMapper = NodeMapper(RequantShiftParser(), None)
 
+GEMM_int8_Mapper = NodeMapper(CMSISGEMMParser(), [CMSISGEMMBinding])
 Conv_int8_Mapper = NodeMapper(CMSISConv2DParser(), [CMSISConv2DBinding])
 AddMapper = NodeMapper(AddParser(), CMSISSaturatingAddBindings)
 
 DummyMapper = NodeMapper(DummyParser(), [DummyBinding])
 
 CMSISMapping = {
-    #'Conv' : ConvLayer([Conv_int8_Mapper]),
     'RequantizedConv' : ConvLayer([Conv_int8_Mapper]),
+    'RequantizedGemm': GEMMLayer([GEMM_int8_Mapper]),
     'iLayerNorm': iLayerNormLayer([iLayerNorm_int8_Mapper]),
     'MultiHeadSelfAttention': MHSALayer([MHSA_int8_Mapper]),
     'iGELU' : iGELULayer([GELU_int8_Mapper]),
-    'MatMul': GEMMLayer([MatMul_int8_Mapper]),
-    'Gemm': GEMMLayer([GEMM_int8_Mapper]),
     
     'Gather': GatherLayer([GatherMapper]),
     'Add': AddLayer([AddMapper]),
-    'RequantShift' : RequantShiftLayer([RequantShiftMapper]),
     'Reshape': ReshapeLayer([ReshapeMapper]),
     'Flatten': ReshapeLayer([FlattenMapper]),
 }
@@ -127,6 +123,6 @@ class SimpleStructBuffer(StructBuffer):
         return FreeTemplate.referenceLocalTemplate.generate(name=self.name)
     
     
-CMSISOptimizer = NetworkOptimizer([ConvRequantMergePass()])
+CMSISOptimizer = NetworkOptimizer([ConvRequantMergePass(), GEMMRequantMergePass(), MatMulRequantMergePass()])
     
 CMSISPlatform = DeploymentPlatform(CMSISMapping, CMSISDataTypes, CMSISTypeInfer, SimpleNetworkBuffer, SimpleGlobalBuffer, SimpleStructBuffer)

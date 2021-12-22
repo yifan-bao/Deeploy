@@ -33,6 +33,7 @@ import onnx
 import onnx_graphsurgeon as gs
 import math
 from enum import Enum
+from onnx.external_data_helper import convert_model_to_external_data
 
 class VariableBuffer():
     def __init__(self, name: str = '', shape = [1], nLevels: int = 1):
@@ -96,10 +97,16 @@ class ConstantBuffer(VariableBuffer):
                           values = values)
 
 class StructBuffer(VariableBuffer):
-    def __init__(self, name: str, shape = None, nLevels = None, structDict: Dict = None):
-        super().__init__(name, shape, nLevels)
+    def __init__(self, name: str, structDict: Dict = None):
+        super().__init__(name, None, None)
         self.structDict = structDict
+        
+    def __str__(self) -> str:
+        return f'StructBuffer: name: {self.name}, type: {self._type}'
 
+    def __repr__(self) -> str:
+        return f'StructBuffer: name: {self.name}, type: {self._type}'
+    
 class NetworkContext():
     def __init__(self, variableBuffer: VariableBuffer, constantBuffer: ConstantBuffer, structBuffer: StructBuffer, globalObjects = {}, localObjects = {}, name: str = 'DumpONetwork'):
         self.globalObjects = {}
@@ -146,11 +153,13 @@ class NetworkContext():
         else:
             return False
 
-    def hoistStruct(self, structBuffer: StructBuffer):
+    def hoistStruct(self, struct: Dict , name: str, _type: str):
 
+        structBuffer = self.StructBuffer(name, struct)
+        structBuffer._type = _type
         self.add(structBuffer, 'global')
         
-    def hoistConstant(self, node: gs.ir.node.Node, name = ''):
+    def hoistConstant(self, node: gs.ir.node.Node, name = '', type = None):
 
         assert len(node.outputs) <= 1, "Constant has more than one output"
 
@@ -161,6 +170,7 @@ class NetworkContext():
         localBuffer = self.VariableBuffer().fromNode(node = node, nLevels = int(node.values.max() - node.values.min()))
         globalBuffer = self.ConstantBuffer().fromVariableBuffer(localBuffer, values=node.values)
         globalBuffer.name = name
+        globalBuffer._type = type
 
         self.add(globalBuffer, 'global')
         
@@ -350,28 +360,20 @@ class NodeTypeChecker():
     def typeInferGlobalCtxt(self, ctxt: NetworkContext, node: gs.ir.node.Node, typeInfer: Callable) -> NetworkContext:
         ctxt = ctxt.copy()
 
-        #import IPython; IPython.embed()
-        
-        # Find all input Nodes in global Context
-        globalInputNodes = [inputNode for inputNode in node.inputs if ctxt.is_global(inputNode.name)]
+        for inputNode, _type in zip(node.inputs, self.input_types):
+            if isinstance(ctxt.lookup(inputNode.name),ConstantBuffer):
+                
+                # SPECIAL CASE HANDLING: CONSTANT WAS NOT FOLDED CORRECTLY                
+                if len(inputNode.inputs) == 1 and hasattr(inputNode.inputs[0], 'attrs') and 'value' in list(inputNode.inputs[0].attrs.keys()):
+                    typeNode = inputNode.inputs[0].attrs['value']
+                else:
+                    typeNode = inputNode
 
-        # Don't override previous annotations
-        nodesToAnnotate = [inputNode for inputNode in globalInputNodes if ctxt.lookup(inputNode.name)._type == None]
-        
-        for inputNode in nodesToAnnotate:
+                _buffer = ctxt.lookup(inputNode.name)
 
-            # SPECIAL CASE HANDLING: CONSTANT WAS NOT FOLDED CORRECTLY
-            if len(inputNode.inputs) == 1 and hasattr(inputNode.inputs[0], 'attrs') and 'value' in list(inputNode.inputs[0].attrs.keys()):
-                typeNode = inputNode.inputs[0].attrs['value']
-            else:
-                typeNode = inputNode
-            
-            _buffer = ctxt.lookup(inputNode.name)
-            _type = typeInfer(typeNode)
-
-            # Check the actual numLevels
-            nLevels = _buffer.values.max() - _buffer.values.min()
-            ctxt.annotateType(inputNode.name, nLevels, _type)
+                # Check the actual numLevels
+                nLevels = _buffer.values.max() - _buffer.values.min()
+                ctxt.annotateType(inputNode.name, nLevels, _type)
         
         return ctxt
 
@@ -824,11 +826,16 @@ class NetworkDeployer(NetworkContainer):
             raise RuntimeError("Lowering of the graph failed!")
 
     def exportGraph(self, f):
-        onnx.save(gs.export_onnx(self.graph), f)
+        model = gs.export_onnx(self.graph)
+        convert_model_to_external_data(model, location="model.data")
+        onnx.save(model, f)
+
+    def realignDims(self):
+        pass
         
     def backEnd(self):
         self.parse() # This reparses the lowered graph
-        import IPython; IPython.embed()
+        self.realignDims()
         self.broadcast() # This broadcasts all tensors offline
         self.bind() # This binds the graph to the node templates
         self.prepared = True
