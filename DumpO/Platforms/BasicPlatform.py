@@ -85,6 +85,9 @@ def TypeInfer(node):
 class SimpleNetworkBuffer(VariableBuffer):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+
+    def init(self):
+        return AllocTemplate.referenceGlobalInitTemplate(type=self._type._name_, name=self.name)
         
     def alloc(self):
         return AllocTemplate.referenceLocalTemplate.generate(type = self._type._name_, name=self.name, size = np.prod(self.shape))
@@ -95,6 +98,9 @@ class SimpleNetworkBuffer(VariableBuffer):
 class SimpleGlobalBuffer(ConstantBuffer):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+
+    def init(self):
+        return AllocTemplate.referenceGlobalInitTemplate(type=self._type._name_, name=self.name)
         
     def alloc(self):
         values = list(self.values.reshape(-1))
@@ -108,6 +114,9 @@ class SimpleGlobalBuffer(ConstantBuffer):
 class SimpleStructBuffer(StructBuffer):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+
+    def init(self):
+        return AllocTemplate.referenceGlobalInitTemplate(type=self._type._name_, name=self.name)
         
     def alloc(self) -> str:
         return AllocateTemplate.referenceStructTemplate.generate(type=type, name=name, structDict=structDict)

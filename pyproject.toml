@@ -8,3 +8,5 @@ requires = [
     "IPython"
 ]
 build-backend = "setuptools.build_meta"
+
+# Also needs onnx_graphsurgeon!

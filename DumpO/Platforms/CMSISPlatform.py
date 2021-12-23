@@ -80,7 +80,7 @@ def CMSISTypeInfer(node: gs.ir.node.Node):
     else:
         signed = False
     
-    for _type in CMSISDataTypes:
+    for _type in DataTypes:
         if signed and outNode.values.max() < 2**(_type._value_-1) and outNode.values.min() >= -2**(_type._value_-1): 
             return _type
         # For nor we only have signed kernels :(
@@ -92,9 +92,12 @@ def CMSISTypeInfer(node: gs.ir.node.Node):
 class SimpleNetworkBuffer(VariableBuffer):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+
+    def init(self):
+        return AllocateTemplate.referenceInitTemplate.generate(type=self._type._name_, name=self.name)
         
     def alloc(self):
-        return AllocateTemplate.referenceLocalTemplate.generate(type = self._type._name_, name=self.name, size = np.prod(self.shape))
+        return AllocateTemplate.referenceAllocateTemplate.generate(type = self._type._name_, name=self.name, size = np.prod(self.shape))
 
     def dealloc(self):
         return FreeTemplate.referenceLocalTemplate.generate(name = self.name)
@@ -102,13 +105,19 @@ class SimpleNetworkBuffer(VariableBuffer):
 class SimpleGlobalBuffer(ConstantBuffer):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+
+    def init(self):
+        values = list(self.values.reshape(-1))
+        strValues = [str(value) for value in values]
+        valueString = ', '.join(strValues)
+        return AllocateTemplate.referenceGlobalInitTemplate.generate(type=self._type._name_, name=self.name, size = np.prod(self.shape), values = valueString)
         
     def alloc(self):
         values = list(self.values.reshape(-1))
         strValues = [str(value) for value in values]
         valueString = ', '.join(strValues)
         
-        return AllocateTemplate.referenceGlobalTemplate.generate(type = self._type._name_, name=self.name, size = np.prod(self.shape), values = valueString)
+        return AllocateTemplate.referenceGlobalAllocateTemplate.generate(type = self._type._name_, name=self.name, size = np.prod(self.shape), values = valueString)
 
     def dealloc(self):
         return FreeTemplate.referenceGlobalTemplate.generate(name = self.name)
@@ -116,9 +125,12 @@ class SimpleGlobalBuffer(ConstantBuffer):
 class SimpleStructBuffer(StructBuffer):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+
+    def init(self):
+        return AllocateTemplate.referenceStructInitTemplate.generate(type=self._type, name=self.name, structDict = self.structDict)
         
     def alloc(self) -> str:
-        return AllocateTemplate.referenceStructTemplate.generate(type=self._type, name=self.name, structDict=self.structDict)
+        return AllocateTemplate.referenceStructAllocateTemplate.generate(type=self._type, name=self.name, structDict=self.structDict)
 
     def dealloc(self) -> str:
         return FreeTemplate.referenceLocalTemplate.generate(name=self.name)
@@ -126,4 +138,4 @@ class SimpleStructBuffer(StructBuffer):
     
 CMSISOptimizer = NetworkOptimizer([ConvRequantMergePass(), GEMMRequantMergePass(), MatMulRequantMergePass()])
     
-CMSISPlatform = DeploymentPlatform(CMSISMapping, CMSISDataTypes, CMSISTypeInfer, SimpleNetworkBuffer, SimpleGlobalBuffer, SimpleStructBuffer)
+CMSISPlatform = DeploymentPlatform(CMSISMapping, DataTypes, CMSISTypeInfer, SimpleNetworkBuffer, SimpleGlobalBuffer, SimpleStructBuffer)

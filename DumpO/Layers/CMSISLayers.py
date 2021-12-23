@@ -30,9 +30,9 @@ class RQSConvLayer(ONNXLayer):
         super().__init__(maps)
 
     def computeShapes(self, inputShapes: List[np.shape], outputShapes: List[np.shape], parserDict) -> (List[np.shape], List[np.shape]):
-        if len(inputShapes) == 4:
-            inputShapes[2] = inputShapes[1][0] # Channels out dimension of Kernel
-            inputShapes[3] = inputShapes[1][0] # Channels out dimension of Kernel
+        inputShapes[2] = inputShapes[1][0] # Channels out dimension of Kernel
+        inputShapes[3] = inputShapes[1][0] # Channels out dimension of Kernel
+        inputShapes[4] = inputShapes[1][0] # Channels out dimension of Kernel
         return (inputShapes, outputShapes)
 
 class RQSGEMMLayer(ONNXLayer):
@@ -40,7 +40,7 @@ class RQSGEMMLayer(ONNXLayer):
         super().__init__(maps)
 
     def computeShapes(self, inputShapes: List[np.shape], outputShapes: List[np.shape], parserDict) -> (List[np.shape], List[np.shape]):
-        if len(inputShapes) == 4:
-            inputShapes[2] = inputShapes[1][-1] # Channels out dimension of Kernel
-            inputShapes[3] = inputShapes[1][-1] # Channels out dimension of Kernel
+        inputShapes[2] = inputShapes[1][-1] # Channels out dimension of Kernel
+        inputShapes[3] = inputShapes[1][-1] # Channels out dimension of Kernel
+        inputShapes[4] = inputShapes[1][-1] # Channels out dimension of Kernel
         return (inputShapes, outputShapes)

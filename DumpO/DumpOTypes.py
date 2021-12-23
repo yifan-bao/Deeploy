@@ -50,6 +50,9 @@ class VariableBuffer():
         # Do not override - Should be written in the deployment passes
         self._live = False
 
+    def init(self) -> str:
+        return ''
+        
     # Allocation code. Choose your Template, might want to override aswell!
     def alloc(self) -> str:
         return ''
@@ -68,13 +71,13 @@ class VariableBuffer():
         return(
             type(self)(
                 name = node.name,
-                shape = node.shape,
+                shape = node.shape if not isinstance(node, gs.Constant) else node.values.shape,
                 nLevels = nLevels
             )
         )
     
 class ConstantBuffer(VariableBuffer):
-    def __init__(self, name : str = '', shape = [1], nLevels : int = 1, values = [1]):
+    def __init__(self, name : str = '', shape = [1], nLevels : int = 0, values = [0]):
         super().__init__(name, shape, nLevels)
         values = np.asarray(values)
         intArray = values.astype(int)
@@ -83,6 +86,9 @@ class ConstantBuffer(VariableBuffer):
 
         # Do not override - ConstantBuffers are assumed to be always live!
         self._live = True
+
+    def init(self) -> str:
+        return ''
         
     def __str__(self) -> str:
         return f'ConstantBuffer: name: {self.name}, type: {self._type}, levels: {self.nLevels}'
@@ -178,7 +184,7 @@ class NetworkContext():
 
     def addUser(self, name:str, node):
         _buffer = self.lookup(name)
-        if node not in _buffer._users:
+        if node.name not in _buffer._users:
             _buffer._users.append(node.name)
         if self.is_local(_buffer.name):
             self.localObjects[_buffer.name] = _buffer
@@ -384,7 +390,10 @@ class NodeTypeChecker():
             # check if the referenced buffer is in the environment
             if value in env:
                 _buffer = ctxt.lookup(value)
-                self.typeDict[key + '_type'] = _buffer._type._name_
+                try:
+                    self.typeDict[key + '_type'] = _buffer._type._name_
+                except:
+                    import IPython; IPython.embed()
     
     # Don't override this. Automated type checking
     def typeCheck(self, ctxt: NetworkContext, node: gs.ir.node.Node, typeInfer: Callable, parserDict) -> (NetworkContext, bool):
@@ -508,19 +517,28 @@ class ONNXLayer():
         outputShapes = [ctxt.lookup(node.name).shape for node in self.node.outputs]
 
         newInputShapes, newOutputShapes = self.computeShapes(inputShapes, outputShapes, self.mapper.parser.parserDict)
+
+        #import IPython; IPython.embed()
         
         for node, newShape, oldShape in zip(self.node.inputs + self.node.outputs, newInputShapes + newOutputShapes, inputShapes + outputShapes):
-            if newShape != oldShape:
+            #if newShape != oldShape:
+            if True:
                 if ctxt.is_local(node.name):
                     ctxt.localObjects[node.name].shape = newShape
                 elif ctxt.is_global(node.name):
                     ctxt.globalObjects[node.name].shape = newShape
                     if isinstance(ctxt.globalObjects[node.name], ConstantBuffer):
-                        try:
-                            ctxt.globalObjects[node.name].values = np.broadcast_to(ctxt.globalObjects[node.name].values, newShape)
-                        except Exception as e:
-                            print(e)
-                            import IPython; IPython.embed()
+
+                        # If the number of elements is equal, reshape
+                        if np.prod(ctxt.globalObjects[node.name].values.shape) == np.prod(newShape):
+                            ctxt.globalObjects[node.name].values.reshape(newShape)
+                        # The number of elements SHOULD be lower, and we broadcast
+                        else:
+                            try:
+                                ctxt.globalObjects[node.name].values = np.broadcast_to(ctxt.globalObjects[node.name].values, newShape)
+                            except Exception as e:
+                                print(e)
+                                import IPython; IPython.embed()
 
                 else:
                     raise KeyError(f'Expected node {node.name} to be in context!')
@@ -727,6 +745,22 @@ class NetworkContainer():
             assert _buffer._live == False, f'There is a memory leak in buffer {_buffer.name} in the generated forward pass!'
             
         return callStack
+
+        # Don't override this
+    def generateInferenceInitializationCode(self) -> str:
+        if not self.parsed or not self.bound:
+            raise ValueError('You need to parse and bind the network before generating code!')
+
+        ctxt = self.ctxt.copy()
+        
+        callStack = ''
+        for node in ctxt.localObjects.values():
+            name = node.name
+            node.name = ctxt._mangle(node.name)
+            callStack += node.init()
+            node.name = name
+        
+        return callStack
     
     # Don't override this
     def generateBufferInitializationCode(self) -> str:
@@ -736,14 +770,44 @@ class NetworkContainer():
         ctxt = self.ctxt.copy()
         
         callStack = ''
-        for node in self.ctxt.globalObjects.values():
-            node.name = ctxt._mangle(node.name)
-            callStack += node.alloc() + '\n'
+        for node in ctxt.globalObjects.values():
+            if isinstance(node, VariableBuffer) and not isinstance(node, StructBuffer):
+                name = node.name
+                node.name = ctxt._mangle(node.name)
+                callStack += node.init()
+                node.name = name
 
-        self.ctxt = ctxt
+        for node in ctxt.globalObjects.values():
+            if isinstance(node, StructBuffer):
+                name = node.name
+                node.name = ctxt._mangle(node.name)
+                callStack += node.init()
+                node.name = name
         
         return callStack
-    
+
+    def generateBufferAllocationCode(self) -> str:
+
+        ctxt = self.ctxt.copy()
+        callStack = ''
+        
+        for node in ctxt.globalObjects.values():
+            if isinstance(node, VariableBuffer) and not isinstance(node, StructBuffer):
+                name = node.name
+                node.name = ctxt._mangle(node.name)
+                callStack += node.alloc()
+                node.name = name
+
+        for node in ctxt.globalObjects.values():
+            if isinstance(node, StructBuffer):
+                name = node.name
+                node.name = ctxt._mangle(node.name)
+                callStack += node.alloc()
+                node.name = name
+
+                
+        return callStack
+            
     # Don't override this
     def generateBufferDeAllocCode(self) -> str:
         if not self.parsed or not self.bound:

@@ -26,18 +26,14 @@
 from DumpO.DumpOTypes import *
 from DumpO.TypeCheckers.BasicCheckers import *
 from DumpO.Templates.BasicTemplates import *
+from DumpO.Bindings.BasicBindings import DataTypes
 
 from DumpO.TypeCheckers.CMSISCheckers import *
 from DumpO.Templates.CMSISTemplates import *
 
-class CMSISDataTypes(Enum):
-    int8_t = 8
-    int16_t = 16
-    int32_t = 32
+CMSISConv2DBinding = NodeBinding(CMSISConvChecker([DataTypes.int8_t, DataTypes.int8_t, DataTypes.int32_t, DataTypes.int32_t,DataTypes.int32_t], [DataTypes.int8_t]), ConvTemplate.conv2DTemplate)
+CMSISGEMMBinding = NodeBinding(CMSISLinearChecker([DataTypes.int8_t, DataTypes.int8_t, DataTypes.int32_t, DataTypes.int32_t,DataTypes.int32_t], [DataTypes.int8_t]), GEMMTemplate.LinearTemplate)
 
-CMSISConv2DBinding = NodeBinding(CMSISConvChecker([CMSISDataTypes.int8_t, CMSISDataTypes.int8_t, CMSISDataTypes.int32_t, CMSISDataTypes.int32_t], [CMSISDataTypes.int8_t]), ConvTemplate.conv2DTemplate)
-CMSISGEMMBinding = NodeBinding(CMSISLinearChecker([CMSISDataTypes.int8_t, CMSISDataTypes.int8_t, CMSISDataTypes.int32_t, CMSISDataTypes.int32_t], [CMSISDataTypes.int8_t]), GEMMTemplate.LinearTemplate)
-
-CMSISSaturatingAddBindings = [NodeBinding(CMSISSaturatingAddChecker([CMSISDataTypes.int8_t],[CMSISDataTypes.int8_t]), AddTemplate.AddInt8Template),
-                              NodeBinding(CMSISSaturatingAddChecker([CMSISDataTypes.int16_t],[CMSISDataTypes.int16_t]), AddTemplate.AddInt16Template),
-                              NodeBinding(CMSISSaturatingAddChecker([CMSISDataTypes.int32_t],[CMSISDataTypes.int32_t]), AddTemplate.AddInt32Template)] 
+CMSISSaturatingAddBindings = [NodeBinding(CMSISSaturatingAddChecker([DataTypes.int8_t],[DataTypes.int8_t]), AddTemplate.AddInt8Template),
+                              NodeBinding(CMSISSaturatingAddChecker([DataTypes.int16_t],[DataTypes.int16_t]), AddTemplate.AddInt16Template),
+                              NodeBinding(CMSISSaturatingAddChecker([DataTypes.int32_t],[DataTypes.int32_t]), AddTemplate.AddInt32Template)] 

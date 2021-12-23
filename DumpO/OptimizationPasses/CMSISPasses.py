@@ -38,8 +38,10 @@ def merge_conv_rq_fun(ctxt: NetworkContext, graph: gs.Graph, match: Match, name:
     rqs = matched_nodes[1]
 
     rqs.inputs[-1].values = np.round(rqs.inputs[-1].values / rqs.inputs[-2].values) # normalize add
-    
-    _inputs = conv.inputs + rqs.inputs[1:]
+    #import IPython; IPython.embed()
+    shiftNode = gs.Constant(f'{conv.name}_shift', np.array((rqs.attrs['div'].values,)))
+
+    _inputs = list(conv.inputs) + list(rqs.inputs[1:]) + [shiftNode]
     _outputs = rqs.outputs
 
     rqsConv = gs.Node(op='RequantizedConv', name=name, attrs={**conv.attrs, **rqs.attrs})
@@ -65,8 +67,10 @@ def merge_gemm_rq_fun(ctxt: NetworkContext, graph: gs.Graph, match: Match, name:
     rqs = matched_nodes[1]
 
     rqs.inputs[-1].values = np.round(rqs.inputs[-1].values / rqs.inputs[-2].values) # normalize add
+
+    shiftNode = gs.Constant(f'{gemm.name}_shift', np.array((rqs.attrs['div'].values,)))
+    _inputs = list(gemm.inputs) + list(rqs.inputs[1:]) + [shiftNode]
     
-    _inputs = gemm.inputs + rqs.inputs[1:]
     _outputs = rqs.outputs
 
     rqsGemm = gs.Node(op='RequantizedGemm', name=name, attrs={**gemm.attrs, **rqs.attrs})

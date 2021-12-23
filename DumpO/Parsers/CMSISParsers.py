@@ -28,7 +28,7 @@ import math
 
 from DumpO.DumpOTypes import *
 from DumpO.Parsers.BasicParsers import *
-from DumpO.Bindings.CMSISBindings import CMSISDataTypes
+from DumpO.Bindings.BasicBindings import DataTypes
 
 class CMSISConv2DParser(Conv2DParser):
     def __init__(self, noBiasHoisting = True):
@@ -46,7 +46,7 @@ class CMSISConv2DParser(Conv2DParser):
                 self.parserDict['pads'][1] == self.parserDict['pads'][3],
                 # Don't support dilations
                 #all([coeff == 1 for coeff in self.parserDict['dilations']]),
-                len(node.inputs) == 4,
+                len(node.inputs) == 5,
                 'div' in node.attrs,
                 'n_levels' in node.attrs,
                 'signed' in node.attrs
@@ -76,7 +76,7 @@ class CMSISConv2DParser(Conv2DParser):
         newCtxt, ret = super().parseNodeCtxt(ctxt, node)
             
         if ret:
-            inputs = ['data_in', 'weight', 'mul', 'add']
+            inputs = ['data_in', 'weight', 'mul', 'add', 'shift']
             for idx, inputNode in enumerate(node.inputs):
                 self.parserDict[inputs[idx]] = ctxt.lookup(inputNode.name).name
                 
@@ -95,9 +95,7 @@ class CMSISConv2DParser(Conv2DParser):
             # First the context
             # https://review.trustedfirmware.org/plugins/gitiles/mirror/ARM-software/CMSIS_5/+/refs/heads/bias_for_conv/CMSIS/NN/Source/ConvolutionFunctions/arm_convolve_s8.c
             bufferSize = 2*self.parserDict['ch_im_in']*self.parserDict['dim_kernel_x']*self.parserDict['dim_kernel_y']*2
-#             values = np.zeros((bufferSize))
-#             zeroTensor = gs.Constant(f'{node.name}_ctxt_buffer', values=values)
-#             newCtxt.hoistConstant(zeroTensor, type=CMSISDataTypes.int8_t)
+
             ctxtDict = {
                 'buf': 0, #f'{node.name}_ctxt_buffer',  
                 'size': bufferSize
@@ -141,22 +139,18 @@ class CMSISConv2DParser(Conv2DParser):
             convParamsDict = {
                 'input_offset': 0,
                 'output_offset': 0,
-                'stride': newCtxt.lookup(f'{node.name}_stride').name,
-                'padding': newCtxt.lookup(f'{node.name}_padding').name,
-                'dilation': newCtxt.lookup(f'{node.name}_dilation').name,
-                'activation': newCtxt.lookup(f'{node.name}_activation').name,
+                'stride': ctxt._mangle(newCtxt.lookup(f'{node.name}_stride').name + '_UL'),
+                'padding': ctxt._mangle(newCtxt.lookup(f'{node.name}_padding').name + '_UL'),
+                'dilation': ctxt._mangle(newCtxt.lookup(f'{node.name}_dilation').name + '_UL'),
+                'activation': ctxt._mangle(newCtxt.lookup(f'{node.name}_activation').name + '_UL'),
             }
             newCtxt.hoistStruct(convParamsDict, f'{node.name}_conv_params', 'cmsis_nn_conv_params')
             self.parserDict[f'conv_params'] = newCtxt.lookup(f'{node.name}_conv_params').name
 
-            # Quant Params
-            values = np.ones((self.parserDict['ch_im_out']))*self.parserDict['log2D']
-            divTensor = gs.Constant(f'{node.name}_shift', values=values)
-            newCtxt.hoistConstant(divTensor, type=CMSISDataTypes.int8_t)
             
             convQuantDict = {
-                'multiplier': self.parserDict['mul'],
-                'shift': newCtxt.lookup(f'{node.name}_shift').name,
+                'multiplier': ctxt._mangle(self.parserDict['mul']),
+                'shift': ctxt._mangle(self.parserDict['shift']),
             }            
             newCtxt.hoistStruct(convQuantDict, f'{node.name}_quant_params', 'cmsis_nn_per_channel_quant_params')
             self.parserDict['quant_params'] = newCtxt.lookup(f'{node.name}_quant_params').name
@@ -284,7 +278,7 @@ class CMSISGEMMParser(CMSISLinearParser):
                 'div' in node.attrs,
                 'n_levels' in node.attrs,
                 'signed' in node.attrs,
-                len(node.inputs) == 4,
+                len(node.inputs) == 5,
         ])
         
 
@@ -304,7 +298,7 @@ class CMSISGEMMParser(CMSISLinearParser):
         
         if ret:
 
-            inputs = ['A', 'B', 'mul', 'add']
+            inputs = ['A', 'B', 'mul', 'add', 'shift']
                 
             for idx, inputNode in enumerate(node.inputs):
                 self.parserDict[inputs[idx]] = ctxt.lookup(inputNode.name).name
@@ -347,21 +341,16 @@ class CMSISGEMMParser(CMSISLinearParser):
                 'input_offset': 0,
                 'filter_offset': 0,
                 'output_offset': 0,
-                'activation': newCtxt.lookup(f'{node.name}_activation').name,
+                'activation': newCtxt._mangle(newCtxt.lookup(f'{node.name}_activation').name + '_UL'),
             }
             newCtxt.hoistStruct(fcParamsDict, f'{node.name}_fc_params', 'cmsis_nn_fc_params')
             self.parserDict[f'fc_params'] = newCtxt.lookup(f'{node.name}_fc_params').name
-
-            # Quant Params
-            values = np.ones((self.parserDict['weight_C']))*self.parserDict['log2D']
-            divTensor = gs.Constant(f'{node.name}_shift', values=values)
-            newCtxt.hoistConstant(divTensor, type=CMSISDataTypes.int8_t)
             
             convQuantDict = {
-                'multiplier': self.parserDict['mul'],
-                'shift': newCtxt.lookup(f'{node.name}_shift').name,
+                'multiplier': newCtxt._mangle(self.parserDict['mul']),
+                'shift': newCtxt._mangle(self.parserDict['shift']),
             }            
-            newCtxt.hoistStruct(convQuantDict, f'{node.name}_quant_params', 'cmsis_nn_per_channel_quant_params')
+            newCtxt.hoistStruct(convQuantDict, f'{node.name}_quant_params', 'cmsis_nn_per_tensor_quant_params')
             self.parserDict['quant_params'] = newCtxt.lookup(f'{node.name}_quant_params').name
 
             inputDimsDict = {
