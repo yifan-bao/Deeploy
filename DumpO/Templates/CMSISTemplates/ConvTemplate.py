@@ -26,8 +26,8 @@
 from DumpO.DumpOTypes import NodeTemplate
 
 conv2DTemplate = NodeTemplate("\
-void* _DumpO__ctxtBuffer = malloc(sizeof(int8_t)*${ctxt}.size)\n\
-${ctxt}.buffer = _DumpO__ctxtBuffer\n\
+void* _DumpO__ctxtBuffer = malloc(sizeof(int8_t)*${ctxt}.size);\n\
+${ctxt}.buffer = _DumpO__ctxtBuffer;\n\
 arm_convolve_s8(${ctxt}, ${conv_params}, ${quant_params}, ${input_dims}, ${data_in}, ${filter_dims}, ${weight}, ${bias_dims}, ${add}, ${output_dims}, ${data_out}); \n\
 free(_DumpO__ctxtBuffer);\
 ")

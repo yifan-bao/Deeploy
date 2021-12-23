@@ -4,9 +4,7 @@ requires = [
     "wheel",
     "onnx",
     "mako",
-    "copy",
-    "re",
     "numpy",
-    "enum"
+    "IPython"
 ]
 build-backend = "setuptools.build_meta"
