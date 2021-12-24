@@ -123,7 +123,7 @@ class NetworkContext():
         self.name = name
 
     def _mangle(self, name: str) -> str:
-        return '_DumpO_BUFFER__'  + re.sub('\.','_',self.name) + '_' + re.sub('\.','_',name)
+        return re.sub('\.','_',self.name) + '_DumpO_BUFFER_'  + re.sub('\.','_',name)
     
     def add(self, obj : VariableBuffer, ctxt = 'local'):
         if ctxt == 'local':
@@ -763,6 +763,24 @@ class NetworkContainer():
         return callStack
     
     # Don't override this
+    def generateIOBufferInitializationCode(self) -> str:
+        if not self.parsed or not self.bound:
+            raise ValueError('You need to parse and bind the network before generating code!')
+
+        ctxt = self.ctxt.copy()
+        
+        callStack = ''
+        for node in ctxt.globalObjects.values():
+            if isinstance(node, VariableBuffer) and not isinstance(node, (StructBuffer, ConstantBuffer)):
+                name = node.name
+                node.name = ctxt._mangle(node.name)
+                callStack += node.init()
+                node.name = name
+        
+        return callStack
+
+
+    # Don't override this
     def generateBufferInitializationCode(self) -> str:
         if not self.parsed or not self.bound:
             raise ValueError('You need to parse and bind the network before generating code!')
@@ -771,7 +789,7 @@ class NetworkContainer():
         
         callStack = ''
         for node in ctxt.globalObjects.values():
-            if isinstance(node, VariableBuffer) and not isinstance(node, StructBuffer):
+            if isinstance(node, ConstantBuffer) and not isinstance(node, StructBuffer):
                 name = node.name
                 node.name = ctxt._mangle(node.name)
                 callStack += node.init()
@@ -786,6 +804,8 @@ class NetworkContainer():
         
         return callStack
 
+
+    
     def generateBufferAllocationCode(self) -> str:
 
         ctxt = self.ctxt.copy()
@@ -809,7 +829,7 @@ class NetworkContainer():
         return callStack
             
     # Don't override this
-    def generateBufferDeAllocCode(self) -> str:
+    def generateBufferDeAllocationCode(self) -> str:
         if not self.parsed or not self.bound:
             raise ValueError('You need to parse and bind the network before generating code!')
 
@@ -831,8 +851,8 @@ class NetworkContainer():
         size = 0
         for _buffer in self.ctxt.globalObjects.values():
             # We do not count structs for now, since they are not properly modeled
-            if not isinstance(_buffer, StructBuffer):
-                size += np.prod(_buffer.shape)*_buffer._type._value_//8
+            if isinstance(_buffer, ConstantBuffer):
+                size += (np.prod(_buffer.shape) * _buffer._type._value_ // 8)
 
         return size
 

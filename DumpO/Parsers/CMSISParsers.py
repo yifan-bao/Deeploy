@@ -139,10 +139,10 @@ class CMSISConv2DParser(Conv2DParser):
             convParamsDict = {
                 'input_offset': 0,
                 'output_offset': 0,
-                'stride': ctxt._mangle(newCtxt.lookup(f'{node.name}_stride').name + '_UL'),
-                'padding': ctxt._mangle(newCtxt.lookup(f'{node.name}_padding').name + '_UL'),
-                'dilation': ctxt._mangle(newCtxt.lookup(f'{node.name}_dilation').name + '_UL'),
-                'activation': ctxt._mangle(newCtxt.lookup(f'{node.name}_activation').name + '_UL'),
+                'stride': ctxt._mangle(newCtxt.lookup(f'{node.name}_stride').name),
+                'padding': ctxt._mangle(newCtxt.lookup(f'{node.name}_padding').name),
+                'dilation': ctxt._mangle(newCtxt.lookup(f'{node.name}_dilation').name),
+                'activation': ctxt._mangle(newCtxt.lookup(f'{node.name}_activation').name),
             }
             newCtxt.hoistStruct(convParamsDict, f'{node.name}_conv_params', 'cmsis_nn_conv_params')
             self.parserDict[f'conv_params'] = newCtxt.lookup(f'{node.name}_conv_params').name
@@ -341,7 +341,7 @@ class CMSISGEMMParser(CMSISLinearParser):
                 'input_offset': 0,
                 'filter_offset': 0,
                 'output_offset': 0,
-                'activation': newCtxt._mangle(newCtxt.lookup(f'{node.name}_activation').name + '_UL'),
+                'activation': newCtxt._mangle(newCtxt.lookup(f'{node.name}_activation').name),
             }
             newCtxt.hoistStruct(fcParamsDict, f'{node.name}_fc_params', 'cmsis_nn_fc_params')
             self.parserDict[f'fc_params'] = newCtxt.lookup(f'{node.name}_fc_params').name

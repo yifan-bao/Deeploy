@@ -28,14 +28,14 @@ from DumpO.DumpOTypes import NodeTemplate
 referenceInitTemplate = NodeTemplate("static ${type}* ${name};\n")
 referenceAllocateTemplate = NodeTemplate("${name} = (${type}*) malloc(sizeof(${type}) * ${size});\n")
 
-#referenceGlobalInitTemplate = NodeTemplate("const ${type} ${name}[${size}] = {${values}};")
-referenceGlobalInitTemplate = NodeTemplate("static const ${type} ${name}[${size}];\n")
+referenceGlobalInitTemplate = NodeTemplate("static const ${type} ${name}[${size}] = {${values}};\n")
+#referenceGlobalInitTemplate = NodeTemplate("static const ${type} ${name}[${size}];\n")
 referenceGlobalAllocateTemplate = NodeTemplate("")
 
-referenceStructInitTemplate = NodeTemplate("""static ${type} ${name}_UL;
-static const ${type}* ${name} = &${name}_UL;
+referenceStructInitTemplate = NodeTemplate("""static ${type} ${name};
 """)
+#static const ${type}* ${name} = &${name}_UL;
 
 referenceStructAllocateTemplate = NodeTemplate(""" % for key, value in structDict.items(): 
-    ${name}_UL.${key} = ${value};
+    ${name}.${key} = ${value};
 % endfor """)

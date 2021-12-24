@@ -26,5 +26,5 @@
 from DumpO.DumpOTypes import NodeTemplate
 
 LinearTemplate = NodeTemplate("\
-arm_fully_connected_s8(${ctxt}, ${fc_params}, ${quant_params}, ${input_dims}, ${A}, ${filter_dims}, ${B}, ${bias_dims}, ${add}, ${output_dims}, ${data_out});\
+arm_fully_connected_s8(&${ctxt}, &${fc_params}, &${quant_params}, &${input_dims}, ${A}, &${filter_dims}, ${B}, &${bias_dims}, ${add}, &${output_dims}, ${data_out});\
 ")
