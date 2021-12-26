@@ -4,3 +4,5 @@ build
 dist
 DumpOTest
 DumpO/DumpO.egg*
+.DS_Store
+*.html
