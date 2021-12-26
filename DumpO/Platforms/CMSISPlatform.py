@@ -40,7 +40,6 @@ from DumpO.OptimizationPasses.CMSISPasses import *
 
 GELU_int8_Mapper = NodeMapper(GELUParser(), None)
 iLayerNorm_int8_Mapper = NodeMapper(iLayerNormParser(), None)
-#Conv_int8_Mapper_testo = NodeMapper(Conv2DParser(), ConvChecker([CMSISDataTypes.int8_t, CMSISDataTypes.int8_t], [CMSISDataTypes.int16_t]), DummyTemplate.referenceTemplate)
 MHSA_int8_Mapper = NodeMapper(MHSAParser(), None)
 
 GatherMapper = NodeMapper(GatherParser(), BasicGatherBindings)
