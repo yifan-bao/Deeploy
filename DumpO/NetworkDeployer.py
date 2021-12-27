@@ -56,6 +56,7 @@ class NetworkDeployer(NetworkContainer):
         if not ret:
             raise RuntimeError("Lowering of the graph failed!")
 
+        
     def exportGraph(self, f):
         model = gs.export_onnx(self.graph)
         convert_model_to_external_data(model, location="model.data")
@@ -66,8 +67,6 @@ class NetworkDeployer(NetworkContainer):
     # Assumes all convolution weights are constants!!!
     # SCHEREMO: This can be done smarter and more robust, but for now it's okayish
     def realignDims(self):
-
-        lastConvolution = None
         
         for idx, nameLayer in enumerate(self.layerBinding.items()):
             name = nameLayer[0]
@@ -83,7 +82,7 @@ class NetworkDeployer(NetworkContainer):
                     assert self.ctxt.is_global(weightName), "Weight tensor was not constant! Cannot flip the weight tensor's dimensions!"
                     self.ctxt.globalObjects[weightName].values = np.transpose(weightTensor.values, (0,2,3,1)) # Channels last!
                     self.ctxt.globalObjects[weightName].shape = self.ctxt.globalObjects[weightName].values.shape
-                    lastConvolution = layer
+                    print(self.ctxt.globalObjects[weightName].shape)
             # Check if Linear layer
             elif isinstance(layer.mapper.parser, GEMMParser):
                 print("SWITCHED ONE GEMM")
@@ -93,7 +92,11 @@ class NetworkDeployer(NetworkContainer):
                 weightName = layer.mapper.parser.parserDict['B']
                 weightTensor = self.ctxt.lookup(weightName)
                 assert self.ctxt.is_global(weightName), "Weight tensor was not constant! Cannot flip the weight tensor's dimensions!"
-                newDim1 = self.ctxt.lookup(lastConvolution.mapper.parser.parserDict['data_out']).shape[1:]
+                
+                #SCHEREMO: THIS WILL BREAK VERY SOON
+                flattener = self.ctxt.lookup(layer.node.inputs[0].inputs[0].inputs[0].name)
+                
+                newDim1 = flattener.shape[1:]
                 intermediateValue = np.reshape(weightTensor.values, newDim1 + list(weightTensor.shape[1:]))
                 intermediateValue = np.transpose(intermediateValue, [1,2,0] + list(range(len(intermediateValue.shape))[3:]) ) # Channels last!
                 intermediateValue = np.reshape(intermediateValue, weightTensor.shape) # Channels last!

@@ -29,6 +29,141 @@ import onnx_graphsurgeon as gs
 
 from DumpO.DumpOTypes import *
 
+class MaxPoolParser(NodeParser):
+    def __init__(self):
+        super().__init__()
+
+    def parseNode(self, node: gs.ir.node.Node) -> bool:
+
+        ret = all([
+            'ceil_mode' in node.attrs,
+            'kernel_shape' in node.attrs,
+            'pads' in node.attrs,
+            'strides' in node.attrs,
+            len(node.inputs) == 1,
+            len(node.outputs) >= 1
+        ])
+
+        if ret:
+            self.parserDict['ceil_mode'] = node.attrs['ceil_mode']
+            self.parserDict['pads'] = node.attrs['pads']
+            self.parserDict['kernel_shape'] = node.attrs['kernel_shape']
+            self.parserDict['strides'] = node.attrs['strides']
+
+        return ret
+
+    def parseNodeCtxt(self, ctxt: NetworkContext, node: gs.ir.node.Node) -> (NetworkContext, bool):
+
+        ctxt = ctxt.copy()
+        
+        data_in = ctxt.lookup(node.inputs[0].name)            
+        data_out = ctxt.lookup(node.outputs[0].name)
+        self.parserDict['data_in'] = data_in.name
+        self.parserDict['data_out'] = data_out.name
+        self.parserDict['data_in_size'] = np.prod(data_in.shape)
+        self.parserDict['data_out_size'] = np.prod(data_out.shape)
+        
+        return ctxt, True
+
+class MaxPool2DParser(MaxPoolParser):
+    def __init__(self):
+        super().__init__()
+
+    def parseNode(self, node: gs.ir.node.Node) -> bool:
+        
+        ret = super().parseNode(node)
+        wellFormed = False
+        if ret:
+            pads = self.parserDict['pads']
+            kernel_shape = self.parserDict['kernel_shape']
+            if len(pads) == 4 and len(kernel_shape) == 2:
+                wellFormed = True
+        return wellFormed
+
+    def parseNodeCtxt(self, ctxt: NetworkContext, node: gs.ir.node.Node) -> (NetworkContext, bool):
+
+        ctxt, ret = super().parseNodeCtxt(ctxt, node)
+        wellFormed = False
+        if ret:
+            data_in = ctxt.lookup(node.inputs[0].name)
+            data_out = ctxt.lookup(node.outputs[0].name)
+            if len(data_in.shape) == 4 and len(data_out.shape) == 4:
+                wellFormed = True
+
+        return ctxt, wellFormed
+
+    
+class PadParser(NodeParser):
+    def __init__(self):
+        super().__init__()
+
+    def parseNode(self, node: gs.ir.node.Node) -> bool:
+
+        ret = all([
+            'mode' in node.attrs,
+            'pads' in node.attrs,
+            'value' in node.attrs,
+            len(node.inputs) == 1,
+            len(node.outputs) == 1
+        ])
+
+        if ret:
+            self.parserDict['mode'] = node.attrs['mode']
+            self.parserDict['pads'] = node.attrs['pads']
+            self.parserDict['value'] = node.attrs['value']
+
+        return ret
+
+    def parseNodeCtxt(self, ctxt: NetworkContext, node: gs.ir.node.Node) -> (NetworkContext, bool):
+
+        ctxt = ctxt.copy()
+        
+        data_in = ctxt.lookup(node.inputs[0].name)            
+        data_out = ctxt.lookup(node.outputs[0].name)
+        self.parserDict['data_in'] = data_in.name
+        self.parserDict['data_out'] = data_out.name
+        self.parserDict['data_in_size'] = np.prod(data_in.shape)
+        self.parserDict['data_out_size'] = np.prod(data_out.shape)
+        
+        return ctxt, True
+
+class Pad2DParser(PadParser):
+    def __init__(self):
+        super().__init__()
+
+    def parseNode(self, node: gs.ir.node.Node) -> bool:
+        
+        ret = super().parseNode(node)
+        wellFormed = False
+        if ret:
+            pads = self.parserDict['pads']
+            if len(pads) == 8 and pads[0] == 0 and pads[4] == 0 \
+            and pads[1] == 0 and pads[5] == 0:
+                wellFormed = True
+                self.parserDict['pad_x'] = pads[3]
+                self.parserDict['pad_y'] = pads[2]
+                
+        return wellFormed
+
+    def parseNodeCtxt(self, ctxt: NetworkContext, node: gs.ir.node.Node) -> (NetworkContext, bool):
+
+        ctxt, ret = super().parseNodeCtxt(ctxt, node)
+        wellFormed = False
+        if ret:
+            data_in = ctxt.lookup(node.inputs[0].name)
+            data_out = ctxt.lookup(node.outputs[0].name)
+            if len(data_in.shape) == 4:
+                wellFormed = True
+                self.parserDict['dim_im_in_x'] = data_in.shape[3]
+                self.parserDict['dim_im_in_y'] = data_in.shape[2]
+                self.parserDict['dim_im_in_ch'] = data_in.shape[1]
+                self.parserDict['dim_im_out_x'] = data_out.shape[3]
+                self.parserDict['dim_im_out_y'] = data_out.shape[2]
+                self.parserDict['dim_im_out_ch'] = data_out.shape[1]
+
+        return ctxt, wellFormed
+
+
 class AddParser(NodeParser):
     def __init__(self):
         super().__init__()

@@ -7,4 +7,5 @@ from .AddTemplate import *
 from .GEMMTemplate import *
 from .MHSATemplate import *
 from .GatherTemplate import *
+from .PadTemplate import *
 from .DummyTemplate import *

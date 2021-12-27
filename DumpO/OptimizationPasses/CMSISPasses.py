@@ -88,14 +88,18 @@ def merge_gemm_rq_fun(ctxt: NetworkContext, graph: gs.Graph, match: Match, name:
 
     # Reweight multiplicators:
     # Get maximum:
-    maxMult = rqs.inputs[1].max()
+    maxMult = rqs.inputs[1].values.max()
     # Get maximum shift possible:
-    MultShift = min(totalShift, np.floor(np.log2(2**31 - rqs.inputs[1].max())))
+    MultShift = min(totalShift, np.floor(np.log2(2**31 - rqs.inputs[1].values.max())))
     # get remaining shift:
     remainingShift = totalShift - MultShift
 
     # shift mult:
     rqs.inputs[1].values = rqs.inputs[1].values * 2**MultShift
+    shiftNode = gs.Constant(f'{gemm.name}_shift', np.array(remainingShift))
+    # rqs.inputs[-1].values = np.round(rqs.inputs[-1].values / rqs.inputs[-2].values) # normalize add
+    # #import IPython; IPython.embed()
+    # shiftNode = gs.Constant(f'{gemm.name}_shift', np.array((31-np.log2(rqs.attrs['div'].values),)))
     
     shiftNode = gs.Constant(f'{gemm.name}_shift', np.array(remainingShift))
     _inputs = list(gemm.inputs) + list(rqs.inputs[1:]) + [shiftNode]

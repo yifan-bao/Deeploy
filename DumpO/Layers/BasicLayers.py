@@ -118,7 +118,14 @@ class ConvLayer(ONNXLayer):
             inputShapes[2] = inputShapes[1][-1]
         return (inputShapes, outputShapes)
 
-    
+class PadLayer(ONNXLayer):
+    def __init__(self, maps : List[NodeMapper]):
+        super().__init__(maps)
+
+class MaxPoolLayer(ONNXLayer):
+    def __init__(self, maps : List[NodeMapper]):
+        super().__init__(maps)
+        
 class iLayerNormLayer(ONNXLayer):
     def __init__(self, maps : List[NodeMapper]):
         super().__init__(maps)

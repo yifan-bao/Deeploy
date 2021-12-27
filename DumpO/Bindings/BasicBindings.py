@@ -44,4 +44,6 @@ BasicRQSBindings = [NodeBinding(RequantShiftChecker([type,DataTypes.int32_t,Data
 
 BasicAddBindings = [NodeBinding(AddChecker([type], [DataTypes.int32_t]), AddTemplate.referenceTemplate) for type in DataTypes]
 
+BasicPadBindings = [NodeBinding(PadChecker([type], [type]), PadTemplate.referenceTemplate) for type in DataTypes]
+
 DummyBinding = NodeBinding(DummyChecker([DataTypes.int8_t],[DataTypes.int8_t]), DummyTemplate.referenceTemplate)

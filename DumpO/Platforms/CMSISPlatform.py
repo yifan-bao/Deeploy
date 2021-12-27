@@ -51,16 +51,21 @@ GEMM_int8_Mapper = NodeMapper(CMSISGEMMParser(), [CMSISGEMMBinding])
 Conv_int8_Mapper = NodeMapper(CMSISConv2DParser(), [CMSISConv2DBinding])
 AddMapper = NodeMapper(AddParser(), CMSISSaturatingAddBindings)
 
+PadMapper = NodeMapper(Pad2DParser(), BasicPadBindings)
+MaxPool2DMapper = NodeMapper(CMSISMaxPool2DParser(), [CMSISMaxPool2DBinding])
+
 DummyMapper = NodeMapper(DummyParser(), [DummyBinding])
 
 CMSISMapping = {
     'RequantizedConv' : RQSConvLayer([Conv_int8_Mapper]),
     'RequantizedGemm': RQSGEMMLayer([GEMM_int8_Mapper]),
+    'MaxPool': MaxPoolLayer([MaxPool2DMapper]),
     'iLayerNorm': iLayerNormLayer([iLayerNorm_int8_Mapper]),
     'MultiHeadSelfAttention': MHSALayer([MHSA_int8_Mapper]),
     'iGELU' : iGELULayer([GELU_int8_Mapper]),
     
     'Gather': GatherLayer([GatherMapper]),
+    'Pad': PadLayer([PadMapper]),
     'Add': AddLayer([AddMapper]),
     'Reshape': ReshapeLayer([ReshapeMapper]),
     'Flatten': ReshapeLayer([FlattenMapper]),

@@ -30,6 +30,105 @@ from DumpO.DumpOTypes import *
 from DumpO.Parsers.BasicParsers import *
 from DumpO.Bindings.BasicBindings import DataTypes
 
+class CMSISMaxPool2DParser(MaxPool2DParser):
+    def __init__(self):
+        super().__init__()
+
+    def parseNode(self, node: gs.ir.node.Node) -> bool:
+        
+        ret = super().parseNode(node)
+        wellFormed = all([
+            self.parserDict['pads'][0] == 0,
+            self.parserDict['pads'][1] == 0,
+        ])
+        if wellFormed:
+            self.parserDict['padding_x'] = int(self.parserDict['pads'][0])
+            self.parserDict['padding_y'] = int(self.parserDict['pads'][1])
+            self.parserDict['stride_x'] = int(self.parserDict['strides'][0])
+            self.parserDict['stride_y'] = int(self.parserDict['strides'][1])
+            self.parserDict['dim_kernel_x'] = int(self.parserDict['kernel_shape'][0])
+            self.parserDict['dim_kernel_y'] = int(self.parserDict['kernel_shape'][1])
+        return wellFormed
+
+    def parseNodeCtxt(self, ctxt: NetworkContext, node: gs.ir.node.Node) -> (NetworkContext, bool):
+
+        newCtxt, ret = super().parseNodeCtxt(ctxt, node)
+        if ret:
+
+            data_in = newCtxt.lookup(self.parserDict['data_in'])
+            data_out = newCtxt.lookup(self.parserDict['data_out'])
+            
+            self.parserDict['ch_im_in'] = data_in.shape[1]
+            self.parserDict['dim_im_in_x'] = data_in.shape[2]
+            self.parserDict['dim_im_in_y'] = data_in.shape[3]
+            self.parserDict['ch_im_out'] = data_out.shape[1]
+            self.parserDict['dim_im_out_x'] = data_out.shape[2]
+            self.parserDict['dim_im_out_y'] = data_out.shape[3]
+            
+            ctxtDict = {
+                'buf': 0, #f'{node.name}_ctxt_buffer',  
+                'size': 0
+            }
+
+            newCtxt.hoistStruct(ctxtDict, f'{node.name}_ctxt', 'cmsis_nn_context')
+            self.parserDict['ctxt'] = f'{node.name}_ctxt'
+
+            strideDict = {
+                'w': self.parserDict['stride_x'],
+                'h': self.parserDict['stride_y']
+            }
+            newCtxt.hoistStruct(strideDict, f'{node.name}_stride', 'cmsis_nn_tile')
+            # padding
+            paddingDict = {
+                'w': self.parserDict['padding_x'],
+                'h': self.parserDict['padding_y']
+            }
+            newCtxt.hoistStruct(paddingDict, f'{node.name}_padding', 'cmsis_nn_tile')
+
+            activationDict = {
+                    'min': -2**31,
+                    'max': 2**31
+            }
+            newCtxt.hoistStruct(activationDict, f'{node.name}_activation', 'cmsis_nn_activation')
+                
+            convParamsDict = {
+                'stride': ctxt._mangle(newCtxt.lookup(f'{node.name}_stride').name),
+                'padding': ctxt._mangle(newCtxt.lookup(f'{node.name}_padding').name),
+                'activation': ctxt._mangle(newCtxt.lookup(f'{node.name}_activation').name),
+            }
+            newCtxt.hoistStruct(convParamsDict, f'{node.name}_pool_params', 'cmsis_nn_pool_params')
+            self.parserDict[f'pool_params'] = newCtxt.lookup(f'{node.name}_pool_params').name
+            
+            inputDimsDict = {
+                'n': 1,
+                'h': self.parserDict['dim_im_in_x'],
+                'w': self.parserDict['dim_im_in_y'],
+                'c': self.parserDict['ch_im_in']
+            }            
+            newCtxt.hoistStruct(inputDimsDict, f'{node.name}_input_dims', 'cmsis_nn_dims')
+            self.parserDict['input_dims'] = newCtxt.lookup(f'{node.name}_input_dims').name
+
+            filterDimsDict = {
+                'n': 1,
+                'h': self.parserDict['dim_kernel_x'],
+                'w': self.parserDict['dim_kernel_y'],
+                'c': 1
+            }
+            newCtxt.hoistStruct(filterDimsDict, f'{node.name}_filter_dims', 'cmsis_nn_dims')
+            self.parserDict['filter_dims'] = newCtxt.lookup(f'{node.name}_filter_dims').name
+
+            outputDimsDict = {
+                'n': 1,
+                'h': self.parserDict['dim_im_out_x'],
+                'w': self.parserDict['dim_im_out_y'],
+                'c': self.parserDict['ch_im_out']
+            }
+            newCtxt.hoistStruct(outputDimsDict, f'{node.name}_output_dims', 'cmsis_nn_dims')
+            self.parserDict['output_dims'] = newCtxt.lookup(f'{node.name}_output_dims').name
+
+        return newCtxt, ret
+
+
 class CMSISConv2DParser(Conv2DParser):
     def __init__(self, noBiasHoisting = True):
         super().__init__(noBiasHoisting)
@@ -44,6 +143,8 @@ class CMSISConv2DParser(Conv2DParser):
                 self.parserDict['group'] == 1,
                 self.parserDict['pads'][0] == self.parserDict['pads'][2],
                 self.parserDict['pads'][1] == self.parserDict['pads'][3],
+                self.parserDict['pads'][0] == self.parserDict['pads'][1],
+                self.parserDict['pads'][0] == 0,
                 # Don't support dilations
                 #all([coeff == 1 for coeff in self.parserDict['dilations']]),
                 len(node.inputs) == 5,
@@ -345,11 +446,12 @@ class CMSISGEMMParser(CMSISLinearParser):
             newCtxt.hoistStruct(fcParamsDict, f'{node.name}_fc_params', 'cmsis_nn_fc_params')
             self.parserDict[f'fc_params'] = newCtxt.lookup(f'{node.name}_fc_params').name
             
-            convQuantDict = {
+            gemmQuantDict = {
                 'multiplier': newCtxt.lookup(self.parserDict['mul']).values,
-                'shift': newCtxt.lookup(self.parserDict['shift']).values[0],
-            }            
-            newCtxt.hoistStruct(convQuantDict, f'{node.name}_quant_params', 'cmsis_nn_per_tensor_quant_params')
+                'shift': newCtxt.lookup(self.parserDict['shift']).values,
+            }
+            
+            newCtxt.hoistStruct(gemmQuantDict, f'{node.name}_quant_params', 'cmsis_nn_per_tensor_quant_params')
             self.parserDict['quant_params'] = newCtxt.lookup(f'{node.name}_quant_params').name
 
             inputDimsDict = {

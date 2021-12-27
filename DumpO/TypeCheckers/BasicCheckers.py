@@ -27,6 +27,13 @@ from enum import Enum
 
 from DumpO.DumpOTypes import *
 
+class PadChecker(NodeTypeChecker):
+    def __init__(self, input_types: List[Enum], output_types: List[Enum]):
+        super().__init__(input_types, output_types)
+
+    def inferNumLevels(self, inputs: List[VariableBuffer], parserDict: Dict) -> List[int]:
+        return [inputs[0].nLevels]
+
 class AddChecker(NodeTypeChecker):
     def __init__(self, input_types: List[Enum], output_types: List[Enum]):
         super().__init__(input_types, output_types)
