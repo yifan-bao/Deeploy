@@ -32,7 +32,7 @@ from DumpO.TypeCheckers.CMSISCheckers import *
 from DumpO.Templates.CMSISTemplates import *
 
 CMSISConv2DBinding = NodeBinding(CMSISConvChecker([DataTypes.int8_t, DataTypes.int8_t, DataTypes.int32_t, DataTypes.int32_t,DataTypes.int32_t], [DataTypes.int8_t]), ConvTemplate.conv2DTemplate)
-CMSISGEMMBinding = NodeBinding(CMSISLinearChecker([DataTypes.int8_t, DataTypes.int8_t, DataTypes.int32_t, DataTypes.int32_t,DataTypes.int32_t], [DataTypes.int8_t]), GEMMTemplate.LinearTemplate)
+CMSISGEMMBinding = NodeBinding(CMSISLinearChecker([DataTypes.int8_t, DataTypes.int8_t, DataTypes.int32_t], [DataTypes.int8_t]), GEMMTemplate.LinearTemplate)
 CMSISMaxPool2DBinding = NodeBinding(CMSISMaxPoolChecker([DataTypes.int8_t], [DataTypes.int8_t]), MaxPool2DTemplate.cmsisTemplate)
 
 CMSISSaturatingAddBindings = [NodeBinding(CMSISSaturatingAddChecker([DataTypes.int8_t],[DataTypes.int8_t]), AddTemplate.AddInt8Template),

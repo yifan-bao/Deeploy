@@ -378,14 +378,18 @@ class CMSISGEMMParser(CMSISLinearParser):
                 'div' in node.attrs,
                 'n_levels' in node.attrs,
                 'signed' in node.attrs,
-                len(node.inputs) == 5,
+                'mul' in node.attrs,
+                'shift' in node.attrs,
+                len(node.inputs) == 3,
         ])
-        
+            import IPython; IPython.embed()
 
             if ret:
                 self.parserDict['n_levels'] = int(node.attrs['n_levels'].values)
                 self.parserDict['signed'] = int(node.attrs['signed'].values)
                 self.parserDict['log2D'] = int(math.log2(node.attrs['div'].values))
+                self.parserDict['mul'] = int(node.attrs['mul'].values)
+                self.parserDict['shift'] = int(node.attrs['shift'].values)
                 
             return ret
         
@@ -398,7 +402,7 @@ class CMSISGEMMParser(CMSISLinearParser):
         
         if ret:
 
-            inputs = ['A', 'B', 'mul', 'add', 'shift']
+            inputs = ['A', 'B', 'add']
                 
             for idx, inputNode in enumerate(node.inputs):
                 self.parserDict[inputs[idx]] = ctxt.lookup(inputNode.name).name
@@ -447,8 +451,8 @@ class CMSISGEMMParser(CMSISLinearParser):
             self.parserDict[f'fc_params'] = newCtxt.lookup(f'{node.name}_fc_params').name
             
             gemmQuantDict = {
-                'multiplier': newCtxt.lookup(self.parserDict['mul']).values,
-                'shift': newCtxt.lookup(self.parserDict['shift']).values,
+                'multiplier': self.parserDict['mul'],
+                'shift': self.parserDict['shift'],
             }
             
             newCtxt.hoistStruct(gemmQuantDict, f'{node.name}_quant_params', 'cmsis_nn_per_tensor_quant_params')

@@ -56,13 +56,14 @@ def merge_conv_rq_fun(ctxt: NetworkContext, graph: gs.Graph, match: Match, name:
     # rqs.inputs[-1].values = np.round(rqs.inputs[-1].values / rqs.inputs[-2].values) # normalize add
     # #import IPython; IPython.embed()
     # shiftNode = gs.Constant(f'{conv.name}_shift', np.array((31-np.log2(rqs.attrs['div'].values),)))
-    
+
+    shiftNode = gs.Constant(f'{conv.name}_shift', np.array(remainingShift))
     _inputs = list(conv.inputs) + list(rqs.inputs[1:]) + [shiftNode]
+    
     _outputs = rqs.outputs
 
     rqsConv = gs.Node(op='RequantizedConv', name=name, attrs={**conv.attrs, **rqs.attrs})
     graph.replaceInsertNode(_inputs, _outputs, rqsConv)
-
 
 class ConvRequantMergePass(ReplaceSequentialPatternPass):
     def __init__(self):
@@ -100,13 +101,13 @@ def merge_gemm_rq_fun(ctxt: NetworkContext, graph: gs.Graph, match: Match, name:
     # rqs.inputs[-1].values = np.round(rqs.inputs[-1].values / rqs.inputs[-2].values) # normalize add
     # #import IPython; IPython.embed()
     # shiftNode = gs.Constant(f'{gemm.name}_shift', np.array((31-np.log2(rqs.attrs['div'].values),)))
-    
-    shiftNode = gs.Constant(f'{gemm.name}_shift', np.array(remainingShift))
-    _inputs = list(gemm.inputs) + list(rqs.inputs[1:]) + [shiftNode]
-    
-    _outputs = rqs.outputs
 
-    rqsGemm = gs.Node(op='RequantizedGemm', name=name, attrs={**gemm.attrs, **rqs.attrs})
+    _inputs = list(gemm.inputs) + list(rqs.inputs[-1:])
+    _outputs = rqs.outputs
+    attrs = {**gemm.attrs, **rqs.attrs}
+    attrs['shift']=gs.Constant(name='shift', values= np.array(remainingShift))
+    attrs['mul']=gs.Constant(name='mul',values = np.array(rqs.inputs[1].values))
+    rqsGemm = gs.Node(op='RequantizedGemm', name=name, attrs=attrs)
     graph.replaceInsertNode(_inputs, _outputs, rqsGemm)
 
 
