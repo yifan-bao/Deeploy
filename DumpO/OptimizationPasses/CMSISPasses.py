@@ -37,10 +37,26 @@ def merge_conv_rq_fun(ctxt: NetworkContext, graph: gs.Graph, match: Match, name:
     conv = matched_nodes[0]
     rqs = matched_nodes[1]
 
-    rqs.inputs[-1].values = np.round(rqs.inputs[-1].values / rqs.inputs[-2].values) # normalize add
-    #import IPython; IPython.embed()
-    shiftNode = gs.Constant(f'{conv.name}_shift', np.array((rqs.attrs['div'].values,)))
 
+    totalShift = 31-np.log2(rqs.attrs['div'].values)
+    
+    rqs.inputs[-1].values = np.round(rqs.inputs[-1].values / rqs.inputs[-2].values) # normalize add
+
+    # Reweight multiplicators:
+    # Get maximum:
+    maxMult = rqs.inputs[1].values.max()
+    # Get maximum shift possible:
+    MultShift = min(totalShift, np.floor(np.log2(2**31 - rqs.inputs[1].values.max())))
+    # get remaining shift:
+    remainingShift = totalShift - MultShift
+
+    # shift mult:
+    rqs.inputs[1].values = rqs.inputs[1].values * 2**MultShift
+    shiftNode = gs.Constant(f'{conv.name}_shift', np.array(remainingShift))
+    # rqs.inputs[-1].values = np.round(rqs.inputs[-1].values / rqs.inputs[-2].values) # normalize add
+    # #import IPython; IPython.embed()
+    # shiftNode = gs.Constant(f'{conv.name}_shift', np.array((31-np.log2(rqs.attrs['div'].values),)))
+    
     _inputs = list(conv.inputs) + list(rqs.inputs[1:]) + [shiftNode]
     _outputs = rqs.outputs
 
@@ -66,9 +82,22 @@ def merge_gemm_rq_fun(ctxt: NetworkContext, graph: gs.Graph, match: Match, name:
     gemm = matched_nodes[0]
     rqs = matched_nodes[1]
 
+    totalShift = 31-np.log2(rqs.attrs['div'].values)
+    
     rqs.inputs[-1].values = np.round(rqs.inputs[-1].values / rqs.inputs[-2].values) # normalize add
 
-    shiftNode = gs.Constant(f'{gemm.name}_shift', np.array((rqs.attrs['div'].values,)))
+    # Reweight multiplicators:
+    # Get maximum:
+    maxMult = rqs.inputs[1].max()
+    # Get maximum shift possible:
+    MultShift = min(totalShift, np.floor(np.log2(2**31 - rqs.inputs[1].max())))
+    # get remaining shift:
+    remainingShift = totalShift - MultShift
+
+    # shift mult:
+    rqs.inputs[1].values = rqs.inputs[1].values * 2**MultShift
+    
+    shiftNode = gs.Constant(f'{gemm.name}_shift', np.array(remainingShift))
     _inputs = list(gemm.inputs) + list(rqs.inputs[1:]) + [shiftNode]
     
     _outputs = rqs.outputs

@@ -126,13 +126,13 @@ class CMSISConv2DParser(Conv2DParser):
             # activation
             if self.parserDict['signed']:
                 activationDict = {
-                    'min': -127,
-                    'max': 128
+                    'min': -(self.parserDict['n_levels']//2),
+                    'max': (self.parserDict['n_levels']//2) - 1
                 }
             else:
                 activationDict = {
                     'min': 0,
-                    'max': 255
+                    'max': (self.parserDict['n_levels'])-1
                 }
             newCtxt.hoistStruct(activationDict, f'{node.name}_activation', 'cmsis_nn_activation')
                 
@@ -146,7 +146,6 @@ class CMSISConv2DParser(Conv2DParser):
             }
             newCtxt.hoistStruct(convParamsDict, f'{node.name}_conv_params', 'cmsis_nn_conv_params')
             self.parserDict[f'conv_params'] = newCtxt.lookup(f'{node.name}_conv_params').name
-
             
             convQuantDict = {
                 'multiplier': ctxt._mangle(self.parserDict['mul']),
@@ -327,13 +326,13 @@ class CMSISGEMMParser(CMSISLinearParser):
             # activation
             if self.parserDict['signed']:
                 activationDict = {
-                    'min': -127,
-                    'max': 128
+                    'min': -(self.parserDict['n_levels']//2),
+                    'max': (self.parserDict['n_levels']//2) - 1
                 }
             else:
                 activationDict = {
                     'min': 0,
-                    'max': 255
+                    'max': (self.parserDict['n_levels'])-1
                 }
             newCtxt.hoistStruct(activationDict, f'{node.name}_activation', 'cmsis_nn_activation')
                 
@@ -347,8 +346,8 @@ class CMSISGEMMParser(CMSISLinearParser):
             self.parserDict[f'fc_params'] = newCtxt.lookup(f'{node.name}_fc_params').name
             
             convQuantDict = {
-                'multiplier': newCtxt._mangle(self.parserDict['mul']),
-                'shift': newCtxt._mangle(self.parserDict['shift']),
+                'multiplier': newCtxt.lookup(self.parserDict['mul']).values,
+                'shift': newCtxt.lookup(self.parserDict['shift']).values[0],
             }            
             newCtxt.hoistStruct(convQuantDict, f'{node.name}_quant_params', 'cmsis_nn_per_tensor_quant_params')
             self.parserDict['quant_params'] = newCtxt.lookup(f'{node.name}_quant_params').name

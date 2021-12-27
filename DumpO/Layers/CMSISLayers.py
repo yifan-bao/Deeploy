@@ -24,8 +24,9 @@
 # limitations under the License.
 
 from DumpO.DumpOTypes import *
+from DumpO.Layers.BasicLayers import *
 
-class RQSConvLayer(ONNXLayer):
+class RQSConvLayer(ConvLayer):
     def __init__(self, maps : List[NodeMapper]):
         super().__init__(maps)
 
@@ -35,7 +36,7 @@ class RQSConvLayer(ONNXLayer):
         inputShapes[4] = inputShapes[1][0] # Channels out dimension of Kernel
         return (inputShapes, outputShapes)
 
-class RQSGEMMLayer(ONNXLayer):
+class RQSGEMMLayer(GEMMLayer):
     def __init__(self, maps : List[NodeMapper]):
         super().__init__(maps)
 

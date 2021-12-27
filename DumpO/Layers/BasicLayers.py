@@ -45,7 +45,7 @@ class ReshapeLayer(ONNXLayer):
         dealloc = ctxt.freeLocal(self.node.name, inputNames)
         
         return (ctxt, [call])
-
+    
 class GatherLayer(ONNXLayer):
     def __init__(self, maps : List[NodeMapper]):
         super().__init__(maps)
@@ -117,7 +117,8 @@ class ConvLayer(ONNXLayer):
         if len(inputShapes) == 3:
             inputShapes[2] = inputShapes[1][-1]
         return (inputShapes, outputShapes)
-        
+
+    
 class iLayerNormLayer(ONNXLayer):
     def __init__(self, maps : List[NodeMapper]):
         super().__init__(maps)

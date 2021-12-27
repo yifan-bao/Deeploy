@@ -635,7 +635,7 @@ class NetworkContainer():
         self.graph = graph
         self.scheduler = scheduler
         self.ctxt = None
-        self.layerBinding = []
+        self.layerBinding = {}
         self.parsed = False
         self.Platform = platform
         self.Platform.Mapping['Constant'] = lambda x: self.ctxt.hoistConstant(x.attrs['value'], x.outputs[0].name)
@@ -673,7 +673,7 @@ class NetworkContainer():
         
         ctxt = self.ctxt.copy()
         
-        for name, layer in self.layerBinding:
+        for name, layer in self.layerBinding.items():
             ctxt = layer.broadcast(ctxt)
 
         self.ctxt = ctxt
@@ -690,7 +690,7 @@ class NetworkContainer():
         backTrackList = []
         
         NetworkBindSuccess = True
-        for name, layer in self.layerBinding:
+        for name, layer in self.layerBinding.items():
             
             newCtxt, LayerBindSuccess = layer.bind(newCtxt, self.Platform.TypeInfer)
             NetworkBindSuccess = NetworkBindSuccess and LayerBindSuccess
@@ -716,10 +716,10 @@ class NetworkContainer():
             assert i.op in list(self.Platform.Mapping.keys()), f'Layer {i.op} not in layer dict!'
             layer = self.Platform.Mapping[i.op](i)
             if layer is not None:
-                self.layerBinding += [(layer.node.name, layer)]
+                self.layerBinding[layer.node.name] = layer
 
         parseSuccess = True
-        for (name, node) in self.layerBinding:
+        for node in self.layerBinding.values():
             self.ctxt, parsePass = node.parse(self.ctxt)
             parseSuccess = parseSuccess and parsePass
 
@@ -735,7 +735,7 @@ class NetworkContainer():
             raise ValueError('You need to parse and bind the network before generating code!')
         
         callStack = ''
-        for name, node in self.layerBinding:
+        for node in self.layerBinding.values():
             self.ctxt, code = node.generate(self.ctxt)
             for section in code:
                 for substr in section:
@@ -774,7 +774,7 @@ class NetworkContainer():
             if isinstance(node, VariableBuffer) and not isinstance(node, (StructBuffer, ConstantBuffer)):
                 name = node.name
                 node.name = ctxt._mangle(node.name)
-                callStack += node.init()
+                callStack += "extern " + node.init()
                 node.name = name
         
         return callStack
@@ -789,7 +789,7 @@ class NetworkContainer():
         
         callStack = ''
         for node in ctxt.globalObjects.values():
-            if isinstance(node, ConstantBuffer) and not isinstance(node, StructBuffer):
+            if isinstance(node, VariableBuffer) and not isinstance(node, StructBuffer):
                 name = node.name
                 node.name = ctxt._mangle(node.name)
                 callStack += node.init()
@@ -863,7 +863,7 @@ class NetworkContainer():
 
         maxSize = 0
         name = ''
-        for layerName, layer in self.layerBinding:
+        for layerName, layer in self.layerBinding.items():
             size = 0
             for edgeNode in layer.node.inputs + layer.node.outputs:
                 _buffer = self.ctxt.lookup(edgeNode.name)
@@ -880,61 +880,3 @@ class NetworkContainer():
             raise ValueError('You need to parse and bind the network before getting RAM Size!')
 
         return self.getParameterSize() + self.getWorstCaseBufferSize()[1]
-        
-class NetworkDeployer(NetworkContainer):
-    def __init__(self, graph: gs.Graph, deploymentPlatform: DeploymentPlatform, loweringOptimizer: NetworkOptimizer, scheduler: Callable = lambda x: x, name: str = "DumpONetwork"):
-        super().__init__(graph, deploymentPlatform, scheduler, name)
-        self.name = name
-        self.prepared = False
-        self.baseParser = NodeParser()
-        self.optimizer = loweringOptimizer
-        
-    # Don't override this
-    def lower(self, ctxt: NetworkContext, graph: gs.Graph) -> (gs.Graph, bool):
-        return (self.optimizer.optimize(ctxt, graph), True)
-
-    # Don't override this
-    def baseParse(self) -> (NetworkContext, bool):
-        newCtxt = NetworkContext(VariableBuffer, ConstantBuffer, StructBuffer, {}, {})
-        newCtxt = self._createIOBindings(newCtxt, self.graph)
-
-        for node in self.graph.nodes:
-            newCtxt, ret = self.baseParser.parse(newCtxt, node)
-
-        return newCtxt, ret
-
-    def middleEnd(self):
-        baseCtxt, ret = self.baseParse() # This sanity checks the graph and generates a base context for lowering/optimization
-        if not ret:
-            raise RuntimeError("The given graph was not valid - check that it is acyclic!")
-        self.graph, ret = self.lower(baseCtxt, self.graph) # This lowers the graph to a deployable format
-        if not ret:
-            raise RuntimeError("Lowering of the graph failed!")
-
-    def exportGraph(self, f):
-        model = gs.export_onnx(self.graph)
-        convert_model_to_external_data(model, location="model.data")
-        onnx.save(model, f)
-
-    def realignDims(self):
-        pass
-        
-    def backEnd(self):
-        self.parse() # This reparses the lowered graph
-        self.realignDims()
-        self.broadcast() # This broadcasts all tensors offline
-        self.bind() # This binds the graph to the node templates
-        self.prepared = True
-        
-    # Don't override this
-    def prepare(self):
-        # MIDDLE END
-        self.middleEnd()
-        # BACK END - Inherited from NetworkContainer
-        self.backEnd()
-        
-    def generateFunction(self) -> str:
-        if not self.prepared:
-            self.prepare()
-
-        return self.generateInferenceCode()
