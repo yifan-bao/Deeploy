@@ -86,22 +86,26 @@ class NetworkDeployer(NetworkContainer):
             # Check if Linear layer
             elif isinstance(layer.mapper.parser, GEMMParser):
                 print("SWITCHED ONE GEMM")
+                weightName = layer.mapper.parser.parserDict['B']
+                # THIS ONE IS NEEDED!
+                self.ctxt.globalObjects[weightName].values = np.transpose(self.ctxt.globalObjects[weightName].values, (1,0))
+                self.ctxt.globalObjects[weightName].shape = self.ctxt.globalObjects[weightName].values.shape
                 # Assume you follow CONV
                 # SCHEREMO: Very fragile, look out in the future to fix this better!
-                #import IPython; IPython.embed()
-                weightName = layer.mapper.parser.parserDict['B']
                 weightTensor = self.ctxt.lookup(weightName)
                 assert self.ctxt.is_global(weightName), "Weight tensor was not constant! Cannot flip the weight tensor's dimensions!"
-                
+
                 #SCHEREMO: THIS WILL BREAK VERY SOON
                 flattener = self.ctxt.lookup(layer.node.inputs[0].inputs[0].inputs[0].name)
                 
-                newDim1 = flattener.shape[1:]
-                intermediateValue = np.reshape(weightTensor.values, newDim1 + list(weightTensor.shape[1:]))
-                intermediateValue = np.transpose(intermediateValue, [1,2,0] + list(range(len(intermediateValue.shape))[3:]) ) # Channels last!
+                newDim2 = flattener.shape[1:]
+                intermediateValue = np.reshape(weightTensor.values, list(weightTensor.shape[:-1]) + newDim2)
+                numAxes = len(intermediateValue.shape)
+                axes = list(range(numAxes))
+                intermediateValue = np.transpose(intermediateValue, axes[:-3] + [-2,-1,-3]) # Channels last!
                 intermediateValue = np.reshape(intermediateValue, weightTensor.shape) # Channels last!
                 self.ctxt.globalObjects[weightName].values = intermediateValue
-
+                self.ctxt.globalObjects[weightName].shape = self.ctxt.globalObjects[weightName].values.shape
                 return
         
     def backEnd(self):

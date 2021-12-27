@@ -85,9 +85,10 @@ class CMSISMaxPool2DParser(MaxPool2DParser):
             }
             newCtxt.hoistStruct(paddingDict, f'{node.name}_padding', 'cmsis_nn_tile')
 
+            # SCHEREMO: Fix this at some point...
             activationDict = {
-                    'min': -2**31,
-                    'max': 2**31
+                    'min': -2**7,
+                    'max': 2**7-1
             }
             newCtxt.hoistStruct(activationDict, f'{node.name}_activation', 'cmsis_nn_activation')
                 
@@ -382,7 +383,6 @@ class CMSISGEMMParser(CMSISLinearParser):
                 'shift' in node.attrs,
                 len(node.inputs) == 3,
         ])
-            import IPython; IPython.embed()
 
             if ret:
                 self.parserDict['n_levels'] = int(node.attrs['n_levels'].values)
