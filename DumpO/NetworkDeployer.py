@@ -81,7 +81,7 @@ class NetworkDeployer(NetworkContainer):
             
             layer = self.layerBinding[layerName]
             
-            if isinstance(layer, (ConvLayer, MaxPoolLayer)):
+            if isinstance(layer, (ConvLayer, MaxPoolLayer, PadLayer)):
 
                 inputNode = layer.node.inputs[0]
                 outputNode = layer.node.outputs[0]
@@ -116,7 +116,7 @@ class NetworkDeployer(NetworkContainer):
 
                 weightNode = layer.node.inputs[1]
                 shape = list(range(len(weightNode.shape)))
-                permute = np.array(shape[0:1] + shape[2:] + shape[1:2])
+                permute = np.array([1,0])
                 
                 weightTransposeOutput = gs.Variable("TransposeWeight"+str(transposeIdx), dtype=np.float32, shape=newShape(weightNode, permute))
                 weightTransposeNode = gs.Node(name='Transpose'+str(transposeIdx), op="Transpose", inputs=[weightNode], outputs=[weightTransposeOutput], attrs={'perm': permute})
@@ -125,6 +125,7 @@ class NetworkDeployer(NetworkContainer):
 
                 transposeIdx += 1
         self.graph.cleanup().toposort()
+        onnx.save_model(gs.export_onnx(self.graph), "test.onnx")
                 
     def backEnd(self, channels_first=True):
         self.parse(channels_first) # This reparses the lowered graph

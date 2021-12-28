@@ -24,10 +24,10 @@
 # limitations under the License.
 
 from DumpO.DumpOTypes import NodeTemplate
-    
-referenceTemplate = NodeTemplate("""
+
+unrolledTemplate = NodeTemplate("""
 memset(${data_out}, 0, ${data_out_size}*sizeof(${data_out_type}));
-% for h in range(dim_im_in_x):
+% for h in range(dim_im_in_y):
 <%    
     y_offset_out = dim_im_out_ch*(pad_y*dim_im_out_x)
     x_offset_out = dim_im_out_ch*(dim_im_out_x * h + pad_x)
@@ -36,3 +36,26 @@ memset(${data_out}, 0, ${data_out_size}*sizeof(${data_out_type}));
 %>
 memcpy(${data_out}+${x_offset_out}+${y_offset_out}, ${data_in}+${offset_in}, ${width}*sizeof(${data_out_type})); 
 % endfor""")
+
+referenceTemplate = NodeTemplate("""
+// Pad
+memset(${data_out}, 0, ${data_out_size}*sizeof(${data_out_type}));
+<%    
+    y_offset_out = dim_im_out_ch*(pad_y*dim_im_out_x)
+    x_offset_out = dim_im_out_ch*(pad_x)
+    width = dim_im_in_ch*dim_im_in_x
+
+    addoffsetOut = dim_im_out_ch * dim_im_out_x
+    addoffsetIn = dim_im_in_ch * dim_im_in_x
+
+    startPosX = y_offset_out + x_offset_out
+    startPosOffset = 0
+%>
+int32_t xoffset_${data_in} = ${startPosX};
+int32_t offset_in_${data_in} = ${startPosOffset};
+for(int h=0; h<${dim_im_in_y}; h++){
+memcpy(${data_out}+xoffset_${data_in}, ${data_in}+offset_in_${data_in}, ${width}*sizeof(${data_out_type})); 
+xoffset_${data_in} += ${addoffsetOut};
+offset_in_${data_in} += ${addoffsetIn};
+}
+""")

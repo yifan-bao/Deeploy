@@ -432,7 +432,7 @@ class CMSISGEMMParser(CMSISLinearParser):
             self.parserDict['in_N'] = 1
             self.parserDict['in_C'] = np.prod(data_in.shape[1:])
             self.parserDict['weight_N'] = self.parserDict['in_C']
-            self.parserDict['weight_C'] = np.prod(weight.shape[1:])
+            self.parserDict['weight_C'] = np.prod(weight.shape[0:1])
                 
             # First the context
             # https://review.trustedfirmware.org/plugins/gitiles/mirror/ARM-software/CMSIS_5/+/refs/heads/bias_for_conv/CMSIS/NN/Source/ConvolutionFunctions/arm_convolve_s8.c
