@@ -400,6 +400,7 @@ class RequantShiftParser(NodeParser):
             self.parserDict[outputs[idx]] = ctxt.lookup(outputNode.name).name
             
         self.parserDict['size'] = np.prod(ctxt.lookup(node.inputs[0].name).shape)
+        self.parserDict['channels'] = ctxt.lookup(node.inputs[0].name).shape[1]
 
         return ctxt, True
 

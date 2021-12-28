@@ -26,5 +26,7 @@
 from DumpO.DumpOTypes import NodeTemplate
 
 referenceTemplate = NodeTemplate("""
-void RequantShift(${data_in}, ${data_out}, ${size}, ${log2D}, ${mul}, ${add}, ${n_levels}, ${signed});
+for (int i=0;i<${size};i++){
+${data_out}[i] = (((int32_t)${data_in}[i] * ${mul}[i/(${size}/${channels})]) + ${add}[i/(${size}/${channels})]) >> ${log2D};
+}
 """)

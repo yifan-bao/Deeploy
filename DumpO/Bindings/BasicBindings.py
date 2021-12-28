@@ -43,7 +43,8 @@ BasicReshapeBindings = [NodeBinding(ReshapeChecker([type],[type]), SkipTemplate.
 BasicTransposeBindings = [NodeBinding(TransposeChecker([type],[type]), TransposeTemplate.referenceTemplate) for type in DataTypes]
 BasicRQSBindings = [NodeBinding(RequantShiftChecker([type,DataTypes.int32_t,DataTypes.int32_t], [DataTypes.int8_t]), RequantShiftTemplate.referenceTemplate) for type in DataTypes]
 
-BasicAddBindings = [NodeBinding(AddChecker([type], [DataTypes.int32_t]), AddTemplate.referenceTemplate) for type in DataTypes]
+BasicAddBindings = [NodeBinding(AddChecker([DataTypes.int8_t, DataTypes.int8_t], [DataTypes.int16_t]), AddTemplate.referenceTemplate)]
+BasicAddBindings += [NodeBinding(AddChecker([DataTypes.int16_t, DataTypes.int16_t], [DataTypes.int32_t]), AddTemplate.referenceTemplate) for type in DataTypes]
 
 BasicPadBindings = [NodeBinding(PadChecker([type], [type]), PadTemplate.referenceTemplate) for type in DataTypes]
 

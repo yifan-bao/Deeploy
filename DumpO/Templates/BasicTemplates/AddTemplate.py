@@ -25,8 +25,9 @@
 
 from DumpO.DumpOTypes import NodeTemplate
 
-referenceTemplate = NodeTemplate("void Add(${data_in_1}, ${data_in_2}, ${data_out}, ${size});")
-
-int8Template = NodeTemplate("void Add_int8(${data_in_1}, ${data_in_2}, ${data_out}, ${size});")
-int16Template = NodeTemplate("void Add_int16(${data_in_1}, ${data_in_2}, ${data_out}, ${size});")
-int32Template = NodeTemplate("void Add_int32(${data_in_1}, ${data_in_2}, ${data_out}, ${size});")
+referenceTemplate = NodeTemplate("""
+// Add
+for (uint32_t i=0;i<${size};i++){
+${data_out}[i] = ${data_in_1}[i] + ${data_in_2}[i];
+}
+""")

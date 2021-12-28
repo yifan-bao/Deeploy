@@ -330,6 +330,8 @@ class NodeTypeChecker():
         inputName = [i.name for i in node.inputs]
         inputs = [ctxt.lookup(name) for name in inputName]
 
+        #import IPython; IPython.embed()
+        
         return all(
             [node.nLevels <= 2**(input_type._value_) for node, input_type in zip(inputs, self.input_types)]
         )

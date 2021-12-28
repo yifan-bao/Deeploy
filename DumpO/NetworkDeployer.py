@@ -63,6 +63,7 @@ class NetworkDeployer(NetworkContainer):
         constOptimizer = TransposeConstOptPass()
         _, self.graph = mergeOptimizer.apply(baseCtxt, self.graph)
         _, self.graph = constOptimizer.apply(baseCtxt, self.graph)
+        self.graph.cleanup().toposort()
         onnx.save_model(gs.export_onnx(self.graph), "test.onnx")
         if not ret:
             raise RuntimeError("Lowering of the graph failed!")
@@ -91,7 +92,7 @@ class NetworkDeployer(NetworkContainer):
             layer = self.layerBinding[layerName]
             
             if isinstance(layer, (ConvLayer, MaxPoolLayer, PadLayer)):
-
+                
                 inputNode = layer.node.inputs[0]
                 outputNode = layer.node.outputs[0]
                 shape = list(range(len(inputNode.shape)))

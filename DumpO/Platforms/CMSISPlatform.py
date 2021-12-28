@@ -50,7 +50,7 @@ RequantShiftMapper = NodeMapper(RequantShiftParser(), BasicRQSBindings)
 
 GEMM_int8_Mapper = NodeMapper(CMSISGEMMParser(), [CMSISGEMMBinding])
 Conv_int8_Mapper = NodeMapper(CMSISConv2DParser(), [CMSISConv2DBinding])
-AddMapper = NodeMapper(AddParser(), CMSISSaturatingAddBindings)
+AddMapper = NodeMapper(AddParser(), BasicAddBindings)
 
 TransposeMapper = NodeMapper(TransposeParser(), BasicTransposeBindings)
 PadMapper = NodeMapper(Pad2DParser(), BasicPadBindings)
@@ -69,7 +69,9 @@ CMSISMapping = {
     'Transpose': TransposeLayer([TransposeMapper]),
     'Gather': GatherLayer([GatherMapper]),
     'Pad': PadLayer([PadMapper]),
+    
     'Add': AddLayer([AddMapper]),
+    
     'Reshape': ReshapeLayer([ReshapeMapper]),
     'Flatten': ReshapeLayer([FlattenMapper]),
 }
@@ -143,6 +145,6 @@ class SimpleStructBuffer(StructBuffer):
         return FreeTemplate.referenceLocalTemplate.generate(name=self.name)
     
     
-CMSISOptimizer = NetworkOptimizer([PropagateRequantThroughAddPass(), MergeRequantPass(), MergeRequantPass(), ConvRequantMergePass(), GEMMRequantMergePass(), MatMulRequantMergePass()])
+CMSISOptimizer = NetworkOptimizer([ConvRequantMergePass(), GEMMRequantMergePass(), MatMulRequantMergePass()])
     
 CMSISPlatform = DeploymentPlatform(CMSISMapping, DataTypes, CMSISTypeInfer, SimpleNetworkBuffer, SimpleGlobalBuffer, SimpleStructBuffer)

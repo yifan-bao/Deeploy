@@ -31,10 +31,14 @@ from DumpO.Bindings.BasicBindings import DataTypes
 from DumpO.TypeCheckers.CMSISCheckers import *
 from DumpO.Templates.CMSISTemplates import *
 
+from DumpO.Templates.BasicTemplates import AddTemplate as AddTemplate
+
 CMSISConv2DBinding = NodeBinding(CMSISConvChecker([DataTypes.int8_t, DataTypes.int8_t, DataTypes.int32_t, DataTypes.int32_t,DataTypes.int32_t], [DataTypes.int8_t]), ConvTemplate.conv2DTemplate)
 CMSISGEMMBinding = NodeBinding(CMSISLinearChecker([DataTypes.int8_t, DataTypes.int8_t, DataTypes.int32_t], [DataTypes.int8_t]), GEMMTemplate.LinearTemplate)
 CMSISMaxPool2DBinding = NodeBinding(CMSISMaxPoolChecker([DataTypes.int8_t], [DataTypes.int8_t]), MaxPool2DTemplate.cmsisTemplate)
 
-CMSISSaturatingAddBindings = [NodeBinding(CMSISSaturatingAddChecker([DataTypes.int8_t],[DataTypes.int8_t]), AddTemplate.AddInt8Template),
-                              NodeBinding(CMSISSaturatingAddChecker([DataTypes.int16_t],[DataTypes.int16_t]), AddTemplate.AddInt16Template),
-                              NodeBinding(CMSISSaturatingAddChecker([DataTypes.int32_t],[DataTypes.int32_t]), AddTemplate.AddInt32Template)] 
+CMSISSaturatingAddBindings = [NodeBinding(CMSISSaturatingAddChecker([DataTypes.int8_t, DataTypes.int8_t],[DataTypes.int8_t]), AddTemplate.referenceTemplate)]
+
+# CMSISSaturatingAddBindings = [NodeBinding(CMSISSaturatingAddChecker([DataTypes.int8_t],[DataTypes.int8_t]), AddTemplate.AddInt8Template),
+#                               NodeBinding(CMSISSaturatingAddChecker([DataTypes.int16_t],[DataTypes.int16_t]), AddTemplate.AddInt16Template),
+#                               NodeBinding(CMSISSaturatingAddChecker([DataTypes.int32_t],[DataTypes.int32_t]), AddTemplate.AddInt32Template)] 
