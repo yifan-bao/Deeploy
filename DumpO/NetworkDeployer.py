@@ -26,6 +26,7 @@
 from DumpO.DumpOTypes import *
 from DumpO.Parsers.BasicParsers import *
 from DumpO.Layers.BasicLayers import *
+from DumpO.OptimizationPasses.BasicPasses import *
         
 class NetworkDeployer(NetworkContainer):
     def __init__(self, graph: gs.Graph, deploymentPlatform: DeploymentPlatform, loweringOptimizer: NetworkOptimizer, scheduler: Callable = lambda x: x, name: str = "DumpONetwork"):
@@ -54,7 +55,13 @@ class NetworkDeployer(NetworkContainer):
         if not ret:
             raise RuntimeError("The given graph was not valid - check that it is acyclic!")
         self.graph, ret = self.lower(baseCtxt, self.graph) # This lowers the graph to a deployable format
+        # Insert appropriate transposes
         self.NCHWtoNHWC()
+        # Remove duplicate transposes
+        baseCtxt, ret = self.baseParse() # This sanity checks the graph and generates a base context for lowering/optimization
+        optimizer = TransposeOptPass()
+        _, self.graph = optimizer.apply(baseCtxt, self.graph)
+        onnx.save_model(gs.export_onnx(self.graph), "test.onnx")
         if not ret:
             raise RuntimeError("Lowering of the graph failed!")
         
@@ -125,7 +132,6 @@ class NetworkDeployer(NetworkContainer):
 
                 transposeIdx += 1
         self.graph.cleanup().toposort()
-        onnx.save_model(gs.export_onnx(self.graph), "test.onnx")
                 
     def backEnd(self, channels_first=True):
         self.parse(channels_first) # This reparses the lowered graph

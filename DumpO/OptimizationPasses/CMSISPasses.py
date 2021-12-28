@@ -30,7 +30,7 @@ import onnx_graphsurgeon as gs
 
 from DumpO.DumpOTypes import *
 from DumpO.Layers.BasicLayers import *
-from DumpO.OptimizationPasses.BasicPasses import *
+from DumpO.OptimizationPasses.PassClasses import *
 
 def merge_conv_rq_fun(ctxt: NetworkContext, graph: gs.Graph, match: Match, name: str):
     matched_nodes = [m for k, m in match.nodes_map.items()]
