@@ -1,0 +1,3 @@
+[submodule "DumpOTest"]
+	path = DumpOTest
+	url = https://iis-git.ee.ethz.ch/scheremo/dumpotest.git
