@@ -93,3 +93,105 @@ class TransposeConstOptPass(ReplaceSequentialPatternPass):
     
         name = f"_CONST_OPT_TRANSPOSES_PASS"
         super().__init__(graph, const_opt_transposes_fun, name)    
+
+def merge_requant_fun(ctxt: NetworkContext, graph: gs.Graph, match: Match, name: str):
+    matched_nodes = [m for k, m in match.nodes_map.items()]
+    attrs = {}
+    rqs1 = matched_nodes[0]
+    rqs2 = matched_nodes[1]
+
+    div1 = rqs1.attrs['div'].values
+    div2 = rqs2.attrs['div'].values
+    newDiv = max(div1,div2)
+    minDiv = min(div1,div2)
+    nLevels = max(rqs1.attrs['n_levels'].values,rqs2.attrs['n_levels'].values)
+    signed = max(rqs1.attrs['signed'].values,rqs2.attrs['signed'].values)
+
+    attrs['div'] = gs.Constant(name='div', values=newDiv)
+    attrs['n_levels'] = gs.Constant(name='n_levels',values=nLevels)
+    attrs['signed'] = gs.Constant(name='signed', values=signed)
+    
+    if isinstance(rqs1.inputs[1], gs.Constant) and isinstance(rqs1.inputs[2], gs.Constant) and \
+       isinstance(rqs2.inputs[1], gs.Constant) and isinstance(rqs2.inputs[2], gs.Constant):
+        mul1 = rqs1.inputs[1].values
+        mul2 = rqs2.inputs[1].values
+        add1 = rqs1.inputs[2].values
+        add2 = rqs2.inputs[2].values
+
+        newMul = (mul1*mul2)
+        newAdd = (add1*mul2) + (div1*add2)
+
+        newMul = gs.Constant(name=rqs1.name+name+'_mul',values = np.array(np.round(newMul / minDiv)))
+        newAdd = gs.Constant(name=rqs1.name+name+'_add',values = np.array(np.round(newAdd / minDiv)))
+        
+        _inputs = [rqs1.inputs[0], newMul, newAdd]
+        _outputs = rqs2.outputs
+        newTrans = gs.Node(op='RequantShift', name=name, attrs=attrs)
+        graph.replaceInsertNode(_inputs, _outputs, newTrans)
+        return ctxt, graph
+    else:    
+        return ctxt, graph
+    
+class MergeRequantPass(ReplaceSequentialPatternPass):
+    def __init__(self):
+        passes = []
+        graph = gs.Graph()
+        _input = gs.Variable(name='input_1')
+        output = graph.layer(inputs=[_input], outputs=['r1_out'], op='RequantShift', name='r1')
+        output = graph.layer(inputs=output, outputs=['r2_out'], op='RequantShift', name='r2')
+        graph.outputs.append(output)
+        graph.inputs.append(_input)
+    
+        name = f"_OPT_RQS_PASS"
+        super().__init__(graph, merge_requant_fun, name)    
+
+def propagate_requant_fun(ctxt: NetworkContext, graph: gs.Graph, match: Match, name: str):
+
+    ctxt = ctxt.copy()
+    
+    matched_nodes = [m for k, m in match.nodes_map.items()]
+    attrs = {}
+    add = matched_nodes[0]
+    rqs = matched_nodes[1]
+
+    inputNode1 = add.inputs[0]
+    inputNode2 = add.inputs[1]
+    
+    newAdd1 = gs.Constant(name=name+'_rqs1_add', values=rqs.inputs[2].values)
+    newAdd2 = gs.Constant(name=name+'_rqs2_add', values=rqs.inputs[2].values)
+    newMul1 = gs.Constant(name=name+'_rqs1_mul', values=rqs.inputs[1].values)
+    newMul2 = gs.Constant(name=name+'_rqs2_mul', values=rqs.inputs[1].values)
+
+    newAddInput1 = gs.Variable(name+'_add_in_1', dtype=np.float32, shape=inputNode1.shape)
+    newAddInput2 = gs.Variable(name+'_add_in_2', dtype=np.float32, shape=inputNode2.shape)
+
+    node1 = ctxt.VariableBuffer().fromNode(newAddInput1, rqs.attrs['n_levels'])
+    node2 = ctxt.VariableBuffer().fromNode(newAddInput2, rqs.attrs['n_levels'])
+    
+    ctxt.add(node1,'local')
+    ctxt.add(node2,'local')
+    
+    newRQS1 = gs.Node(op='RequantShift', name=name+'_rqs1', attrs=rqs.attrs, inputs=[inputNode1, newMul1, newAdd1], outputs= [newAddInput1])
+    newRQS2 = gs.Node(op='RequantShift', name=name+'_rqs2', attrs=rqs.attrs, inputs=[inputNode2, newMul2, newAdd2], outputs= [newAddInput2])
+
+    graph.nodes.append(newRQS1)
+    graph.nodes.append(newRQS2)
+
+    add.inputs = [newAddInput1, newAddInput2]
+    graph.deleteNode(rqs)
+
+    return ctxt, graph
+    
+class PropagateRequantThroughAddPass(ReplaceSequentialPatternPass):
+    def __init__(self):
+        passes = []
+        graph = gs.Graph()
+        _input = gs.Variable(name='input_1')
+        _input2 = gs.Variable(name='input_2')
+        output = graph.layer(inputs=[_input, _input2], outputs=['add_out'], op='Add', name='add1')
+        output = graph.layer(inputs=output, outputs=['r1_out'], op='RequantShift', name='r1')
+        graph.outputs.append(output)
+        graph.inputs = [_input, _input2]
+    
+        name = f"_OPT_ADD_RQS_PASS"
+        super().__init__(graph, propagate_requant_fun, name)    

@@ -609,17 +609,18 @@ class NetworkOptimizationPass():
     def __init__(self):
         pass
 
-    def apply(self, ctxt: NetworkContext, graph: gs.Graph) -> gs.Graph :
+    def apply(self, ctxt: NetworkContext, graph: gs.Graph) -> (NetworkContext, gs.Graph) :
         return ctxt, graph
     
 class NetworkOptimizer():
     def __init__(self, passes: List[NetworkOptimizationPass]):
         self.passes = passes
         
-    def optimize(self, ctxt: NetworkContext, graph: gs.Graph) -> gs.Graph:
+    def optimize(self, ctxt: NetworkContext, graph: gs.Graph) -> (NetworkContext, gs.Graph):
         for _pass in self.passes:
             ctxt, graph = _pass.apply(ctxt, graph)
-        return graph
+            graph.cleanup().toposort()
+        return ctxt, graph
     
 class DeploymentPlatform():
     def __init__(self, Mapping: Dict[str, ONNXLayer], DataTypes: Enum, TypeInfer: Callable, VariableBuffer: VariableBuffer, ConstantBuffer: ConstantBuffer, StructBuffer: StructBuffer):

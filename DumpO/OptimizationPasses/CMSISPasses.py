@@ -64,6 +64,8 @@ def merge_conv_rq_fun(ctxt: NetworkContext, graph: gs.Graph, match: Match, name:
     rqsConv = gs.Node(op='RequantizedConv', name=name, attrs={**conv.attrs, **rqs.attrs})
     graph.replaceInsertNode(_inputs, _outputs, rqsConv)
 
+    return ctxt, graph
+    
 class ConvRequantMergePass(ReplaceSequentialPatternPass):
     def __init__(self):
         passes = []
@@ -109,7 +111,8 @@ def merge_gemm_rq_fun(ctxt: NetworkContext, graph: gs.Graph, match: Match, name:
     rqsGemm = gs.Node(op='RequantizedGemm', name=name, attrs=attrs)
     graph.replaceInsertNode(_inputs, _outputs, rqsGemm)
 
-
+    return ctxt, graph
+    
 class GEMMRequantMergePass(ReplaceSequentialPatternPass):
     def __init__(self):
         passes = []

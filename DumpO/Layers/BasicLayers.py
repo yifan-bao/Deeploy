@@ -73,8 +73,8 @@ class RequantShiftLayer(ONNXLayer):
 
     def computeShapes(self, inputShapes: List[np.shape], outputShapes: List[np.shape], parserDict, channels_first) -> (List[np.shape], List[np.shape]):
 
-        inputShapes[2]  = inputShapes[0]
         channel_dim = inputShapes[0][1]
+        inputShapes[2]  = [inputShapes[0][0], channel_dim] + list(inputShapes[1][1:])
         inputShapes[1] = [inputShapes[0][0], channel_dim] + list(inputShapes[1][1:])
             
         return (inputShapes, outputShapes)

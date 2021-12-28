@@ -37,6 +37,7 @@ from DumpO.Bindings.BasicBindings import *
 from DumpO.Bindings.CMSISBindings import *
 
 from DumpO.OptimizationPasses.CMSISPasses import *
+from DumpO.OptimizationPasses.BasicPasses import *
 
 GELU_int8_Mapper = NodeMapper(GELUParser(), None)
 iLayerNorm_int8_Mapper = NodeMapper(iLayerNormParser(), None)
@@ -45,7 +46,7 @@ MHSA_int8_Mapper = NodeMapper(MHSAParser(), None)
 GatherMapper = NodeMapper(GatherParser(), BasicGatherBindings)
 ReshapeMapper = NodeMapper(ReshapeParser(), BasicReshapeBindings)
 FlattenMapper = NodeMapper(FlattenParser(), BasicReshapeBindings)
-RequantShiftMapper = NodeMapper(RequantShiftParser(), None)
+RequantShiftMapper = NodeMapper(RequantShiftParser(), BasicRQSBindings)
 
 GEMM_int8_Mapper = NodeMapper(CMSISGEMMParser(), [CMSISGEMMBinding])
 Conv_int8_Mapper = NodeMapper(CMSISConv2DParser(), [CMSISConv2DBinding])
@@ -60,6 +61,7 @@ DummyMapper = NodeMapper(DummyParser(), [DummyBinding])
 CMSISMapping = {
     'RequantizedConv' : RQSConvLayer([Conv_int8_Mapper]),
     'RequantizedGemm': RQSGEMMLayer([GEMM_int8_Mapper]),
+    'RequantShift': RequantShiftLayer([RequantShiftMapper]),
     'MaxPool': MaxPoolLayer([MaxPool2DMapper]),
     'iLayerNorm': iLayerNormLayer([iLayerNorm_int8_Mapper]),
     'MultiHeadSelfAttention': MHSALayer([MHSA_int8_Mapper]),
@@ -141,6 +143,6 @@ class SimpleStructBuffer(StructBuffer):
         return FreeTemplate.referenceLocalTemplate.generate(name=self.name)
     
     
-CMSISOptimizer = NetworkOptimizer([ConvRequantMergePass(), GEMMRequantMergePass(), MatMulRequantMergePass()])
+CMSISOptimizer = NetworkOptimizer([PropagateRequantThroughAddPass(), MergeRequantPass(), MergeRequantPass(), ConvRequantMergePass(), GEMMRequantMergePass(), MatMulRequantMergePass()])
     
 CMSISPlatform = DeploymentPlatform(CMSISMapping, DataTypes, CMSISTypeInfer, SimpleNetworkBuffer, SimpleGlobalBuffer, SimpleStructBuffer)

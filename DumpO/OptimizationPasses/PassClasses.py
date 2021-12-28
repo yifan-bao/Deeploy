@@ -118,7 +118,7 @@ class GSPass(NetworkOptimizationPass):
     # DO NOT OVERWRITE this function in custom pass subclasses unless you have
     # a very good reason!
     def apply(self, ctxt: NetworkContext, graph: gs.Graph):
-        self.retarget(ctxt, graph)
+        ctxt, graph = self.retarget(ctxt, graph)
         ctxt, graph = self.run_pass(ctxt, graph)
         return ctxt, graph
 
@@ -130,7 +130,7 @@ class GSPass(NetworkOptimizationPass):
     # execute probably depends on the graph. See e.g.
     # ReplaceSequentialPatternPass for an example)
     def retarget(self, ctxt: NetworkContext, graph: gs.Graph):
-        pass
+        return ctxt, graph
 
 class SequentialPass(GSPass):
     def __init__(self, *passes, name_prefix = ''):
@@ -153,7 +153,6 @@ class SequentialMatcher:
         # This checking is sufficient - iff the graph is acyclic and connected (checked by parser)
         # and every node has one output, the graph is sequential
         
-        assert len(pattern.inputs) == 1, "Found more than one input"
         assert len(pattern.outputs) == 1, "Found more than one output"
         for node in pattern.nodes:
             assert len(node.outputs) == 1, "Graph needs to be purely sequential!"
@@ -276,5 +275,7 @@ class ReplaceSequentialPatternPass(SequentialPass):
         self.matches = self.matcher.match_graph(ctxt, graph)
         passes = []
         for i, m in enumerate(self.matches):
-            self.replacement_fn(ctxt, graph, m, f"{self.name}_{i}", **self.kwargs)
+            ctxt, graph = self.replacement_fn(ctxt, graph, m, f"{self.name}_{i}", **self.kwargs)
         graph.cleanup().toposort()
+        return ctxt, graph
+

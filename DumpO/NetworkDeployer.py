@@ -37,8 +37,8 @@ class NetworkDeployer(NetworkContainer):
         self.optimizer = loweringOptimizer
         
     # Don't override this
-    def lower(self, ctxt: NetworkContext, graph: gs.Graph) -> (gs.Graph, bool):
-        return (self.optimizer.optimize(ctxt, graph), True)
+    def lower(self, ctxt: NetworkContext, graph: gs.Graph) -> (NetworkContext, gs.Graph):
+        return self.optimizer.optimize(ctxt, graph)
 
     # Don't override this
     def baseParse(self) -> (NetworkContext, bool):
@@ -54,7 +54,7 @@ class NetworkDeployer(NetworkContainer):
         baseCtxt, ret = self.baseParse() # This sanity checks the graph and generates a base context for lowering/optimization
         if not ret:
             raise RuntimeError("The given graph was not valid - check that it is acyclic!")
-        self.graph, ret = self.lower(baseCtxt, self.graph) # This lowers the graph to a deployable format
+        baseCtxt, self.graph = self.lower(baseCtxt, self.graph) # This lowers the graph to a deployable format
         # Insert appropriate transposes
         self.NCHWtoNHWC()
         # Remove duplicate transposes
