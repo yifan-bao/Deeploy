@@ -71,17 +71,19 @@ class RequantShiftLayer(ONNXLayer):
     def __init__(self, maps : List[NodeMapper]):
         super().__init__(maps)
 
-    def computeShapes(self, inputShapes: List[np.shape], outputShapes: List[np.shape], parserDict) -> (List[np.shape], List[np.shape]):
-        inputShapes[2]  = inputShapes[0]
-        inputShapes[1] = [inputShapes[0][0], inputShapes[0][1]] + list(inputShapes[1][1:])
+    def computeShapes(self, inputShapes: List[np.shape], outputShapes: List[np.shape], parserDict, channels_first) -> (List[np.shape], List[np.shape]):
 
+        inputShapes[2]  = inputShapes[0]
+        channel_dim = inputShapes[0][1]
+        inputShapes[1] = [inputShapes[0][0], channel_dim] + list(inputShapes[1][1:])
+            
         return (inputShapes, outputShapes)
         
 class AddLayer(ONNXLayer):
     def __init__(self, maps : List[NodeMapper]):
         super().__init__(maps)
 
-    def computeShapes(self, inputShapes: List[np.shape], outputShapes: List[np.shape], parserDict) -> (List[np.shape], List[np.shape]):
+    def computeShapes(self, inputShapes: List[np.shape], outputShapes: List[np.shape], parserDict, channels_first) -> (List[np.shape], List[np.shape]):
         if len(inputShapes[0]) > len(inputShapes[1]):
             inputShapes[1] = inputShapes[0]
         else:
@@ -93,7 +95,7 @@ class GEMMLayer(ONNXLayer):
     def __init__(self, maps : List[NodeMapper]):
         super().__init__(maps)
 
-    def computeShapes(self, inputShapes: List[np.shape], outputShapes: List[np.shape], parserDict) -> (List[np.shape], List[np.shape]):
+    def computeShapes(self, inputShapes: List[np.shape], outputShapes: List[np.shape], parserDict, channels_first) -> (List[np.shape], List[np.shape]):
         if parserDict['transA']:
             M = inputShapes[0][-1]
         else:
@@ -113,7 +115,7 @@ class ConvLayer(ONNXLayer):
     def __init__(self, maps : List[NodeMapper]):
         super().__init__(maps)
 
-    def computeShapes(self, inputShapes: List[np.shape], outputShapes: List[np.shape], parserDict) -> (List[np.shape], List[np.shape]):
+    def computeShapes(self, inputShapes: List[np.shape], outputShapes: List[np.shape], parserDict, channels_first) -> (List[np.shape], List[np.shape]):
         if len(inputShapes) == 3:
             inputShapes[2] = inputShapes[1][-1]
         return (inputShapes, outputShapes)

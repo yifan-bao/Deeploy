@@ -51,6 +51,7 @@ GEMM_int8_Mapper = NodeMapper(CMSISGEMMParser(), [CMSISGEMMBinding])
 Conv_int8_Mapper = NodeMapper(CMSISConv2DParser(), [CMSISConv2DBinding])
 AddMapper = NodeMapper(AddParser(), CMSISSaturatingAddBindings)
 
+TransposeMapper = NodeMapper(TransposeParser(), BasicTransposeBindings)
 PadMapper = NodeMapper(Pad2DParser(), BasicPadBindings)
 MaxPool2DMapper = NodeMapper(CMSISMaxPool2DParser(), [CMSISMaxPool2DBinding])
 
@@ -63,7 +64,7 @@ CMSISMapping = {
     'iLayerNorm': iLayerNormLayer([iLayerNorm_int8_Mapper]),
     'MultiHeadSelfAttention': MHSALayer([MHSA_int8_Mapper]),
     'iGELU' : iGELULayer([GELU_int8_Mapper]),
-    
+    'Transpose': TransposeLayer([TransposeMapper]),
     'Gather': GatherLayer([GatherMapper]),
     'Pad': PadLayer([PadMapper]),
     'Add': AddLayer([AddMapper]),

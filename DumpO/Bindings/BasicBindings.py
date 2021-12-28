@@ -40,6 +40,7 @@ BasicMHSABinding = NodeBinding(MHSAChecker([DataTypes.int8_t], [DataTypes.int32_
 
 BasicGatherBindings = [NodeBinding(GatherChecker([type],[type]), GatherTemplate.referenceTemplate) for type in DataTypes]
 BasicReshapeBindings = [NodeBinding(ReshapeChecker([type],[type]), SkipTemplate.referenceTemplate) for type in DataTypes]
+BasicTransposeBindings = [NodeBinding(TransposeChecker([type],[type]), TransposeTemplate.referenceTemplate) for type in DataTypes]
 BasicRQSBindings = [NodeBinding(RequantShiftChecker([type,DataTypes.int32_t,DataTypes.int32_t], [DataTypes.int8_t]), RequantShiftTemplate.referenceTemplate) for type in DataTypes]
 
 BasicAddBindings = [NodeBinding(AddChecker([type], [DataTypes.int32_t]), AddTemplate.referenceTemplate) for type in DataTypes]

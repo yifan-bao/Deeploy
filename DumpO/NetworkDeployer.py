@@ -25,6 +25,7 @@
 
 from DumpO.DumpOTypes import *
 from DumpO.Parsers.BasicParsers import *
+from DumpO.Layers.BasicLayers import *
         
 class NetworkDeployer(NetworkContainer):
     def __init__(self, graph: gs.Graph, deploymentPlatform: DeploymentPlatform, loweringOptimizer: NetworkOptimizer, scheduler: Callable = lambda x: x, name: str = "DumpONetwork"):
@@ -48,79 +49,96 @@ class NetworkDeployer(NetworkContainer):
 
         return newCtxt, ret
 
-    def middleEnd(self):
+    def middleWare(self):
         baseCtxt, ret = self.baseParse() # This sanity checks the graph and generates a base context for lowering/optimization
         if not ret:
             raise RuntimeError("The given graph was not valid - check that it is acyclic!")
         self.graph, ret = self.lower(baseCtxt, self.graph) # This lowers the graph to a deployable format
+        self.NCHWtoNHWC()
         if not ret:
             raise RuntimeError("Lowering of the graph failed!")
-
         
     def exportGraph(self, f):
         model = gs.export_onnx(self.graph)
         convert_model_to_external_data(model, location="model.data")
         onnx.save(model, f)
 
-    # Works purely on the context
-    # Currently flips all convolutions and the FIRST linear layer
-    # Assumes all convolution weights are constants!!!
-    # SCHEREMO: This can be done smarter and more robust, but for now it's okayish
-    def realignDims(self):
-        
-        for idx, nameLayer in enumerate(self.layerBinding.items()):
-            name = nameLayer[0]
-            layer = nameLayer[1]
-            # Check if is conv
-            if isinstance(layer.mapper.parser, Conv2DParser):
-                # Check if conv2D
-                if len(self.ctxt.lookup(layer.mapper.parser.parserDict['data_in']).shape) == 4:
-                    print("SWITCHED ONE CONV")
-                    weightName = layer.mapper.parser.parserDict['weight']
-                    weightTensor = self.ctxt.lookup(weightName)
-                    # Flip weight buffer
-                    assert self.ctxt.is_global(weightName), "Weight tensor was not constant! Cannot flip the weight tensor's dimensions!"
-                    self.ctxt.globalObjects[weightName].values = np.transpose(weightTensor.values, (0,2,3,1)) # Channels last!
-                    self.ctxt.globalObjects[weightName].shape = self.ctxt.globalObjects[weightName].values.shape
-                    print(self.ctxt.globalObjects[weightName].shape)
-            # Check if Linear layer
-            elif isinstance(layer.mapper.parser, GEMMParser):
-                print("SWITCHED ONE GEMM")
-                weightName = layer.mapper.parser.parserDict['B']
-                # THIS ONE IS NEEDED!
-                self.ctxt.globalObjects[weightName].values = np.transpose(self.ctxt.globalObjects[weightName].values, (1,0))
-                self.ctxt.globalObjects[weightName].shape = self.ctxt.globalObjects[weightName].values.shape
-                # Assume you follow CONV
-                # SCHEREMO: Very fragile, look out in the future to fix this better!
-                weightTensor = self.ctxt.lookup(weightName)
-                assert self.ctxt.is_global(weightName), "Weight tensor was not constant! Cannot flip the weight tensor's dimensions!"
 
-                #SCHEREMO: THIS WILL BREAK VERY SOON
-                flattener = self.ctxt.lookup(layer.node.inputs[0].inputs[0].inputs[0].name)
-                
-                newDim2 = flattener.shape[1:]
-                intermediateValue = np.reshape(weightTensor.values, list(weightTensor.shape[:-1]) + newDim2)
-                numAxes = len(intermediateValue.shape)
-                axes = list(range(numAxes))
-                intermediateValue = np.transpose(intermediateValue, axes[:-3] + [-2,-1,-3]) # Channels last!
-                intermediateValue = np.reshape(intermediateValue, weightTensor.shape) # Channels last!
-                self.ctxt.globalObjects[weightName].values = intermediateValue
-                self.ctxt.globalObjects[weightName].shape = self.ctxt.globalObjects[weightName].values.shape
-                return
+    def NCHWtoNHWC(self):
+
+        def newShape(node, shape):
+            newShape = []
+            for i in shape:
+                newShape.append(node.shape[i])
+
+            return newShape
         
-    def backEnd(self):
-        self.parse() # This reparses the lowered graph
-        self.broadcast() # This broadcasts all tensors offline
+        newlayerBindings = []
+        transposeIdx = 0
+        self._bindLayers()
+        # Insert Transpose nodes for NCHW to NHWC conversion
+        for idx, layerName in enumerate(self.layerBinding):
+            
+            layer = self.layerBinding[layerName]
+            
+            if isinstance(layer, (ConvLayer, MaxPoolLayer)):
+
+                inputNode = layer.node.inputs[0]
+                outputNode = layer.node.outputs[0]
+                shape = list(range(len(inputNode.shape)))
+                inPermute = shape[0:1] + shape[2:] + shape[1:2]
+                outPermute = inPermute[0:1] + inPermute[2:] + inPermute[1:2]
+                # Transpose conv input
+                inputTransposeOutput = gs.Variable("TransposeIn"+str(transposeIdx), dtype=np.float32, shape=newShape(inputNode, np.array(inPermute)))
+                outputTransposeInput = gs.Variable("TransposeOut"+str(transposeIdx+1), dtype=np.float32, shape=newShape(outputNode, np.array(inPermute)))
+
+                inputTransposeNode = gs.Node(name='Transpose'+str(transposeIdx),op="Transpose", inputs=[inputNode], outputs=[inputTransposeOutput], attrs={'perm': inPermute})
+                outputTransposeNode = gs.Node(name='Transpose'+str(transposeIdx+1),op="Transpose", inputs=[outputTransposeInput], outputs=[outputNode], attrs={'perm': outPermute})
+
+                layer.node.inputs[0] = inputTransposeOutput
+                layer.node.outputs[0] = outputTransposeInput
+
+                self.graph.nodes.append(inputTransposeNode)
+                self.graph.nodes.append(outputTransposeNode)
+
+                if isinstance(layer, ConvLayer):
+                    weightNode = layer.node.inputs[1]
+                    weightTransposeOutput = gs.Variable("TransposeWeight"+str(transposeIdx+2), dtype=np.float32, shape=newShape(weightNode, np.array(inPermute)))
+                    weightTransposeNode = gs.Node(name='Transpose'+str(transposeIdx+2),op="Transpose", inputs=[weightNode], outputs=[weightTransposeOutput], attrs={'perm': inPermute})
+                    layer.node.inputs[1] = weightTransposeOutput
+                    self.graph.nodes.append(weightTransposeNode)
+
+                    transposeIdx += 1
+                    
+                transposeIdx += 2
+                
+            elif isinstance(layer, GEMMLayer):
+
+                weightNode = layer.node.inputs[1]
+                shape = list(range(len(weightNode.shape)))
+                permute = np.array(shape[0:1] + shape[2:] + shape[1:2])
+                
+                weightTransposeOutput = gs.Variable("TransposeWeight"+str(transposeIdx), dtype=np.float32, shape=newShape(weightNode, permute))
+                weightTransposeNode = gs.Node(name='Transpose'+str(transposeIdx), op="Transpose", inputs=[weightNode], outputs=[weightTransposeOutput], attrs={'perm': permute})
+                layer.node.inputs[1] = weightTransposeOutput
+                self.graph.nodes.append(weightTransposeNode)
+
+                transposeIdx += 1
+        self.graph.cleanup().toposort()
+                
+    def backEnd(self, channels_first=True):
+        self.parse(channels_first) # This reparses the lowered graph
+        self.broadcast(channels_first) # This broadcasts all tensors offline
         self.bind() # This binds the graph to the node templates
-        self.realignDims() # Performs the NCHW -> NHWC conversion
-        self.prepared = True
         
     # Don't override this
     def prepare(self):
         # MIDDLE END
-        self.middleEnd()
+        self.middleWare()
         # BACK END - Inherited from NetworkContainer
-        self.backEnd()
+        self.backEnd(channels_first=False)
+        # FINAL TRANSFORMS 
+        self.prepared = True
         
     def generateFunction(self) -> str:
         if not self.prepared:

@@ -37,7 +37,6 @@ def merge_conv_rq_fun(ctxt: NetworkContext, graph: gs.Graph, match: Match, name:
     conv = matched_nodes[0]
     rqs = matched_nodes[1]
 
-
     totalShift = 31-np.log2(rqs.attrs['div'].values)
     
     rqs.inputs[-1].values = np.round(rqs.inputs[-1].values / rqs.inputs[-2].values) # normalize add

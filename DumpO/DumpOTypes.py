@@ -262,7 +262,7 @@ class NodeParser():
         return True
 
     # Change this
-    def parseNodeCtxt(self, ctxt: NetworkContext, node: gs.ir.node.Node) -> (NetworkContext, bool):
+    def parseNodeCtxt(self, ctxt: NetworkContext, node: gs.ir.node.Node, channels_first: bool = True) -> (NetworkContext, bool):
         return ctxt, True
     
     # Don't override this, it checks for consistency (all inputs are available, no outputs are defined)
@@ -471,10 +471,10 @@ class NodeMapper():
         self.bound = False
         
     # Don't override this. Parses the networks with the correct data type
-    def parse(self, ctxt: NetworkContext, node: gs.ir.node.Node) -> (NetworkContext, bool):
+    def parse(self, ctxt: NetworkContext, node: gs.ir.node.Node, channels_first: bool) -> (NetworkContext, bool):
         hoistedCtxt, parseable = self.parser.parse(ctxt, node)
         if parseable:
-            newCtxt, ret = self.parser.parseNodeCtxt(hoistedCtxt, node)
+            newCtxt, ret = self.parser.parseNodeCtxt(hoistedCtxt, node, channels_first)
             return (newCtxt, ret)
         else:
             raise ValueError(f'Parser {self.parser} failed - Layer is NOT parseable')
@@ -507,16 +507,16 @@ class ONNXLayer():
 
     # Override this for broadcasting support
     # Returns a tuple of new, broadcasted inputShapes and outputShapes
-    def computeShapes(self, inputShapes: List[np.shape], outputShapes: List[np.shape], parserDict: Dict) -> (List[np.shape], List[np.shape]):
+    def computeShapes(self, inputShapes: List[np.shape], outputShapes: List[np.shape], parserDict: Dict, channels_first: bool) -> (List[np.shape], List[np.shape]):
         return (inputShapes, outputShapes)
         
-    def broadcast(self, ctxt: NetworkContext) -> (NetworkContext):
+    def broadcast(self, ctxt: NetworkContext, channels_first: bool = True) -> (NetworkContext):
         ctxt = ctxt.copy()
         
         inputShapes = [ctxt.lookup(node.name).shape for node in self.node.inputs]
         outputShapes = [ctxt.lookup(node.name).shape for node in self.node.outputs]
 
-        newInputShapes, newOutputShapes = self.computeShapes(inputShapes, outputShapes, self.mapper.parser.parserDict)
+        newInputShapes, newOutputShapes = self.computeShapes(inputShapes, outputShapes, self.mapper.parser.parserDict, channels_first)
 
         #import IPython; IPython.embed()
         
@@ -564,12 +564,12 @@ class ONNXLayer():
         return _copy
     
     # Call this, DO NOT override! -> This should assert that all variables required are in the node!
-    def parse(self, ctxt: NetworkContext) -> (NetworkContext, bool):
+    def parse(self, ctxt: NetworkContext, channels_first: bool) -> (NetworkContext, bool):
         retCtxt = None
         # iterate through all possible mappings and return the first that works
         for mapper in self.maps:
             newCtxt = ctxt.copy()
-            newCtxt, ret = mapper.parse(newCtxt, self.node)
+            newCtxt, ret = mapper.parse(newCtxt, self.node, channels_first)
             if ret:
                 self.mapper = mapper
                 return newCtxt, True
@@ -669,12 +669,12 @@ class NetworkContainer():
         return ctxt
 
     # Don't override this
-    def broadcast(self) -> bool:
+    def broadcast(self, channels_first: bool = True) -> bool:
         
         ctxt = self.ctxt.copy()
         
         for name, layer in self.layerBinding.items():
-            ctxt = layer.broadcast(ctxt)
+            ctxt = layer.broadcast(ctxt, channels_first)
 
         self.ctxt = ctxt
         return True
@@ -700,16 +700,11 @@ class NetworkContainer():
         else:
             self.bound = True
             self.ctxt = newCtxt
-            
-    # Don't override this        
-    def parse(self) -> bool:
-        # Reset context
-        self.ctxt = NetworkContext(self.Platform.VariableBuffer, self.Platform.ConstantBuffer, self.Platform.StructBuffer, {}, {})
-        self.ctxt = self._createIOBindings(self.ctxt, self.graph)
-        
+
+    def _bindLayers(self):
         # Create schedule, binding, then parse resulting program for correctness
         # Create schedule
-        
+        self.layerBinding = {}
         for i in self.scheduler(self.graph):
             
             # Create binding
@@ -718,9 +713,20 @@ class NetworkContainer():
             if layer is not None:
                 self.layerBinding[layer.node.name] = layer
 
+            
+    # Don't override this        
+    def parse(self, channels_first=True) -> bool:
+        # Reset context
+        self.ctxt = NetworkContext(self.Platform.VariableBuffer, self.Platform.ConstantBuffer, self.Platform.StructBuffer, {}, {})
+        self.ctxt = self._createIOBindings(self.ctxt, self.graph)
+
+        self._bindLayers()
+
+        import IPython; IPython.embed()
+        
         parseSuccess = True
         for node in self.layerBinding.values():
-            self.ctxt, parsePass = node.parse(self.ctxt)
+            self.ctxt, parsePass = node.parse(self.ctxt, channels_first)
             parseSuccess = parseSuccess and parsePass
 
         if parseSuccess:
@@ -743,6 +749,10 @@ class NetworkContainer():
 
         for _buffer in self.ctxt.localObjects.values():
             assert _buffer._live == False, f'There is a memory leak in buffer {_buffer.name} in the generated forward pass!'
+
+        lines = callStack.split('\n')
+        lines = [line for line in lines if line.strip()]
+        callStack = '\n'.join(lines)
             
         return callStack
 
@@ -759,6 +769,10 @@ class NetworkContainer():
             node.name = ctxt._mangle(node.name)
             callStack += node.init()
             node.name = name
+
+        lines = callStack.split('\n')
+        lines = [line for line in lines if line.strip()]
+        callStack = '\n'.join(lines)
         
         return callStack
     
@@ -776,7 +790,11 @@ class NetworkContainer():
                 node.name = ctxt._mangle(node.name)
                 callStack += "extern " + node.init()
                 node.name = name
-        
+
+        lines = callStack.split('\n')
+        lines = [line for line in lines if line.strip()]
+        callStack = '\n'.join(lines)
+                
         return callStack
 
 
@@ -801,7 +819,11 @@ class NetworkContainer():
                 node.name = ctxt._mangle(node.name)
                 callStack += node.init()
                 node.name = name
-        
+
+        lines = callStack.split('\n')
+        lines = [line for line in lines if line.strip()]
+        callStack = '\n'.join(lines)
+                
         return callStack
 
 
@@ -824,7 +846,10 @@ class NetworkContainer():
                 node.name = ctxt._mangle(node.name)
                 callStack += node.alloc()
                 node.name = name
-
+                
+        lines = callStack.split('\n')
+        lines = [line for line in lines if line.strip()]
+        callStack = '\n'.join(lines)
                 
         return callStack
             
@@ -840,6 +865,10 @@ class NetworkContainer():
             node.name = ctxt._mangle(node.name)
             callStack += node.dealloc() + '\n'
 
+        lines = callStack.split('\n')
+        lines = [line for line in lines if line.strip()]
+        callStack = '\n'.join(lines)
+            
         self.ctxt = ctxt
         return callStack
     

@@ -30,7 +30,7 @@ class RQSConvLayer(ConvLayer):
     def __init__(self, maps : List[NodeMapper]):
         super().__init__(maps)
 
-    def computeShapes(self, inputShapes: List[np.shape], outputShapes: List[np.shape], parserDict) -> (List[np.shape], List[np.shape]):
+    def computeShapes(self, inputShapes: List[np.shape], outputShapes: List[np.shape], parserDict, channels_first) -> (List[np.shape], List[np.shape]):
         inputShapes[2] = inputShapes[1][0] # Channels out dimension of Kernel
         inputShapes[3] = inputShapes[1][0] # Channels out dimension of Kernel
         inputShapes[4] = inputShapes[1][0] # Channels out dimension of Kernel
@@ -40,7 +40,7 @@ class RQSGEMMLayer(GEMMLayer):
     def __init__(self, maps : List[NodeMapper]):
         super().__init__(maps)
 
-    def computeShapes(self, inputShapes: List[np.shape], outputShapes: List[np.shape], parserDict) -> (List[np.shape], List[np.shape]):
+    def computeShapes(self, inputShapes: List[np.shape], outputShapes: List[np.shape], parserDict, channels_first) -> (List[np.shape], List[np.shape]):
         inputShapes[2] = inputShapes[1][-1] # Channels out dimension of Kernel
         # inputShapes[3] = inputShapes[1][-1] # Channels out dimension of Kernel
         # inputShapes[4] = inputShapes[1][-1] # Channels out dimension of Kernel
