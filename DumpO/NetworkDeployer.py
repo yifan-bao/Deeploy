@@ -59,8 +59,10 @@ class NetworkDeployer(NetworkContainer):
         self.NCHWtoNHWC()
         # Remove duplicate transposes
         baseCtxt, ret = self.baseParse() # This sanity checks the graph and generates a base context for lowering/optimization
-        optimizer = TransposeOptPass()
-        _, self.graph = optimizer.apply(baseCtxt, self.graph)
+        mergeOptimizer = TransposeMergePass()
+        constOptimizer = TransposeConstOptPass()
+        _, self.graph = mergeOptimizer.apply(baseCtxt, self.graph)
+        _, self.graph = constOptimizer.apply(baseCtxt, self.graph)
         onnx.save_model(gs.export_onnx(self.graph), "test.onnx")
         if not ret:
             raise RuntimeError("Lowering of the graph failed!")

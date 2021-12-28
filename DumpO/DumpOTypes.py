@@ -721,8 +721,6 @@ class NetworkContainer():
         self.ctxt = self._createIOBindings(self.ctxt, self.graph)
 
         self._bindLayers()
-
-        import IPython; IPython.embed()
         
         parseSuccess = True
         for node in self.layerBinding.values():

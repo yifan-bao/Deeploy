@@ -34,9 +34,20 @@ from DumpO.Layers.BasicLayers import *
 
 @gs.Graph.register()
 def deleteNode(self, node):
-    # Disconnect output nodes of all input tensors
-    inp_node = node.i()
-    inp_node.outputs = node.outputs
+        
+    inputNode = node.inputs[0]
+    outputNode = node.outputs[0]
+    
+    outputLayer = node.o()
+    newInputs = []
+
+    for i in outputLayer.inputs:
+        if i == outputNode:
+            newInputs.append(inputNode)
+        else:
+            newInputs.append(i)
+
+    outputLayer.inputs = newInputs
     node.inputs.clear()
     node.outputs.clear()
 
@@ -185,7 +196,6 @@ class SequentialMatcher:
         def attributes_are_equal(pn: gs.ir.node.Node, gn: gs.ir.node.Node) -> bool:
             return pn.op == gn.op
         
-        #import IPython; IPython.embed()
                 
         # from here on, proceed as in the original implementation.
         if not attributes_are_equal(pn, gn):
@@ -245,7 +255,6 @@ class ReplaceMatchWithModulePass(GSPass):
         matched_nodes = list(self.match.nodes_map.values())
         if self.replacementNode is not None:
             graph.replaceInsertNode(self.replacementNode)
-        import IPython; IPython.embed()
         return ctxt, graph
 
             
