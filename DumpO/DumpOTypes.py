@@ -396,7 +396,7 @@ class NodeTypeChecker():
                     self.typeDict[key + '_type'] = _buffer._type._name_
                 except:
                     import IPython; IPython.embed()
-    
+                    
     # Don't override this. Automated type checking
     def typeCheck(self, ctxt: NetworkContext, node: gs.ir.node.Node, typeInfer: Callable, parserDict) -> (NetworkContext, bool):
         newCtxt = ctxt.copy()

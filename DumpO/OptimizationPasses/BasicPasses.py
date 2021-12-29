@@ -195,3 +195,52 @@ class PropagateRequantThroughAddPass(ReplaceSequentialPatternPass):
     
         name = f"_OPT_ADD_RQS_PASS"
         super().__init__(graph, propagate_requant_fun, name)    
+
+def extract_padding_fun(ctxt: NetworkContext, graph: gs.Graph, match: Match, name: str):
+
+    ctxt = ctxt.copy()
+    
+    matched_nodes = [m for k, m in match.nodes_map.items()]
+    attrs = {}
+    conv = matched_nodes[0]
+    if 'pads' in conv.attrs:
+        pads = copy.deepcopy(conv.attrs['pads'])
+        shape = copy.deepcopy(conv.inputs[0].shape)
+        newPads = np.zeros(2*len(shape))
+        assert len(shape)-2 == len(pads)/2, "Conv padding dims do not match!"
+        newShape = shape
+
+        beginPads = pads[0:len(pads)//2]
+        endPads = pads[len(pads)//2:]
+        for idx, i in enumerate(beginPads):
+            newShape[2+idx] = newShape[2+idx] + i
+            newPads[2+idx] = i
+
+        for idx, i in enumerate(endPads):
+            newShape[2+idx] = newShape[2+idx] + i
+            newPads[len(newPads)//2+2+idx] = i
+            
+        newConvInput = gs.Variable(name+'_padded_input', dtype=np.float32, shape=newShape)
+        ctxt.add(ctxt.VariableBuffer().fromNode(newConvInput, ctxt.lookup(conv.inputs[0].name).nLevels))
+        #valConst = gs.Constant('value', np.array(0))
+        conv.attrs['pads'] = [0 for pad in conv.attrs['pads']]
+        newPad = gs.Node(op='Pad', name=name+'_pad', attrs={'pads': newPads, 'mode': 'constant', 'value': 0}, inputs=[conv.inputs[0]], outputs= [newConvInput])
+        
+        conv.inputs[0] = newConvInput
+        graph.nodes.append(newPad)
+        graph.cleanup().toposort()
+        #import IPython; IPython.embed()
+        
+    return ctxt, graph
+
+class ExtractPaddingFromConvPass(ReplaceSequentialPatternPass):
+    def __init__(self):
+        passes = []
+        graph = gs.Graph()
+        _input = gs.Variable(name='input_1')
+        output = graph.layer(inputs=[_input], outputs=['conv_out'], op='Conv', name='conv1')
+        graph.outputs.append(output)
+        graph.inputs = [_input]
+    
+        name = f"_EXTRACT_CONV_PASS"
+        super().__init__(graph, extract_padding_fun, name)    
