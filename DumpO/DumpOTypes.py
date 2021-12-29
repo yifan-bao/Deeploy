@@ -392,10 +392,7 @@ class NodeTypeChecker():
             # check if the referenced buffer is in the environment
             if value in env:
                 _buffer = ctxt.lookup(value)
-                try:
-                    self.typeDict[key + '_type'] = _buffer._type._name_
-                except:
-                    import IPython; IPython.embed()
+                self.typeDict[key + '_type'] = _buffer._type._name_
                     
     # Don't override this. Automated type checking
     def typeCheck(self, ctxt: NetworkContext, node: gs.ir.node.Node, typeInfer: Callable, parserDict) -> (NetworkContext, bool):
@@ -536,11 +533,7 @@ class ONNXLayer():
                             ctxt.globalObjects[node.name].values.reshape(newShape)
                         # The number of elements SHOULD be lower, and we broadcast
                         else:
-                            try:
-                                ctxt.globalObjects[node.name].values = np.broadcast_to(ctxt.globalObjects[node.name].values, newShape)
-                            except Exception as e:
-                                print(e)
-                                import IPython; IPython.embed()
+                            ctxt.globalObjects[node.name].values = np.broadcast_to(ctxt.globalObjects[node.name].values, newShape)
 
                 else:
                     raise KeyError(f'Expected node {node.name} to be in context!')
@@ -785,6 +778,8 @@ class NetworkContainer():
         ctxt = self.ctxt.copy()
         
         callStack = ''
+        inputNum = 0
+        outputNum = 0
         for node in ctxt.globalObjects.values():
             if isinstance(node, VariableBuffer) and not isinstance(node, (StructBuffer, ConstantBuffer)):
                 name = node.name
