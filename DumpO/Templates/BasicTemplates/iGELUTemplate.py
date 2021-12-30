@@ -25,5 +25,5 @@
 
 from DumpO.DumpOTypes import NodeTemplate
 
-referenceTemplate = NodeTemplate("void iGELU(${data_in}, ${data_out}, ${size}, ${b}, ${log2D}, ${n_levels}, ${one}, ${totScaler});")
+referenceTemplate = NodeTemplate("GELUKernel_s8(${data_in}, ${data_out}, ${size}, ${b}, ${log2D}, ${totScaler}, ${one});")
 

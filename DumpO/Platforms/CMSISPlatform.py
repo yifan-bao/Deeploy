@@ -39,7 +39,7 @@ from DumpO.Bindings.CMSISBindings import *
 from DumpO.OptimizationPasses.CMSISPasses import *
 from DumpO.OptimizationPasses.BasicPasses import *
 
-GELU_int8_Mapper = NodeMapper(GELUParser(), None)
+GELU_int8_Mapper = NodeMapper(GELUParser(), [BasicGELUBinding])
 iLayerNorm_int8_Mapper = NodeMapper(iLayerNormParser(), None)
 MHSA_int8_Mapper = NodeMapper(MHSAParser(), None)
 
