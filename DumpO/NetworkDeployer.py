@@ -57,11 +57,13 @@ class NetworkDeployer(NetworkContainer):
             inputNode.name = "input_"+str(idx)
         for idx, outputNode in enumerate(self.graph.outputs):
             outputNode.name = "output_"+str(idx)
-        
-        baseCtxt, ret = self.baseParse() # This sanity checks the graph and generates a base context for lowering/optimization
+            
+        # sanity check the graph and generate a base context for lowering/optimization
+        baseCtxt, ret = self.baseParse() 
         if not ret:
             raise RuntimeError("The given graph was not valid - check that it is acyclic!")
         baseCtxt, self.graph = self.lower(baseCtxt, self.graph) # This lowers the graph to a deployable format
+        
         # Insert appropriate transposes
         self.NCHWtoNHWC()
         # Remove duplicate transposes
