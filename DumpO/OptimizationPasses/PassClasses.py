@@ -23,8 +23,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-
-
 import copy
 from typing import NamedTuple
 import onnx_graphsurgeon as gs
@@ -55,8 +53,8 @@ def deleteNode(self, node):
 @gs.Graph.register()
 def replaceInsertNode(self, inputs, outputs, node):
     # Disconnect output nodes of all input tensors
-    for inp in inputs:
-        inp.outputs.clear()
+    # for inp in inputs:
+    #     inp.outputs.clear()
 
     ret = self.layer(op=node.op, name=node.name, attrs=node.attrs, inputs=inputs, outputs=outputs)
     

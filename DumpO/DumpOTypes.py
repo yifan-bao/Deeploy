@@ -34,6 +34,7 @@ import onnx_graphsurgeon as gs
 import math
 from enum import Enum
 from onnx.external_data_helper import convert_model_to_external_data
+from collections import OrderedDict
 
 class VariableBuffer():
     def __init__(self, name: str = '', shape = [1], nLevels: int = 1):
@@ -533,7 +534,10 @@ class ONNXLayer():
                             ctxt.globalObjects[node.name].values.reshape(newShape)
                         # The number of elements SHOULD be lower, and we broadcast
                         else:
-                            ctxt.globalObjects[node.name].values = np.broadcast_to(ctxt.globalObjects[node.name].values, newShape)
+                            try:
+                                ctxt.globalObjects[node.name].values = np.broadcast_to(ctxt.globalObjects[node.name].values, newShape)
+                            except:
+                                import IPython; IPython.embed()
 
                 else:
                     raise KeyError(f'Expected node {node.name} to be in context!')
@@ -631,7 +635,7 @@ class NetworkContainer():
         self.graph = graph
         self.scheduler = scheduler
         self.ctxt = None
-        self.layerBinding = {}
+        self.layerBinding = OrderedDict()
         self.parsed = False
         self.Platform = platform
         self.Platform.Mapping['Constant'] = lambda x: self.ctxt.hoistConstant(x.attrs['value'], x.outputs[0].name)
@@ -700,7 +704,7 @@ class NetworkContainer():
     def _bindLayers(self):
         # Create schedule, binding, then parse resulting program for correctness
         # Create schedule
-        self.layerBinding = {}
+        self.layerBinding = OrderedDict()
         for i in self.scheduler(self.graph):
             
             # Create binding
@@ -719,7 +723,7 @@ class NetworkContainer():
         self._bindLayers()
         
         parseSuccess = True
-        for node in self.layerBinding.values():
+        for key, node in self.layerBinding.items():
             self.ctxt, parsePass = node.parse(self.ctxt, channels_first)
             parseSuccess = parseSuccess and parsePass
 
@@ -735,7 +739,7 @@ class NetworkContainer():
             raise ValueError('You need to parse and bind the network before generating code!')
         
         callStack = ''
-        for node in self.layerBinding.values():
+        for key, node in self.layerBinding.items():
             self.ctxt, code = node.generate(self.ctxt)
             for section in code:
                 for substr in section:

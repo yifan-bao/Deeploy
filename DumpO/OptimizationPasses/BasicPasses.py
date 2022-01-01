@@ -244,3 +244,37 @@ class ExtractPaddingFromConvPass(ReplaceSequentialPatternPass):
     
         name = f"_EXTRACT_CONV_PASS"
         super().__init__(graph, extract_padding_fun, name)    
+
+def merge_rqs_add_fun(ctxt: NetworkContext, graph: gs.Graph, match: Match, name: str):
+    matched_nodes = [m for k, m in match.nodes_map.items()]
+    attrs = {}
+    add = matched_nodes[0]
+    rqs = matched_nodes[1]
+
+    if (isinstance(add.inputs[0], gs.Constant) or isinstance(add.inputs[1], gs.Constant)) and isinstance(rqs.inputs[2], gs.Constant):
+        if isinstance(add.inputs[0], gs.Constant):
+            idx = 1 # Non-constant idx
+            constantTensor = add.inputs[0]
+        else:
+            idx = 0 # non-constant idx
+            constantTensor = add.inputs[1]
+        if constantTensor.values.shape != tuple(add.inputs[idx].shape):
+            rqs.inputs[2].values = (rqs.inputs[1].values*constantTensor.values) + rqs.inputs[2].values
+            add.inputs[(idx+1)%2].values = add.inputs[(idx+1)%2].values * 0
+            rqs.inputs[0] = add.inputs[idx]
+        return ctxt, graph
+    else:    
+        return ctxt, graph
+        
+class MergeConstAddAndRequantPass(ReplaceSequentialPatternPass):
+    def __init__(self):
+        passes = []
+        graph = gs.Graph()
+        _input = gs.Variable(name='input_1')
+        output = graph.layer(inputs=[_input], outputs=['add_out'], op='Add', name='add1')
+        output = graph.layer(inputs=output, outputs=['rqs_out'], op='RequantShift', name='rqs1')
+        graph.outputs.append(output)
+        graph.inputs = [_input]
+    
+        name = f"_MERGE_RQS_ADD_PASS"
+        super().__init__(graph, merge_rqs_add_fun, name)    

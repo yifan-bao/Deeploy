@@ -103,7 +103,11 @@ def merge_gemm_rq_fun(ctxt: NetworkContext, graph: gs.Graph, match: Match, name:
     # #import IPython; IPython.embed()
     # shiftNode = gs.Constant(f'{gemm.name}_shift', np.array((31-np.log2(rqs.attrs['div'].values),)))
 
-    _inputs = list(gemm.inputs) + list(rqs.inputs[-1:])
+    if len(list(gemm.inputs)) == 3:
+        gemm.inputs[2].values = gemm.inputs[2].values + rqs.inputs[-1].values
+        _inputs = list(gemm.inputs)
+    else:
+        _inputs = list(gemm.inputs) + list(rqs.inputs[-1:])
     _outputs = rqs.outputs
     attrs = {**gemm.attrs, **rqs.attrs}
     attrs['shift']=gs.Constant(name='shift', values= np.array(remainingShift))
@@ -136,5 +140,5 @@ class MatMulRequantMergePass(ReplaceSequentialPatternPass):
         graph.outputs.append(output)
         graph.inputs.append(_input)
     
-        name = f"_MERGE_GEMMRQ_PASS"
+        name = f"_MERGE_GEMM_MATMUL_RQ_PASS"
         super().__init__(graph, merge_gemm_rq_fun, name)    

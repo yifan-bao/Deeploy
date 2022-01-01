@@ -59,19 +59,19 @@ class NetworkDeployer(NetworkContainer):
             outputNode.name = "output_"+str(idx)
             
         # sanity check the graph and generate a base context for lowering/optimization
-        baseCtxt, ret = self.baseParse() 
+        self.ctxt, ret = self.baseParse() 
         if not ret:
             raise RuntimeError("The given graph was not valid - check that it is acyclic!")
-        baseCtxt, self.graph = self.lower(baseCtxt, self.graph) # This lowers the graph to a deployable format
-        
+        self.ctxt, self.graph = self.lower(self.ctxt, self.graph) # This lowers the graph to a deployable format
+        onnx.save_model(gs.export_onnx(self.graph), "test_preturn.onnx")
         # Insert appropriate transposes
         self.NCHWtoNHWC()
         # Remove duplicate transposes
-        baseCtxt, ret = self.baseParse() # This sanity checks the graph and generates a base context for lowering/optimization
+        self.ctxt, ret = self.baseParse() # This sanity checks the graph and generates a base context for lowering/optimization
         mergeOptimizer = TransposeMergePass()
         constOptimizer = TransposeConstOptPass()
-        _, self.graph = mergeOptimizer.apply(baseCtxt, self.graph)
-        _, self.graph = constOptimizer.apply(baseCtxt, self.graph)
+        _, self.graph = mergeOptimizer.apply(self.ctxt, self.graph)
+        _, self.graph = constOptimizer.apply(self.ctxt, self.graph)
         self.graph.cleanup().toposort()
         onnx.save_model(gs.export_onnx(self.graph), "test.onnx")
         if not ret:
@@ -131,18 +131,18 @@ class NetworkDeployer(NetworkContainer):
                     
                 transposeIdx += 2
                 
-            elif isinstance(layer, GEMMLayer):
+            # elif isinstance(layer, GEMMLayer):
 
-                weightNode = layer.node.inputs[1]
-                shape = list(range(len(weightNode.shape)))
-                permute = np.array([1,0])
+            #     weightNode = layer.node.inputs[1]
+            #     shape = list(range(len(weightNode.shape)))
+            #     permute = np.array([1,0])
                 
-                weightTransposeOutput = gs.Variable("TransposeWeight"+str(transposeIdx), dtype=np.float32, shape=newShape(weightNode, permute))
-                weightTransposeNode = gs.Node(name='Transpose'+str(transposeIdx), op="Transpose", inputs=[weightNode], outputs=[weightTransposeOutput], attrs={'perm': permute})
-                layer.node.inputs[1] = weightTransposeOutput
-                self.graph.nodes.append(weightTransposeNode)
+            #     weightTransposeOutput = gs.Variable("TransposeWeight"+str(transposeIdx), dtype=np.float32, shape=newShape(weightNode, permute))
+            #     weightTransposeNode = gs.Node(name='Transpose'+str(transposeIdx), op="Transpose", inputs=[weightNode], outputs=[weightTransposeOutput], attrs={'perm': permute})
+            #     layer.node.inputs[1] = weightTransposeOutput
+            #     self.graph.nodes.append(weightTransposeNode)
 
-                transposeIdx += 1
+            #     transposeIdx += 1
         self.graph.cleanup().toposort()
                 
     def backEnd(self, channels_first=True):

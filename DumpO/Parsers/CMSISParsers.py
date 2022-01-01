@@ -327,57 +327,56 @@ class CMSISLinearParser(GEMMParser):
         
         ctxt = ctxt.copy()
         newCtxt, ret = super().parseNodeCtxt(ctxt, node)
-        
         if ret:
             # Try to transpose A offline if possible, else fail
-            if self.parserDict['transA']:
+            if self.parserDict['transA'] == 1:
                 nameA = self.parserDict['A']
-                if ctxt.is_global(nameA) and isinstance(ctxt.lookup(nameA), ConstantBuffer):
-                    A = ctxt.lookup(nameA)
+                if newCtxt.is_global(nameA) and isinstance(newCtxt.lookup(nameA), ConstantBuffer):
+                    A = newCtxt.lookup(nameA)
                     npA = np.asarray(A.values).reshape(A.shape)
                     newA = np.transpose(npA, list(range(len(A.shape)-2)) + [len(A.shape)-1, len(A.shape)-2])
-                    ctxt.globalObjects[nameA].shape = newA.shape
-                    ctxt.globalObjects[nameA].values = newA
+                    newCtxt.globalObjects[nameA].shape = newA.shape
+                    newCtxt.globalObjects[nameA].values = newA
                     self.parserDict['transA'] = 0
                 else:
-                    return ctxt, False    
+                    return newCtxt, False    
 
             # Try to transpose B offline if possible, else fail
-            if self.parserDict['transB']:
+            if self.parserDict['transB'] == 1:
                 nameB = self.parserDict['B']
-                if ctxt.is_global(nameB) and isinstance(ctxt.lookup(nameB), ConstantBuffer):
-                    B = ctxt.lookup(nameB)
+                if newCtxt.is_global(nameB) and isinstance(newCtxt.lookup(nameB), ConstantBuffer):
+                    B = newCtxt.lookup(nameB)
                     npB = np.asarray(B.values).reshape(B.shape)
                     newB = np.transpose(npB, list(range(len(B.shape)-2)) + [len(B.shape)-1, len(B.shape)-2])
-                    ctxt.globalObjects[nameB].values = newB
-                    ctxt.globalObjects[nameB].shape = newB.shape
+                    newCtxt.globalObjects[nameB].values = newB
+                    newCtxt.globalObjects[nameB].shape = newB.shape
                     self.parserDict['transB'] = 0
                 else:
-                    return ctxt, False    
+                    return newCtxt, False    
 
             # Try to scale A offline if possible, else fail
             if self.parserDict['alpha'] != 1.0:
                 nameA = self.parserDict['A']
-                if ctxt.is_global(nameA) and isinstance(ctxt.lookup(nameA), ConstantBuffer):
-                    A = ctxt.lookup(nameA)
+                if newCtxt.is_global(nameA) and isinstance(newCtxt.lookup(nameA), ConstantBuffer):
+                    A = newCtxt.lookup(nameA)
                     npA = np.asarray(A.values).reshape(A.shape)
                     newA = npA * alpha
-                    ctxt.globalObjects[nameA].values = newA
+                    newCtxt.globalObjects[nameA].values = newA
                     self.parserDict['alpha'] = 1.0
                 else:
-                    return ctxt, False
+                    return newCtxt, False
                 
             # Try to scale B offline if possible, else fail
             if self.parserDict['beta'] != 1.0:
                 nameB = self.parserDict['B']
-                if ctxt.is_global(nameB) and isinstance(ctxt.lookup(nameB), ConstantBuffer):
-                    B = ctxt.lookup(nameB)
+                if newCtxt.is_global(nameB) and isinstance(newCtxt.lookup(nameB), ConstantBuffer):
+                    B = newCtxt.lookup(nameB)
                     npB = np.asarray(B.values).reshape(B.shape)
                     newB = npB * beta
-                    ctxt.globalObjects[nameB].values = newB
+                    newCtxt.globalObjects[nameB].values = newB
                     self.parserDict['beta'] = 1.0
                 else:
-                    return ctxt, False    
+                    return newCtxt, False    
                 
             return newCtxt, True
         

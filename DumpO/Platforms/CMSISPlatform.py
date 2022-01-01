@@ -41,8 +41,8 @@ from DumpO.OptimizationPasses.BasicPasses import *
 
 GELU_int8_Mapper = NodeMapper(iGELUParser(), [BasicGELUBinding])
 Softmax_int8_Mapper = NodeMapper(iSoftmaxParser(), [BasicSoftmaxBinding])
-iLayerNorm_int8_Mapper = NodeMapper(iLayerNormParser(), [BasicLayerNormBinding])
-MHSA_int8_Mapper = NodeMapper(MHSAParser(), None)
+iLayerNorm_int8_Mapper = NodeMapper(iLayerNormParser(), [CMSISLayerNormBinding])
+MHSA_int8_Mapper = NodeMapper(MHSAParser(), [CMSISMHSABinding])
 
 GatherMapper = NodeMapper(GatherParser(), BasicGatherBindings)
 ReshapeMapper = NodeMapper(ReshapeParser(), BasicReshapeBindings)
@@ -71,9 +71,7 @@ CMSISMapping = {
     'Transpose': TransposeLayer([TransposeMapper]),
     'Gather': GatherLayer([GatherMapper]),
     'Pad': PadLayer([PadMapper]),
-    
     'Add': AddLayer([AddMapper]),
-    
     'Reshape': ReshapeLayer([ReshapeMapper]),
     'Flatten': ReshapeLayer([FlattenMapper]),
 }
@@ -147,6 +145,6 @@ class SimpleStructBuffer(StructBuffer):
         return FreeTemplate.referenceLocalTemplate.generate(name=self.name)
     
     
-CMSISOptimizer = NetworkOptimizer([ExtractPaddingFromConvPass(), ConvRequantMergePass(), GEMMRequantMergePass(), MatMulRequantMergePass()])
+CMSISOptimizer = NetworkOptimizer([MergeConstAddAndRequantPass(), ExtractPaddingFromConvPass(), ConvRequantMergePass(), GEMMRequantMergePass(), MatMulRequantMergePass()])
     
 CMSISPlatform = DeploymentPlatform(CMSISMapping, DataTypes, CMSISTypeInfer, SimpleNetworkBuffer, SimpleGlobalBuffer, SimpleStructBuffer)

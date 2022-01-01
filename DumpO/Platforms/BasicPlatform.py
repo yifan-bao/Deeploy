@@ -32,13 +32,13 @@ from DumpO.Layers.BasicLayers import *
 from DumpO.Parsers.BasicParsers import *
 from DumpO.Bindings.BasicBindings import *
 
-GELU_int8_Mapper = NodeMapper(iGELUParser(), [BasicGELUBinding])
-iLayerNorm_int8_Mapper = NodeMapper(iLayerNormParser(), [BasicLayerNormBinding])
+#GELU_int8_Mapper = NodeMapper(iGELUParser(), [BasicGELUBinding])
+#iLayerNorm_int8_Mapper = NodeMapper(iLayerNormParser(), [BasicLayerNormBinding])
 MatMul_int8_Mapper = NodeMapper(GEMMParser(), [BasicGEMMBinding])
 GEMM_int8_Mapper = NodeMapper(GEMMParser(), [BasicGEMMBinding])
 Conv_int8_Mapper = NodeMapper(Conv2DParser(), [BasicConv2DBinding])
 #Conv_int8_Mapper_testo = NodeMapper(Conv2DParser(), ConvChecker([CMSISDataTypes.int8_t, CMSISDataTypes.int8_t], [CMSISDataTypes.int16_t]), DummyTemplate.referenceTemplate)
-MHSA_int8_Mapper = NodeMapper(MHSAParser(), [BasicMHSABinding])
+#MHSA_int8_Mapper = NodeMapper(MHSAParser(), [BasicMHSABinding])
 
 GatherMapper = NodeMapper(GatherParser(), BasicGatherBindings)
 ReshapeMapper = NodeMapper(ReshapeParser(), BasicReshapeBindings)
@@ -51,9 +51,9 @@ DummyMapper = NodeMapper(DummyParser(), [DummyBinding])
 
 BasicMapping = {
     'Conv' : ConvLayer([Conv_int8_Mapper]),
-    'iLayerNorm': iLayerNormLayer([iLayerNorm_int8_Mapper]),
-    'MultiHeadSelfAttention': MHSALayer([MHSA_int8_Mapper]),
-    'iGELU' : iGELULayer([GELU_int8_Mapper]),
+    #'iLayerNorm': iLayerNormLayer([iLayerNorm_int8_Mapper]),
+    #'MultiHeadSelfAttention': MHSALayer([MHSA_int8_Mapper]),
+    #'iGELU' : iGELULayer([GELU_int8_Mapper]),
     'MatMul': GEMMLayer([MatMul_int8_Mapper]),
     'Gemm': GEMMLayer([GEMM_int8_Mapper]),
     

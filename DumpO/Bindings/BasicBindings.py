@@ -34,14 +34,12 @@ class DataTypes(Enum):
 
 BasicGELUBinding = NodeBinding(GELUChecker([DataTypes.int8_t], [DataTypes.int8_t]), iGELUTemplate.referenceTemplate)
 BasicSoftmaxBinding = NodeBinding(SoftmaxChecker([DataTypes.int8_t], [DataTypes.int8_t]), iSoftmaxTemplate.referenceTemplate)
-BasicLayerNormBinding = NodeBinding(iLayerNormChecker([DataTypes.int8_t,DataTypes.int32_t,DataTypes.int32_t], [DataTypes.int8_t]), iLayernormTemplate.referenceTemplate)
 
 BasicGEMMBinding = NodeBinding(GEMMChecker([DataTypes.int8_t, DataTypes.int8_t], [DataTypes.int32_t]), GEMMTemplate.referenceTemplate)
 BasicConv2DBinding = NodeBinding(ConvChecker([DataTypes.int8_t, DataTypes.int8_t], [DataTypes.int32_t]), DummyTemplate.referenceTemplate)
-BasicMHSABinding = NodeBinding(MHSAChecker([DataTypes.int8_t], [DataTypes.int32_t]), MHSATemplate.referenceTemplate)
 
-BasicGatherBindings = [NodeBinding(GatherChecker([type],[type]), GatherTemplate.referenceTemplate) for type in DataTypes]
-BasicReshapeBindings = [NodeBinding(ReshapeChecker([type],[type]), SkipTemplate.referenceTemplate) for type in DataTypes]
+BasicGatherBindings = [NodeBinding(GatherChecker([type, DataTypes.int32_t],[type]), GatherTemplate.referenceTemplate) for type in DataTypes]
+BasicReshapeBindings = [NodeBinding(ReshapeChecker([type, DataTypes.int32_t],[type]), SkipTemplate.referenceTemplate) for type in DataTypes]
 BasicTransposeBindings = [NodeBinding(TransposeChecker([type],[type]), TransposeTemplate.referenceTemplate) for type in DataTypes]
 BasicRQSBindings = [NodeBinding(RequantShiftChecker([type,DataTypes.int32_t,DataTypes.int32_t], [DataTypes.int8_t]), RequantShiftTemplate.referenceTemplate) for type in DataTypes]
 

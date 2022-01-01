@@ -37,6 +37,9 @@ CMSISConv2DBinding = NodeBinding(CMSISConvChecker([DataTypes.int8_t, DataTypes.i
 CMSISGEMMBinding = NodeBinding(CMSISLinearChecker([DataTypes.int8_t, DataTypes.int8_t, DataTypes.int32_t], [DataTypes.int8_t]), GEMMTemplate.LinearTemplate)
 CMSISMaxPool2DBinding = NodeBinding(CMSISMaxPoolChecker([DataTypes.int8_t], [DataTypes.int8_t]), MaxPool2DTemplate.cmsisTemplate)
 
+CMSISLayerNormBinding = NodeBinding(iLayerNormChecker([DataTypes.int8_t,DataTypes.int32_t,DataTypes.int32_t], [DataTypes.int8_t]), iLayernormTemplate.referenceTemplate)
+CMSISMHSABinding = NodeBinding(MHSAChecker([DataTypes.int8_t,DataTypes.int8_t,DataTypes.int8_t]+[DataTypes.int8_t, DataTypes.int32_t]*4, [DataTypes.int8_t]), MHSATemplate.referenceTemplate)
+
 CMSISSaturatingAddBindings = [NodeBinding(CMSISSaturatingAddChecker([DataTypes.int8_t, DataTypes.int8_t],[DataTypes.int8_t]), AddTemplate.referenceTemplate)]
 
 # CMSISSaturatingAddBindings = [NodeBinding(CMSISSaturatingAddChecker([DataTypes.int8_t],[DataTypes.int8_t]), AddTemplate.AddInt8Template),
