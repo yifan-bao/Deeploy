@@ -131,18 +131,6 @@ class NetworkDeployer(NetworkContainer):
                     
                 transposeIdx += 2
                 
-            # elif isinstance(layer, GEMMLayer):
-
-            #     weightNode = layer.node.inputs[1]
-            #     shape = list(range(len(weightNode.shape)))
-            #     permute = np.array([1,0])
-                
-            #     weightTransposeOutput = gs.Variable("TransposeWeight"+str(transposeIdx), dtype=np.float32, shape=newShape(weightNode, permute))
-            #     weightTransposeNode = gs.Node(name='Transpose'+str(transposeIdx), op="Transpose", inputs=[weightNode], outputs=[weightTransposeOutput], attrs={'perm': permute})
-            #     layer.node.inputs[1] = weightTransposeOutput
-            #     self.graph.nodes.append(weightTransposeNode)
-
-            #     transposeIdx += 1
         self.graph.cleanup().toposort()
                 
     def backEnd(self, channels_first=True):

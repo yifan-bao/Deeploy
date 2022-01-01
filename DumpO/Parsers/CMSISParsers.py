@@ -342,7 +342,9 @@ class CMSISLinearParser(GEMMParser):
                     return newCtxt, False    
 
             # Try to transpose B offline if possible, else fail
-            if self.parserDict['transB'] == 1:
+            # SCHEREMO: Magic trick - CMSIS works a bit weirdly with matmuls...
+            # To get the same output as with ONNX/Pytorch, we switch weights and inputs (A/B)
+            if self.parserDict['transB'] == 0:
                 nameB = self.parserDict['B']
                 if newCtxt.is_global(nameB) and isinstance(newCtxt.lookup(nameB), ConstantBuffer):
                     B = newCtxt.lookup(nameB)
@@ -350,7 +352,7 @@ class CMSISLinearParser(GEMMParser):
                     newB = np.transpose(npB, list(range(len(B.shape)-2)) + [len(B.shape)-1, len(B.shape)-2])
                     newCtxt.globalObjects[nameB].values = newB
                     newCtxt.globalObjects[nameB].shape = newB.shape
-                    self.parserDict['transB'] = 0
+                    self.parserDict['transB'] = 1
                 else:
                     return newCtxt, False    
 
@@ -419,10 +421,10 @@ class CMSISGEMMParser(CMSISLinearParser):
         if ret:
 
             inputs = ['A', 'B', 'add']
-                
+                            
             for idx, inputNode in enumerate(node.inputs):
                 self.parserDict[inputs[idx]] = ctxt.lookup(inputNode.name).name
-            
+                
             # Hoist the structs to the global ctxt
             data_in = newCtxt.lookup(self.parserDict['A'])
             data_out = newCtxt.lookup(self.parserDict['data_out'])
