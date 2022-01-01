@@ -343,7 +343,6 @@ class CMSISLinearParser(GEMMParser):
 
             # Try to transpose B offline if possible, else fail
             # SCHEREMO: Magic trick - CMSIS works a bit weirdly with matmuls...
-            # To get the same output as with ONNX/Pytorch, we switch weights and inputs (A/B)
             if self.parserDict['transB'] == 0:
                 nameB = self.parserDict['B']
                 if newCtxt.is_global(nameB) and isinstance(newCtxt.lookup(nameB), ConstantBuffer):

@@ -41,7 +41,7 @@ class RQSGEMMLayer(GEMMLayer):
         super().__init__(maps)
 
     def computeShapes(self, inputShapes: List[np.shape], outputShapes: List[np.shape], parserDict, channels_first) -> (List[np.shape], List[np.shape]):
-        inputShapes[2] = inputShapes[1][-1] # Channels out dimension of Kernel
+        inputShapes[2] = inputShapes[1][-2] # Channels out dimension of Kernel
         # inputShapes[3] = inputShapes[1][-1] # Channels out dimension of Kernel
         # inputShapes[4] = inputShapes[1][-1] # Channels out dimension of Kernel
         return (inputShapes, outputShapes)
