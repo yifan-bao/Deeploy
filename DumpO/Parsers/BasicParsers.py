@@ -228,8 +228,43 @@ class AddParser(NodeParser):
         
         return ctxt, True
 
+class iSoftmaxParser(NodeParser):
+    def __init__(self):
+        super().__init__()
 
-class GELUParser(NodeParser):
+    def parseNode(self, node: gs.ir.node.Node) -> bool:
+
+        ret = all([
+            'coeffA' in node.attrs,
+            'coeffB' in node.attrs,
+            'coeffC' in node.attrs,
+            'log2' in node.attrs,
+            len(node.inputs) == 1,
+            len(node.outputs) == 1
+        ])
+
+        if ret:
+            self.parserDict['coeffA'] = int(node.attrs['coeffA'].values)
+            self.parserDict['coeffB'] = int(math.log2(node.attrs['coeffB'].values))
+            self.parserDict['coeffC'] = int(node.attrs['coeffC'].values)
+            self.parserDict['log2'] = int(node.attrs['log2'].values)
+
+        return ret
+
+    def parseNodeCtxt(self, ctxt: NetworkContext, node: gs.ir.node.Node, channels_first: bool = True) -> (NetworkContext, bool):
+        
+        ctxt = ctxt.copy()
+        
+        data_in = ctxt.lookup(node.inputs[0].name)
+        data_out = ctxt.lookup(node.outputs[0].name)
+        self.parserDict['data_in'] = data_in.name
+        self.parserDict['data_out'] = data_out.name
+        self.parserDict['size'] = np.prod(data_in.shape)
+        self.parserDict['lastDimLength'] = data_in.shape[-1]
+        
+        return ctxt, True
+
+class iGELUParser(NodeParser):
     def __init__(self):
         super().__init__()
 
@@ -590,6 +625,7 @@ class iLayerNormParser(NodeParser):
             self.parserDict[outputs[idx]] = ctxt.lookup(outputNode.name).name
             
         self.parserDict['size'] = np.prod(ctxt.lookup(node.inputs[0].name).shape)
+        self.parserDict['lastDimLength'] = ctxt.lookup(node.inputs[0].name).shape[-1]
 
         return ctxt, True
 

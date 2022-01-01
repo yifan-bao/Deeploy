@@ -66,6 +66,10 @@ class GatherLayer(ONNXLayer):
 class iGELULayer(ONNXLayer):
     def __init__(self, maps : List[NodeMapper]):
         super().__init__(maps)
+
+class iSoftmaxLayer(ONNXLayer):
+    def __init__(self, maps : List[NodeMapper]):
+        super().__init__(maps)
         
 class RequantShiftLayer(ONNXLayer):
     def __init__(self, maps : List[NodeMapper]):

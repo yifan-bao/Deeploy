@@ -39,8 +39,9 @@ from DumpO.Bindings.CMSISBindings import *
 from DumpO.OptimizationPasses.CMSISPasses import *
 from DumpO.OptimizationPasses.BasicPasses import *
 
-GELU_int8_Mapper = NodeMapper(GELUParser(), [BasicGELUBinding])
-iLayerNorm_int8_Mapper = NodeMapper(iLayerNormParser(), None)
+GELU_int8_Mapper = NodeMapper(iGELUParser(), [BasicGELUBinding])
+Softmax_int8_Mapper = NodeMapper(iSoftmaxParser(), [BasicSoftmaxBinding])
+iLayerNorm_int8_Mapper = NodeMapper(iLayerNormParser(), [BasicLayerNormBinding])
 MHSA_int8_Mapper = NodeMapper(MHSAParser(), None)
 
 GatherMapper = NodeMapper(GatherParser(), BasicGatherBindings)
@@ -66,6 +67,7 @@ CMSISMapping = {
     'iLayerNorm': iLayerNormLayer([iLayerNorm_int8_Mapper]),
     'MultiHeadSelfAttention': MHSALayer([MHSA_int8_Mapper]),
     'iGELU' : iGELULayer([GELU_int8_Mapper]),
+    'iSoftmax' : iSoftmaxLayer([Softmax_int8_Mapper]),
     'Transpose': TransposeLayer([TransposeMapper]),
     'Gather': GatherLayer([GatherMapper]),
     'Pad': PadLayer([PadMapper]),

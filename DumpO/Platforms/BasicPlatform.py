@@ -32,7 +32,7 @@ from DumpO.Layers.BasicLayers import *
 from DumpO.Parsers.BasicParsers import *
 from DumpO.Bindings.BasicBindings import *
 
-GELU_int8_Mapper = NodeMapper(GELUParser(), [BasicGELUBinding])
+GELU_int8_Mapper = NodeMapper(iGELUParser(), [BasicGELUBinding])
 iLayerNorm_int8_Mapper = NodeMapper(iLayerNormParser(), [BasicLayerNormBinding])
 MatMul_int8_Mapper = NodeMapper(GEMMParser(), [BasicGEMMBinding])
 GEMM_int8_Mapper = NodeMapper(GEMMParser(), [BasicGEMMBinding])

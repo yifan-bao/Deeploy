@@ -1,4 +1,6 @@
 from .iGELUTemplate import *
+from .iSoftmaxTemplate import *
+from .iLayernormTemplate import *
 from .RequantShiftTemplate import *
 from .SkipTemplate import *
 from .AllocateTemplate import *
