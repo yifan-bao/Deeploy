@@ -333,8 +333,8 @@ class GatherParser(NodeParser):
 
 
         axis = self.parserDict['axis']
-        self.parserDict['index'] = np.prod(ctxt.lookup(node.inputs[0].name).shape)
-        self.parserDict['offset'] = np.prod(ctxt.lookup(node.inputs[0].name).shape)
+        self.parserDict['numIndices'] = np.prod(ctxt.lookup(self.parserDict['indices']).values.shape)
+        self.parserDict['offset'] = np.prod(ctxt.lookup(node.inputs[0].name).shape[axis+1:])
         self.parserDict['size'] = np.prod(ctxt.lookup(node.inputs[0].name).shape)
 
         return ctxt, True
@@ -550,27 +550,33 @@ class MHSAParser(NodeParser):
             'isoftmaxC' in node.attrs,
             'isoftmaxlog2' in node.attrs,
             'n_levels' in node.attrs,
+            'dim' in node.attrs,
+            'dim_head' in node.attrs,
+            'heads' in node.attrs,
             len(node.inputs) == 11,
             len(node.outputs) == 1
         ])
         
 
         if ret:
-            self.parserDict['attn_requant_mul'] = int(node.attrs['attn_requant_mul'].values),
-            self.parserDict['attn_requant_div'] = int(node.attrs['attn_requant_div'].values),
-            self.parserDict['wo_requant_mul'] = int(node.attrs['wo_requant_mul'].values),
-            self.parserDict['wo_requant_div'] = int(node.attrs['wo_requant_div'].values),
-            self.parserDict['wq_requant_mul'] = int(node.attrs['wq_requant_mul'].values),
-            self.parserDict['wq_requant_div'] = int(node.attrs['wq_requant_div'].values),
-            self.parserDict['wk_requant_mul'] = int(node.attrs['wk_requant_mul'].values),
-            self.parserDict['wk_requant_div'] = int(node.attrs['wk_requant_div'].values),
-            self.parserDict['wv_requant_mul'] = int(node.attrs['wv_requant_mul'].values),
-            self.parserDict['wv_requant_div'] = int(node.attrs['wv_requant_div'].values),
-            self.parserDict['isoftmaxA'] = int(node.attrs['isoftmaxA'].values),
-            self.parserDict['isoftmaxB'] = int(node.attrs['isoftmaxB'].values),
-            self.parserDict['isoftmaxC'] = int(node.attrs['isoftmaxC'].values),
-            self.parserDict['isoftmaxlog2'] = int(node.attrs['isoftmaxlog2'].values),
-            self.parserDict['n_levels'] = int(node.attrs['n_levels'].values),
+            self.parserDict['attn_requant_mul'] = int(node.attrs['attn_requant_mul'].values)
+            self.parserDict['attn_requant_div'] = int(node.attrs['attn_requant_div'].values)
+            self.parserDict['wo_requant_mul'] = int(node.attrs['wo_requant_mul'].values)
+            self.parserDict['wo_requant_div'] = int(node.attrs['wo_requant_div'].values)
+            self.parserDict['wq_requant_mul'] = int(node.attrs['wq_requant_mul'].values)
+            self.parserDict['wq_requant_div'] = int(node.attrs['wq_requant_div'].values)
+            self.parserDict['wk_requant_mul'] = int(node.attrs['wk_requant_mul'].values)
+            self.parserDict['wk_requant_div'] = int(node.attrs['wk_requant_div'].values)
+            self.parserDict['wv_requant_mul'] = int(node.attrs['wv_requant_mul'].values)
+            self.parserDict['wv_requant_div'] = int(node.attrs['wv_requant_div'].values)
+            self.parserDict['isoftmaxA'] = int(node.attrs['isoftmaxA'].values)
+            self.parserDict['isoftmaxB'] = int(node.attrs['isoftmaxB'].values)
+            self.parserDict['isoftmaxC'] = int(node.attrs['isoftmaxC'].values)
+            self.parserDict['isoftmaxlog2'] = int(node.attrs['isoftmaxlog2'].values)
+            self.parserDict['n_levels'] = int(node.attrs['n_levels'].values)
+            self.parserDict['dim'] = int(node.attrs['dim'].values)
+            self.parserDict['dim_head'] = int(node.attrs['dim_head'].values)
+            self.parserDict['heads'] = int(node.attrs['heads'].values)
             
         return ret
     

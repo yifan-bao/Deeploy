@@ -25,5 +25,5 @@
 
 from DumpO.DumpOTypes import NodeTemplate
 
-referenceTemplate = NodeTemplate("void MHSA(${data_out}, ${q}, ${k}, ${v}, ${wq_weight}, ${wq_bias}, ${wk_weight}, ${wk_bias}, ${wv_weight}, ${wv_bias}, ${wo_weight}, ${wo_bias});")
+basicReferenceTemplate = NodeTemplate("void MHSA(${data_out}, ${q}, ${k}, ${v}, ${wq_weight}, ${wq_bias}, ${wk_weight}, ${wk_bias}, ${wv_weight}, ${wv_bias}, ${wo_weight}, ${wo_bias}, ${wq_requant_mul}, ${wq_requant_div},${wk_requant_mul}, ${wk_requant_div},${wv_requant_mul}, ${wv_requant_div},${wo_requant_mul}, ${wo_requant_div}, ${attn_requant_div}, ${attn_requant_mul}, ${dim}, ${dim_head}, ${heads}, ${isoftmaxA}, ${isoftmaxB}, ${isoftmaxC}, ${isoftmaxlog2}, ${n_levels});")
 

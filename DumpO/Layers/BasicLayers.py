@@ -49,19 +49,6 @@ class ReshapeLayer(ONNXLayer):
 class GatherLayer(ONNXLayer):
     def __init__(self, maps : List[NodeMapper]):
         super().__init__(maps)
-
-    def generate(self, ctxt: NetworkContext) -> (NetworkContext, List[str]):        
-        outputs = [node for node in self.node.outputs]
-        inputs = [node for node in self.node.inputs]
-        
-        outputNames = [node.name for node in outputs]
-        inputNames = [node.name for node in inputs]
-        
-        alloc = ctxt.allocLocal(self.node.name, outputNames)
-        call = self.mapper.generate(ctxt)
-        dealloc = ctxt.freeLocal(self.node.name, inputNames)
-        
-        return (ctxt, [call])
     
 class iGELULayer(ONNXLayer):
     def __init__(self, maps : List[NodeMapper]):

@@ -119,14 +119,14 @@ class SimpleGlobalBuffer(ConstantBuffer):
         values = list(self.values.reshape(-1))
         strValues = [str(value) for value in values]
         valueString = ', '.join(strValues)
-        return AllocateTemplate.referenceGlobalInitTemplate.generate(type=self._type._name_, name=self.name, size = np.prod(self.shape), values = valueString)
+        return AllocateTemplate.referenceGlobalInitTemplate.generate(type=self._type._name_, name=self.name, size = int(np.prod(self.shape)), values = valueString)
         
     def alloc(self):
         values = list(self.values.reshape(-1))
         strValues = [str(value) for value in values]
         valueString = ', '.join(strValues)
         
-        return AllocateTemplate.referenceGlobalAllocateTemplate.generate(type = self._type._name_, name=self.name, size = np.prod(self.shape), values = valueString)
+        return AllocateTemplate.referenceGlobalAllocateTemplate.generate(type = self._type._name_, name=self.name, size = int(np.prod(self.shape)), values = valueString)
 
     def dealloc(self):
         return FreeTemplate.referenceGlobalTemplate.generate(name = self.name)

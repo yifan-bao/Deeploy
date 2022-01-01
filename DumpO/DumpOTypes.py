@@ -457,7 +457,7 @@ class NodeBinding():
                 parseDict[key] = ctxt._mangle(value)
             else:
                 parseDict[key] = value
-        
+                
         return [self.template.generate(**{**parseDict, **self.typeChecker.typeDict})]
 
         

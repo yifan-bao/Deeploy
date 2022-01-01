@@ -25,7 +25,7 @@
 
 from DumpO.DumpOTypes import NodeTemplate
 
-referenceTemplate = NodeTemplate("\
-${data_out_type}* ${data_out} = ${data_in} + (*(${indices}) * ${offset});\
-")
+referenceTemplate = NodeTemplate("""
+memcpy(${data_out}, ${data_in}, ${offset});
+""")
 
