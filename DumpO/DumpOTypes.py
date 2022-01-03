@@ -391,7 +391,7 @@ class NodeTypeChecker():
         env = [node.name for node in node.inputs + node.outputs]
         for key, value in parserDict.items():
             # check if the referenced buffer is in the environment
-            if value in env:
+            if isinstance(value, str) and value in env:
                 _buffer = ctxt.lookup(value)
                 self.typeDict[key + '_type'] = _buffer._type._name_
                     
@@ -662,9 +662,9 @@ class NetworkContainer():
             data_name = node.name
             data_size = node.shape
             # SCHEREMO: Should be parsed from graph
-            data_type = 2**32
+            data_type = 2**8
             nb = ctxt.VariableBuffer(data_name, data_size, data_type)
-            nb._type = self.Platform.DataTypes.int32_t
+            nb._type = self.Platform.DataTypes.int8_t
             ctxt.add(nb, 'global')
 
         return ctxt
@@ -928,4 +928,4 @@ class NetworkContainer():
         if not self.parsed or not self.bound:
             raise ValueError('You need to parse and bind the network before getting RAM Size!')
 
-        return self.getParameterSize() + self.getworstCaseBufferSize()
+        return self.getParameterSize() + self.getWorstCaseBufferSize()
