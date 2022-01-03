@@ -130,3 +130,10 @@ class TransposeLayer(ONNXLayer):
 class MHSALayer(ONNXLayer):
     def __init__(self, maps : List[NodeMapper]):
         super().__init__(maps)
+    def computeShapes(self, inputShapes: List[np.shape], outputShapes: List[np.shape], parserDict, channels_first) -> (List[np.shape], List[np.shape]):
+        inputShapes[4] = inputShapes[3][0]
+        inputShapes[6] = inputShapes[5][0]
+        inputShapes[8] = inputShapes[7][0]
+        inputShapes[10] = inputShapes[9][0]
+
+        return(inputShapes, outputShapes)

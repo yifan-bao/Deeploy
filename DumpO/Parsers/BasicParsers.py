@@ -535,8 +535,10 @@ class MHSAParser(NodeParser):
     def parseNode(self, node: gs.ir.node.Node) -> (bool):
 
         ret = all([
-            'attn_requant_mul' in node.attrs,
-            'attn_requant_div' in node.attrs,
+            'preattn_requant_mul' in node.attrs,
+            'preattn_requant_div' in node.attrs,
+            'postattn_requant_mul' in node.attrs,
+            'postattn_requant_div' in node.attrs,
             'wo_requant_mul' in node.attrs,
             'wo_requant_div' in node.attrs,
             'wq_requant_mul' in node.attrs,
@@ -559,15 +561,23 @@ class MHSAParser(NodeParser):
         
 
         if ret:
-            self.parserDict['attn_requant_mul'] = int(node.attrs['attn_requant_mul'].values)
-            self.parserDict['attn_requant_div'] = int(math.log2(int(node.attrs['attn_requant_div'].values)))
+            self.parserDict['preattn_requant_mul'] = int(node.attrs['preattn_requant_mul'].values) 
+            self.parserDict['preattn_requant_shift'] = int(node.attrs['preattn_requant_shift'].values)           
+            self.parserDict['preattn_requant_div'] = int(math.log2(int(node.attrs['preattn_requant_div'].values)))
+            self.parserDict['postattn_requant_mul'] = int(node.attrs['postattn_requant_mul'].values)
+            self.parserDict['postattn_requant_shift'] = int(node.attrs['postattn_requant_shift'].values)            
+            self.parserDict['postattn_requant_div'] = int(math.log2(int(node.attrs['postattn_requant_div'].values)))
             self.parserDict['wo_requant_mul'] = int(node.attrs['wo_requant_mul'].values)
+            self.parserDict['wo_requant_shift'] = int(node.attrs['wo_requant_shift'].values)            
             self.parserDict['wo_requant_div'] = int(math.log2(int(node.attrs['wo_requant_div'].values)))
             self.parserDict['wq_requant_mul'] = int(node.attrs['wq_requant_mul'].values)
+            self.parserDict['wq_requant_shift'] = int(node.attrs['wq_requant_shift'].values)            
             self.parserDict['wq_requant_div'] = int(math.log2(int(node.attrs['wq_requant_div'].values)))
             self.parserDict['wk_requant_mul'] = int(node.attrs['wk_requant_mul'].values)
+            self.parserDict['wk_requant_shift'] = int(node.attrs['wk_requant_shift'].values)
             self.parserDict['wk_requant_div'] = int(math.log2(int(node.attrs['wk_requant_div'].values)))
             self.parserDict['wv_requant_mul'] = int(node.attrs['wv_requant_mul'].values)
+            self.parserDict['wv_requant_shift'] = int(node.attrs['wv_requant_shift'].values)            
             self.parserDict['wv_requant_div'] = int(math.log2(int(node.attrs['wv_requant_div'].values)))
             self.parserDict['isoftmaxA'] = int(node.attrs['isoftmaxA'].values)
             self.parserDict['isoftmaxB'] = int(node.attrs['isoftmaxB'].values)
@@ -584,7 +594,7 @@ class MHSAParser(NodeParser):
         
         ctxt = ctxt.copy()
 
-        inputs = ['q', 'k', 'v', 'wq_weight', 'wq_bias' , 'wk_weight', 'wk_bias', 'wv_weight', 'wv_bias', 'wo_weight', 'wo_bias']
+        inputs = ['q', 'k', 'v', 'wq_weight', 'wq_bias', 'wk_weight', 'wk_bias' , 'wv_weight', 'wv_bias', 'wo_weight', 'wo_bias']
         outputs = ['data_out']
         
         for idx, inputNode in enumerate(node.inputs):
@@ -593,6 +603,7 @@ class MHSAParser(NodeParser):
             self.parserDict[outputs[idx]] = ctxt.lookup(outputNode.name).name
             
         self.parserDict['size'] = np.prod(ctxt.lookup(node.inputs[0].name).shape)
+        self.parserDict['q_shape'] = ctxt.lookup(node.inputs[0].name).shape
 
         return ctxt, True
 

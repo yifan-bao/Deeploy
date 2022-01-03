@@ -30,14 +30,14 @@ from DumpO.DumpOTypes import *
 from DumpO.Parsers.BasicParsers import *
 from DumpO.Bindings.BasicBindings import DataTypes
 
-def bindFCParams(ctxt, name, mul, shift, data_in, weight, parserDict,  parserDictPrefix =''):
+def bindFCParams(ctxt, name, mul, shift, data_in, weight, parserDict,  parserDictPrefix ='', bias=True):
 
     newCtxt = ctxt.copy()
-
+    
     parserDict['in_N'] = np.prod(data_in.shape[0:-1])
     parserDict['in_C'] = np.prod(data_in.shape[-1:])
     parserDict['weight_N'] = parserDict['in_C']
-    parserDict['weight_C'] = np.prod(weight.shape[0:1])
+    parserDict['weight_C'] = np.prod(weight.shape[0:-1])
     
     ctxtDict = {
         'buf': 0, #f'{name}_ctxt_buffer',  
@@ -96,7 +96,7 @@ def bindFCParams(ctxt, name, mul, shift, data_in, weight, parserDict,  parserDic
     parserDict[f'{parserDictPrefix}filter_dims'] = newCtxt.lookup(f'{name}_filter_dims').name
 
     outputDimsDict = {
-        'n': 1,
+        'n': parserDict['in_N'],
         'h': 1,
         'w': 1,
         'c': parserDict['weight_C']
@@ -108,7 +108,7 @@ def bindFCParams(ctxt, name, mul, shift, data_in, weight, parserDict,  parserDic
         'n': 1,
         'h': 1,
         'w': 1,
-        'c': parserDict['weight_C'],
+        'c': parserDict['weight_C'] * bias,
     }
     newCtxt.hoistStruct(biasDimsDict, f'{name}_bias_dims', 'cmsis_nn_dims')
     parserDict[f'{parserDictPrefix}bias_dims'] = newCtxt.lookup(f'{name}_bias_dims').name
@@ -537,32 +537,44 @@ class CMSISMHSAParser(MHSAParser):
         newCtxt, ret = super().parseNodeCtxt(ctxt, node)
 
         if ret:
-            inputs = ['q', 'k', 'v', 'wq_weight', 'wq_bias' , 'wk_weight', 'wk_bias', 'wv_weight', 'wv_bias', 'wo_weight', 'wo_bias']
-            s = ctxt.lookup(self.parserDict['q']).shape[1]
+            inputs = ['q', 'k', 'v', 'wq_weight', 'wq_bias','wk_weight', 'wk_bias', 'wv_weight', 'wv_bias', 'wo_weight', 'wo_bias']                    
+            s = newCtxt.lookup(self.parserDict['q']).shape[1]
 
-            data_in = ctxt.lookup(self.parserDict['q'])
-            weight = ctxt.lookup(self.parserDict['wq_weight'])
+            data_in = newCtxt.lookup(self.parserDict['q'])
+            bias = newCtxt.lookup(self.parserDict['wq_bias'])
+            weight = newCtxt.lookup(self.parserDict['wq_weight'])
+
             # Q FC layer:
-            newCtxt, self.parserDict = bindFCParams(newCtxt, node.name+"_wq", self.parserDict['wq_requant_mul'], self.parserDict['wq_requant_div'], data_in, weight, self.parserDict, "wq_")
+            newCtxt, self.parserDict = bindFCParams(newCtxt, node.name+"_wq", self.parserDict['wq_requant_mul'], self.parserDict['wq_requant_shift'], data_in, weight, self.parserDict, "wq_", bias = (np.prod(bias.shape) > 1))
 
-            data_in = ctxt.lookup(self.parserDict['k'])
-            weight = ctxt.lookup(self.parserDict['wk_weight'])
-            newCtxt, self.parserDict = bindFCParams(newCtxt, node.name+"_wk", self.parserDict['wk_requant_mul'], self.parserDict['wk_requant_div'], data_in, weight, self.parserDict, "wk_")
+            data_in = newCtxt.lookup(self.parserDict['k'])
+            bias = newCtxt.lookup(self.parserDict['wk_bias'])
+            weight = newCtxt.lookup(self.parserDict['wk_weight'])
 
-            data_in = ctxt.lookup(self.parserDict['v'])
-            weight = ctxt.lookup(self.parserDict['wv_weight'])
-            newCtxt, self.parserDict = bindFCParams(newCtxt, node.name+"_wv", self.parserDict['wv_requant_mul'], self.parserDict['wv_requant_div'], data_in, weight, self.parserDict, "wv_")
+            newCtxt, self.parserDict = bindFCParams(newCtxt, node.name+"_wk", self.parserDict['wk_requant_mul'], self.parserDict['wk_requant_shift'], data_in, weight, self.parserDict, "wk_", bias = (np.prod(bias.shape) > 1))
+
+            data_in = newCtxt.lookup(self.parserDict['v'])
+            bias = newCtxt.lookup(self.parserDict['wv_bias'])
+            weight = newCtxt.lookup(self.parserDict['wv_weight'])
+
+            newCtxt, self.parserDict = bindFCParams(newCtxt, node.name+"_wv", self.parserDict['wv_requant_mul'], self.parserDict['wv_requant_shift'], data_in, weight, self.parserDict, "wv_", bias = (np.prod(bias.shape) > 1))
 
             data_in= np.ones((1, data_in.shape[1], self.parserDict['heads']*self.parserDict['dim_head']))
-            weight = ctxt.lookup(self.parserDict['wo_weight'])
-            newCtxt, self.parserDict = bindFCParams(newCtxt, node.name+"_wo", self.parserDict['wo_requant_mul'], self.parserDict['wo_requant_div'], data_in, weight, self.parserDict, "wo_")
+            bias = newCtxt.lookup(self.parserDict['wo_bias'])
+            weight = newCtxt.lookup(self.parserDict['wo_weight'])
 
-            data_in = np.ones((s*self.parserDict['heads'],self.parserDict['dim_head']))
+            newCtxt, self.parserDict = bindFCParams(newCtxt, node.name+"_wo", self.parserDict['wo_requant_mul'], self.parserDict['wo_requant_shift'], data_in, weight, self.parserDict, "wo_", bias = (np.prod(bias.shape) > 1))
+
+            data_in = np.ones((s,self.parserDict['dim_head']))
             # K
-            weight = np.ones((s*self.parserDict['heads'],self.parserDict['dim_head']))
+            weight = np.ones((s,self.parserDict['dim_head']))
             
-            newCtxt, self.parserDict = bindFCParams(newCtxt, node.name+"_attn", self.parserDict['attn_requant_mul'], self.parserDict['attn_requant_div'], data_in, weight, self.parserDict, "attn_")
+            newCtxt, self.parserDict = bindFCParams(newCtxt, node.name+"_preattn", self.parserDict['preattn_requant_mul'], self.parserDict['preattn_requant_shift'], data_in, weight, self.parserDict, "preattn_", bias=False)
 
+            data_in = np.ones((s,s))
+            # K
+            weight = np.ones((self.parserDict['dim_head'],s))
             
-            #import IPython; IPython.embed()
+            newCtxt, self.parserDict = bindFCParams(newCtxt, node.name+"_postattn", self.parserDict['postattn_requant_mul'], self.parserDict['postattn_requant_shift'], data_in, weight, self.parserDict, "postattn_", bias=False)
+
         return newCtxt, ret

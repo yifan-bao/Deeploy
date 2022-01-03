@@ -25,4 +25,4 @@
 
 from DumpO.DumpOTypes import NodeTemplate
 
-referenceTemplate = NodeTemplate("SoftmaxKernel_s8(${data_in}, ${data_out}, ${size}, ${lastDimLength}, ${coeffA}, ${coeffB}, ${coeffC}, ${log2});")
+referenceTemplate = NodeTemplate("SoftmaxKernel_s8(${data_in}, ${data_out}, ${size}, ${lastDimLength}, ${coeffA}, ${coeffB}, ${coeffC}, ${log2}, ${n_levels});")

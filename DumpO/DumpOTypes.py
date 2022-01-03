@@ -231,13 +231,13 @@ class NetworkContext():
         allocCode = []
         
         # We have to free the input buffers, unless they are global OR we are not the last user
-        for buffer in inBuffers:
+        for buffer in list(set(inBuffers)):
             if self.is_local(buffer):
                 nb = copy.deepcopy(self.lookup(buffer))
                 # If we are the last user in the list, we can safely free
                 if nodeName == nb._users[-1]:
 
-                    assert self.localObjects[nb.name]._live == True, "Tried to deallocate already non-live buffer {nb.name}"
+                    assert self.localObjects[nb.name]._live == True, f'Tried to deallocate already non-live buffer {nb.name}'
                     self.localObjects[nb.name]._live = False
                     
                     nb.name = self._mangle(nb.name)

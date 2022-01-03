@@ -142,3 +142,35 @@ class MatMulRequantMergePass(ReplaceSequentialPatternPass):
     
         name = f"_MERGE_GEMM_MATMUL_RQ_PASS"
         super().__init__(graph, merge_gemm_rq_fun, name)    
+
+def align_mhsa_fun(ctxt: NetworkContext, graph: gs.Graph, match: Match, name: str):
+    matched_nodes = [m for k, m in match.nodes_map.items()]
+    mhsa = matched_nodes[0]
+        
+    for idx, name in enumerate(["wq", "wk",  "wv", "wo", "postattn", "preattn"]):
+        totalShift = 31-np.log2(mhsa.attrs[f'{name}_requant_div'].values)
+        # Reweight multiplicators:
+        # Get maximum:
+        maxMult = mhsa.attrs[f'{name}_requant_mul'].values.max()
+        # Get maximum shift possible:
+        MultShift = min(totalShift, np.floor(np.log2(2**31 - maxMult)))
+        # get remaining shift:
+        remainingShift = totalShift - MultShift
+
+        # shift mult:
+        mhsa.attrs[f'{name}_requant_mul'].values = mhsa.attrs[f'{name}_requant_mul'].values * 2**MultShift
+        mhsa.attrs[f'{name}_requant_shift'] = gs.Constant(name=f'{name}_requant_shift', values=np.array(remainingShift))
+
+    return ctxt, graph
+        
+class MHSAAlignmentPass(ReplaceSequentialPatternPass):
+    def __init__(self):
+        passes = []
+        graph = gs.Graph()
+        _input = gs.Variable(name='input_1')
+        output = graph.layer(inputs=[_input], outputs=['gemm_out'], op='MultiHeadSelfAttention', name='mhsa')
+        graph.outputs.append(output)
+        graph.inputs.append(_input)
+    
+        name = f"_ALIGN_MHSA_PASS"
+        super().__init__(graph, align_mhsa_fun, name)    
