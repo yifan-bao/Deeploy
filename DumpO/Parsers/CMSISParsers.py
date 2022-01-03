@@ -507,7 +507,7 @@ class CMSISGEMMParser(CMSISLinearParser):
             inputs = ['A', 'B', 'add']
                             
             for idx, inputNode in enumerate(node.inputs):
-                self.parserDict[inputs[idx]] = ctxt.lookup(inputNode.name).name
+                self.parserDict[inputs[idx]] = newCtxt.lookup(inputNode.name).name
                 
             # Hoist the structs to the global ctxt
             data_in = newCtxt.lookup(self.parserDict['A'])
