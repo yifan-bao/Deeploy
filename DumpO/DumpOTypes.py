@@ -642,6 +642,7 @@ class NetworkContainer():
 
         self.parsed = False
         self.bound = False
+        self.worstCaseBufferSize = 0
     
     # Don't override this
     def _createIOBindings(self, ctxt: NetworkContext, graph: gs.Graph):
@@ -732,15 +733,54 @@ class NetworkContainer():
             return True
         else:
             raise RuntimeError(f'Could not parse the graph!')
+
+    def getWorstCaseBufferSize(self) -> int:
+        if not self.parsed or not self.bound:
+            raise ValueError('You need to parse and bind the network before generating code!')
+
+        if self.worstCaseBufferSize == 0:
+            for _buffer in self.ctxt.localObjects.values():
+                assert _buffer._live == False, f'There is a memory leak in buffer {_buffer.name} before the generated forward pass!'
+
+            callStack = ''
+            for key, node in self.layerBinding.items():
+                self.ctxt, code = node.generate(self.ctxt)
+
+                currentBufferSize = 0
+                for _buffer in self.ctxt.localObjects.values():
+                    if _buffer._live == True:
+                        currentBufferSize += np.prod(_buffer.shape) * _buffer._type._value_//8
+                if currentBufferSize > self.worstCaseBufferSize:
+                    self.worstCaseBufferSize = currentBufferSize
+
+                for section in code:
+                    for substr in section:
+                        callStack += substr + '\n'
+
+            for _buffer in self.ctxt.localObjects.values():
+                assert _buffer._live == False, f'There is a memory leak in buffer {_buffer.name} in the generated forward pass!'
+
+        return self.worstCaseBufferSize
         
     # Don't override this
     def generateInferenceCode(self) -> str:
         if not self.parsed or not self.bound:
             raise ValueError('You need to parse and bind the network before generating code!')
         
+        for _buffer in self.ctxt.localObjects.values():
+            assert _buffer._live == False, f'There is a memory leak in buffer {_buffer.name} before the generated forward pass!'
+        
         callStack = ''
         for key, node in self.layerBinding.items():
             self.ctxt, code = node.generate(self.ctxt)
+
+            currentBufferSize = 0
+            for _buffer in self.ctxt.localObjects.values():
+                if _buffer._live == True:
+                    currentBufferSize += np.prod(_buffer.shape) * _buffer._type._value_//8
+            if currentBufferSize > self.worstCaseBufferSize:
+                self.worstCaseBufferSize = currentBufferSize
+            
             for section in code:
                 for substr in section:
                     callStack += substr + '\n'
@@ -825,8 +865,6 @@ class NetworkContainer():
         callStack = '\n'.join(lines)
                 
         return callStack
-
-
     
     def generateBufferAllocationCode(self) -> str:
 
@@ -886,26 +924,8 @@ class NetworkContainer():
         return size
 
     # Don't override this - Returns worst case layer and buffering size in bytes
-    def getWorstCaseBufferSize(self) -> (str, int):
-        if not self.parsed or not self.bound:
-            raise ValueError('You need to parse and bind the network before getting RAM Size!')
-
-        maxSize = 0
-        name = ''
-        for layerName, layer in self.layerBinding.items():
-            size = 0
-            for edgeNode in layer.node.inputs + layer.node.outputs:
-                _buffer = self.ctxt.lookup(edgeNode.name)
-                size += np.prod(_buffer.shape) * _buffer._type._value_//8
-            if size > maxSize:
-                maxSize = size
-                name = layerName
-
-        return (name, maxSize)
-
-    # Don't override this - Returns worst case layer and buffering size in bytes
     def getTotalSize(self) -> (str, int):
         if not self.parsed or not self.bound:
             raise ValueError('You need to parse and bind the network before getting RAM Size!')
 
-        return self.getParameterSize() + self.getWorstCaseBufferSize()[1]
+        return self.getParameterSize() + self.getworstCaseBufferSize()
