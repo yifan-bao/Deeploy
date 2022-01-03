@@ -919,7 +919,7 @@ class NetworkContainer():
         for _buffer in self.ctxt.globalObjects.values():
             # We do not count structs for now, since they are not properly modeled
             if isinstance(_buffer, ConstantBuffer):
-                size += (np.prod(_buffer.shape) * _buffer._type._value_ // 8)
+                size += int((np.prod(_buffer.shape) * _buffer._type._value_ // 8))
 
         return size
 
