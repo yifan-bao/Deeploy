@@ -26,5 +26,6 @@
 from DumpO.DumpOTypes import NodeTemplate
 
 referenceTemplate = NodeTemplate("""
-MHSAKernel_s8( ${q},${k},${v},${wq_weight},${wq_bias},${wk_weight},${wk_bias},${wv_weight},${wv_bias},${wo_weight},${wo_bias}, ${wq_requant_mul}, ${wq_requant_div},${wk_requant_mul}, ${wk_requant_div},${wv_requant_mul}, ${wv_requant_div},${wo_requant_mul}, ${wo_requant_div}, ${attn_requant_div}, ${attn_requant_mul}, ${dim}, ${dim_head}, ${heads}, ${isoftmaxA}, ${isoftmaxB}, ${isoftmaxC}, ${isoftmaxlog2}, ${n_levels});
+// W_Q * Q
+// arm_fully_connected_s8(&${wq_ctxt}, &${wq_fc_params}, &${wq_quant_params}, &${wq_input_dims}, ${q}, &${wq_filter_dims}, ${wq_weight}, &${wq_bias_dims}, ${wq_bias}, &${wq_output_dims}, ${data_out});
 """)

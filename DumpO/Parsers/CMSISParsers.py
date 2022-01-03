@@ -30,6 +30,91 @@ from DumpO.DumpOTypes import *
 from DumpO.Parsers.BasicParsers import *
 from DumpO.Bindings.BasicBindings import DataTypes
 
+def bindFCParams(ctxt, name, mul, shift, data_in, weight, parserDict,  parserDictPrefix =''):
+
+    newCtxt = ctxt.copy()
+
+    parserDict['in_N'] = np.prod(data_in.shape[0:-1])
+    parserDict['in_C'] = np.prod(data_in.shape[-1:])
+    parserDict['weight_N'] = parserDict['in_C']
+    parserDict['weight_C'] = np.prod(weight.shape[0:1])
+    
+    ctxtDict = {
+        'buf': 0, #f'{name}_ctxt_buffer',  
+        'size': 0
+    }
+
+    newCtxt.hoistStruct(ctxtDict, f'{name}_ctxt', 'cmsis_nn_context')
+    parserDict[f'{parserDictPrefix}ctxt'] = f'{name}_ctxt'
+
+    # activation
+    if parserDict[f'signed']:
+        activationDict = {
+            'min': -(parserDict[f'n_levels']//2),
+            'max': (parserDict[f'n_levels']//2) - 1
+        }
+    else:
+        activationDict = {
+            'min': 0,
+            'max': (parserDict[f'n_levels'])-1
+        }
+    newCtxt.hoistStruct(activationDict, f'{name}_activation', 'cmsis_nn_activation')
+
+    fcParamsDict = {
+        'input_offset': 0,
+        'filter_offset': 0,
+        'output_offset': 0,
+        'activation': newCtxt._mangle(newCtxt.lookup(f'{name}_activation').name),
+    }
+    newCtxt.hoistStruct(fcParamsDict, f'{name}_fc_params', 'cmsis_nn_fc_params')
+    parserDict[f'{parserDictPrefix}fc_params'] = newCtxt.lookup(f'{name}_fc_params').name
+
+    gemmQuantDict = {
+        'multiplier': mul,
+        'shift': shift,
+    }
+
+    newCtxt.hoistStruct(gemmQuantDict, f'{name}_quant_params', 'cmsis_nn_per_tensor_quant_params')
+    parserDict[f'{parserDictPrefix}quant_params'] = newCtxt.lookup(f'{name}_quant_params').name
+
+    inputDimsDict = {
+        'n': parserDict['in_N'],
+        'h': 1,
+        'w': 1,
+        'c': parserDict['in_C'],
+    }            
+    newCtxt.hoistStruct(inputDimsDict, f'{name}_input_dims', 'cmsis_nn_dims')
+    parserDict[f'{parserDictPrefix}input_dims'] = newCtxt.lookup(f'{name}_input_dims').name
+
+    filterDimsDict = {
+        'n': parserDict['weight_N'],
+        'h': 1,
+        'w': 1,
+        'c': parserDict['weight_C']
+    }
+    newCtxt.hoistStruct(filterDimsDict, f'{name}_filter_dims', 'cmsis_nn_dims')
+    parserDict[f'{parserDictPrefix}filter_dims'] = newCtxt.lookup(f'{name}_filter_dims').name
+
+    outputDimsDict = {
+        'n': 1,
+        'h': 1,
+        'w': 1,
+        'c': parserDict['weight_C']
+    }
+    newCtxt.hoistStruct(outputDimsDict, f'{name}_output_dims', 'cmsis_nn_dims')
+    parserDict[f'{parserDictPrefix}output_dims'] = newCtxt.lookup(f'{name}_output_dims').name
+
+    biasDimsDict = {
+        'n': 1,
+        'h': 1,
+        'w': 1,
+        'c': parserDict['weight_C'],
+    }
+    newCtxt.hoistStruct(biasDimsDict, f'{name}_bias_dims', 'cmsis_nn_dims')
+    parserDict[f'{parserDictPrefix}bias_dims'] = newCtxt.lookup(f'{name}_bias_dims').name
+    
+    return newCtxt, parserDict
+
 class CMSISMaxPool2DParser(MaxPool2DParser):
     def __init__(self):
         super().__init__()
@@ -428,90 +513,56 @@ class CMSISGEMMParser(CMSISLinearParser):
             data_in = newCtxt.lookup(self.parserDict['A'])
             data_out = newCtxt.lookup(self.parserDict['data_out'])
             weight = newCtxt.lookup(self.parserDict['B'])
-
-            self.parserDict['in_N'] = 1
-            self.parserDict['in_C'] = np.prod(data_in.shape[1:])
-            self.parserDict['weight_N'] = self.parserDict['in_C']
-            self.parserDict['weight_C'] = np.prod(weight.shape[0:1])
-                
-            # First the context
-            # https://review.trustedfirmware.org/plugins/gitiles/mirror/ARM-software/CMSIS_5/+/refs/heads/bias_for_conv/CMSIS/NN/Source/ConvolutionFunctions/arm_convolve_s8.c
             
-            ctxtDict = {
-                'buf': 0, #f'{node.name}_ctxt_buffer',  
-                'size': 0
-            }
-
-            newCtxt.hoistStruct(ctxtDict, f'{node.name}_ctxt', 'cmsis_nn_context')
-            self.parserDict['ctxt'] = f'{node.name}_ctxt'
-            
-            # activation
-            if self.parserDict['signed']:
-                activationDict = {
-                    'min': -(self.parserDict['n_levels']//2),
-                    'max': (self.parserDict['n_levels']//2) - 1
-                }
-            else:
-                activationDict = {
-                    'min': 0,
-                    'max': (self.parserDict['n_levels'])-1
-                }
-            newCtxt.hoistStruct(activationDict, f'{node.name}_activation', 'cmsis_nn_activation')
-                
-            fcParamsDict = {
-                'input_offset': 0,
-                'filter_offset': 0,
-                'output_offset': 0,
-                'activation': newCtxt._mangle(newCtxt.lookup(f'{node.name}_activation').name),
-            }
-            newCtxt.hoistStruct(fcParamsDict, f'{node.name}_fc_params', 'cmsis_nn_fc_params')
-            self.parserDict[f'fc_params'] = newCtxt.lookup(f'{node.name}_fc_params').name
-            
-            gemmQuantDict = {
-                'multiplier': self.parserDict['mul'],
-                'shift': self.parserDict['shift'],
-            }
-            
-            newCtxt.hoistStruct(gemmQuantDict, f'{node.name}_quant_params', 'cmsis_nn_per_tensor_quant_params')
-            self.parserDict['quant_params'] = newCtxt.lookup(f'{node.name}_quant_params').name
-
-            inputDimsDict = {
-                'n': self.parserDict['in_N'],
-                'h': 1,
-                'w': 1,
-                'c': self.parserDict['in_C'],
-            }            
-            newCtxt.hoistStruct(inputDimsDict, f'{node.name}_input_dims', 'cmsis_nn_dims')
-            self.parserDict['input_dims'] = newCtxt.lookup(f'{node.name}_input_dims').name
-
-            filterDimsDict = {
-                'n': self.parserDict['weight_N'],
-                'h': 1,
-                'w': 1,
-                'c': self.parserDict['weight_C']
-            }
-            newCtxt.hoistStruct(filterDimsDict, f'{node.name}_filter_dims', 'cmsis_nn_dims')
-            self.parserDict['filter_dims'] = newCtxt.lookup(f'{node.name}_filter_dims').name
-
-            outputDimsDict = {
-                'n': 1,
-                'h': 1,
-                'w': 1,
-                'c': self.parserDict['weight_C']
-            }
-            newCtxt.hoistStruct(outputDimsDict, f'{node.name}_output_dims', 'cmsis_nn_dims')
-            self.parserDict['output_dims'] = newCtxt.lookup(f'{node.name}_output_dims').name
-
-            biasDimsDict = {
-                'n': 1,
-                'h': 1,
-                'w': 1,
-                'c': self.parserDict['weight_C'],
-            }
-            newCtxt.hoistStruct(biasDimsDict, f'{node.name}_bias_dims', 'cmsis_nn_dims')
-            self.parserDict['bias_dims'] = newCtxt.lookup(f'{node.name}_bias_dims').name
+            newCtxt, self.parserDict = bindFCParams(newCtxt, node.name, self.parserDict['mul'], self.parserDict['shift'], data_in, weight, self.parserDict);
             
             return newCtxt, True
         
         else:
             return ctxt, False
+
+class CMSISMHSAParser(MHSAParser):
+    def __init__(self):
+        super().__init__()
+    
+    def parseNode(self, node: gs.ir.node.Node) -> (bool):
+
+        wellFormed = super().parseNode(node)
+        self.parserDict['signed'] = 1
+        return wellFormed
+
+    def parseNodeCtxt(self, ctxt: NetworkContext, node: gs.ir.node.Node, channels_first: bool = True) -> (NetworkContext, bool):
+        
+        ctxt = ctxt.copy()
+        newCtxt, ret = super().parseNodeCtxt(ctxt, node)
+
+        if ret:
+            inputs = ['q', 'k', 'v', 'wq_weight', 'wq_bias' , 'wk_weight', 'wk_bias', 'wv_weight', 'wv_bias', 'wo_weight', 'wo_bias']
+            s = ctxt.lookup(self.parserDict['q']).shape[1]
+
+            data_in = ctxt.lookup(self.parserDict['q'])
+            weight = ctxt.lookup(self.parserDict['wq_weight'])
+            # Q FC layer:
+            newCtxt, self.parserDict = bindFCParams(newCtxt, node.name+"_wq", self.parserDict['wq_requant_mul'], self.parserDict['wq_requant_div'], data_in, weight, self.parserDict, "wq_")
+
+            data_in = ctxt.lookup(self.parserDict['k'])
+            weight = ctxt.lookup(self.parserDict['wk_weight'])
+            newCtxt, self.parserDict = bindFCParams(newCtxt, node.name+"_wk", self.parserDict['wk_requant_mul'], self.parserDict['wk_requant_div'], data_in, weight, self.parserDict, "wk_")
+
+            data_in = ctxt.lookup(self.parserDict['v'])
+            weight = ctxt.lookup(self.parserDict['wv_weight'])
+            newCtxt, self.parserDict = bindFCParams(newCtxt, node.name+"_wv", self.parserDict['wv_requant_mul'], self.parserDict['wv_requant_div'], data_in, weight, self.parserDict, "wv_")
+
+            data_in= np.ones((1, data_in.shape[1], self.parserDict['heads']*self.parserDict['dim_head']))
+            weight = ctxt.lookup(self.parserDict['wo_weight'])
+            newCtxt, self.parserDict = bindFCParams(newCtxt, node.name+"_wo", self.parserDict['wo_requant_mul'], self.parserDict['wo_requant_div'], data_in, weight, self.parserDict, "wo_")
+
+            data_in = np.ones((s*self.parserDict['heads'],self.parserDict['dim_head']))
+            # K
+            weight = np.ones((s*self.parserDict['heads'],self.parserDict['dim_head']))
+            
+            newCtxt, self.parserDict = bindFCParams(newCtxt, node.name+"_attn", self.parserDict['attn_requant_mul'], self.parserDict['attn_requant_div'], data_in, weight, self.parserDict, "attn_")
+
+            
+            #import IPython; IPython.embed()
+        return newCtxt, ret

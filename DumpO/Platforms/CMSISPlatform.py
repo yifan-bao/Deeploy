@@ -42,7 +42,7 @@ from DumpO.OptimizationPasses.BasicPasses import *
 GELU_int8_Mapper = NodeMapper(iGELUParser(), [BasicGELUBinding])
 Softmax_int8_Mapper = NodeMapper(iSoftmaxParser(), [BasicSoftmaxBinding])
 iLayerNorm_int8_Mapper = NodeMapper(iLayerNormParser(), [CMSISLayerNormBinding])
-MHSA_int8_Mapper = NodeMapper(MHSAParser(), [CMSISMHSABinding])
+MHSA_int8_Mapper = NodeMapper(CMSISMHSAParser(), [CMSISMHSABinding])
 
 GatherMapper = NodeMapper(GatherParser(), BasicGatherBindings)
 ReshapeMapper = NodeMapper(ReshapeParser(), BasicReshapeBindings)
