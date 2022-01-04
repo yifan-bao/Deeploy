@@ -222,6 +222,191 @@ class CMSISMaxPool2DParser(MaxPool2DParser):
 
         return newCtxt, ret
 
+class CMSISDWConv2DParser(Conv2DParser):
+    def __init__(self, noBiasHoisting = True):
+        super().__init__(noBiasHoisting)
+    
+    def parseNode(self, node: gs.ir.node.Node) -> (bool):
+
+        wellFormed = super().parseNode(node)
+        if wellFormed:
+            ret = all([
+                # Make sure padding is square
+                node.op == 'RequantizedConv',
+                self.parserDict['pads'][0] == self.parserDict['pads'][2],
+                self.parserDict['pads'][1] == self.parserDict['pads'][3],
+                self.parserDict['pads'][0] == self.parserDict['pads'][1],
+                self.parserDict['pads'][0] == 0,
+                # Don't support dilations
+                #all([coeff == 1 for coeff in self.parserDict['dilations']]),
+                len(node.inputs) == 5,
+                'div' in node.attrs,
+                'n_levels' in node.attrs,
+                'signed' in node.attrs
+            ])
+            
+            if ret:
+                self.parserDict['dim_kernel_x'] = int(self.parserDict['kernel_shape'][0])
+                self.parserDict['dim_kernel_y'] = int(self.parserDict['kernel_shape'][1])
+                self.parserDict['dilation_x'] = int(self.parserDict['dilations'][0])
+                self.parserDict['dilation_y'] = int(self.parserDict['dilations'][1])
+                self.parserDict['padding_x'] = int(self.parserDict['pads'][0])
+                self.parserDict['padding_y'] = int(self.parserDict['pads'][1])
+                self.parserDict['stride_x'] = int(self.parserDict['strides'][0])
+                self.parserDict['stride_y'] = int(self.parserDict['strides'][1])
+                self.parserDict['bias_shift'] = int(0)
+                self.parserDict['out_shift'] = int(0)
+
+                self.parserDict['n_levels'] = int(node.attrs['n_levels'].values)
+                self.parserDict['signed'] = int(node.attrs['signed'].values)
+                self.parserDict['log2D'] = int(math.log2(node.attrs['div'].values))
+                
+            return ret
+    
+    def parseNodeCtxt(self, ctxt: NetworkContext, node: gs.ir.node.Node, channels_first: bool = True) -> (NetworkContext, bool):
+        
+        ctxt = ctxt.copy()
+        newCtxt, ret = super().parseNodeCtxt(ctxt, node)
+            
+        if ret:
+
+            if not self.parserDict['group'] == newCtxt.lookup(self.parserDict['weight']).shape[0]:
+                return ctxt, False
+
+            inputs = ['data_in', 'weight', 'mul', 'add', 'shift']
+            for idx, inputNode in enumerate(node.inputs):
+                self.parserDict[inputs[idx]] = newCtxt.lookup(inputNode.name).name
+                
+            data_in = newCtxt.lookup(self.parserDict['data_in'])
+            data_out = newCtxt.lookup(self.parserDict['data_out'])
+            weight = newCtxt.lookup(self.parserDict['weight'])
+
+            if not newCtxt.is_global(self.parserDict['weight']):
+                return ctxt, False
+
+            # SCHEREMO: Transpose weights to be num filters last
+            newCtxt.globalObjects[self.parserDict['weight']].values = np.transpose(weight.values, list(range(len(weight.shape)))[1:] + [0])
+            
+            if channels_first:
+                self.parserDict['ch_im_in'] = data_in.shape[1]
+                self.parserDict['dim_im_in_x'] = data_in.shape[2]
+                self.parserDict['dim_im_in_y'] = data_in.shape[3]
+                self.parserDict['ch_im_out'] = data_out.shape[1]
+                self.parserDict['dim_im_out_x'] = data_out.shape[2]
+                self.parserDict['dim_im_out_y'] = data_out.shape[3]
+            else:
+                self.parserDict['ch_im_in'] = data_in.shape[3]
+                self.parserDict['dim_im_in_x'] = data_in.shape[1]
+                self.parserDict['dim_im_in_y'] = data_in.shape[2]
+                self.parserDict['ch_im_out'] = data_out.shape[3]
+                self.parserDict['dim_im_out_x'] = data_out.shape[1]
+                self.parserDict['dim_im_out_y'] = data_out.shape[2]
+                
+            # Hoist the structs to the global ctxt
+
+            # First the context
+            # https://review.trustedfirmware.org/plugins/gitiles/mirror/ARM-software/CMSIS_5/+/refs/heads/bias_for_conv/CMSIS/NN/Source/ConvolutionFunctions/arm_convolve_s8.c
+            bufferSize = 2*self.parserDict['ch_im_in']*self.parserDict['dim_kernel_x']*self.parserDict['dim_kernel_y']*2 + 4
+
+            ctxtDict = {
+                'buf': 0, #f'{node.name}_ctxt_buffer',  
+                'size': bufferSize
+            }
+
+            newCtxt.hoistStruct(ctxtDict, f'{node.name}_ctxt', 'cmsis_nn_context')
+            self.parserDict['ctxt'] = f'{node.name}_ctxt'
+
+            # Next the conv params
+            # stride
+            strideDict = {
+                'w': self.parserDict['stride_x'],
+                'h': self.parserDict['stride_y']
+            }
+            newCtxt.hoistStruct(strideDict, f'{node.name}_stride', 'cmsis_nn_tile')
+            # padding
+            paddingDict = {
+                'w': self.parserDict['padding_x'],
+                'h': self.parserDict['padding_y']
+            }
+            newCtxt.hoistStruct(paddingDict, f'{node.name}_padding', 'cmsis_nn_tile')
+            # dilation
+            dilationDict = {
+                'w': self.parserDict['dilation_x'],
+                'h': self.parserDict['dilation_y']
+            }
+            newCtxt.hoistStruct(dilationDict, f'{node.name}_dilation', 'cmsis_nn_tile')
+            # activation
+            if self.parserDict['signed']:
+                activationDict = {
+                    'min': -(self.parserDict['n_levels']//2),
+                    'max': (self.parserDict['n_levels']//2) - 1
+                }
+            else:
+                activationDict = {
+                    'min': 0,
+                    'max': (self.parserDict['n_levels'])-1
+                }
+            newCtxt.hoistStruct(activationDict, f'{node.name}_activation', 'cmsis_nn_activation')
+                
+            convParamsDict = {
+                'input_offset': 0,
+                'output_offset': 0,
+                'ch_mult': 1,
+                'stride': ctxt._mangle(newCtxt.lookup(f'{node.name}_stride').name),
+                'padding': ctxt._mangle(newCtxt.lookup(f'{node.name}_padding').name),
+                'dilation': ctxt._mangle(newCtxt.lookup(f'{node.name}_dilation').name),
+                'activation': ctxt._mangle(newCtxt.lookup(f'{node.name}_activation').name),
+            }
+            newCtxt.hoistStruct(convParamsDict, f'{node.name}_dw_conv_params', 'cmsis_nn_dw_conv_params')
+            self.parserDict[f'dw_conv_params'] = newCtxt.lookup(f'{node.name}_dw_conv_params').name
+            
+            convQuantDict = {
+                'multiplier': ctxt._mangle(self.parserDict['mul']),
+                'shift': ctxt._mangle(self.parserDict['shift']),
+            }            
+            newCtxt.hoistStruct(convQuantDict, f'{node.name}_quant_params', 'cmsis_nn_per_channel_quant_params')
+            self.parserDict['quant_params'] = newCtxt.lookup(f'{node.name}_quant_params').name
+
+            inputDimsDict = {
+                'n': 1,
+                'h': self.parserDict['dim_im_in_x'],
+                'w': self.parserDict['dim_im_in_y'],
+                'c': self.parserDict['ch_im_in']
+            }            
+            newCtxt.hoistStruct(inputDimsDict, f'{node.name}_input_dims', 'cmsis_nn_dims')
+            self.parserDict['input_dims'] = newCtxt.lookup(f'{node.name}_input_dims').name
+
+            filterDimsDict = {
+                'n': 1,
+                'h': self.parserDict['dim_kernel_x'],
+                'w': self.parserDict['dim_kernel_y'],
+                'c': self.parserDict['ch_im_out']
+            }
+            newCtxt.hoistStruct(filterDimsDict, f'{node.name}_filter_dims', 'cmsis_nn_dims')
+            self.parserDict['filter_dims'] = newCtxt.lookup(f'{node.name}_filter_dims').name
+
+            outputDimsDict = {
+                'n': 1,
+                'h': self.parserDict['dim_im_out_x'],
+                'w': self.parserDict['dim_im_out_y'],
+                'c': self.parserDict['ch_im_out']
+            }
+            newCtxt.hoistStruct(outputDimsDict, f'{node.name}_output_dims', 'cmsis_nn_dims')
+            self.parserDict['output_dims'] = newCtxt.lookup(f'{node.name}_output_dims').name
+
+            biasDimsDict = {
+                'n': 1,
+                'h': 1,
+                'w': 1,
+                'c': self.parserDict['ch_im_out'],
+            }
+            newCtxt.hoistStruct(biasDimsDict, f'{node.name}_bias_dims', 'cmsis_nn_dims')
+            self.parserDict['bias_dims'] = newCtxt.lookup(f'{node.name}_bias_dims').name
+            
+            return newCtxt, True
+        
+        return ctxt, False
+
 
 class CMSISConv2DParser(Conv2DParser):
     def __init__(self, noBiasHoisting = True):
@@ -298,7 +483,7 @@ class CMSISConv2DParser(Conv2DParser):
 
             # First the context
             # https://review.trustedfirmware.org/plugins/gitiles/mirror/ARM-software/CMSIS_5/+/refs/heads/bias_for_conv/CMSIS/NN/Source/ConvolutionFunctions/arm_convolve_s8.c
-            bufferSize = 2*self.parserDict['ch_im_in']*self.parserDict['dim_kernel_x']*self.parserDict['dim_kernel_y']*2
+            bufferSize = 2*self.parserDict['ch_im_in']*self.parserDict['dim_kernel_x']*self.parserDict['dim_kernel_y']*2 
 
             ctxtDict = {
                 'buf': 0, #f'{node.name}_ctxt_buffer',  

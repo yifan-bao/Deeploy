@@ -477,7 +477,7 @@ class NodeMapper():
             newCtxt, ret = self.parser.parseNodeCtxt(hoistedCtxt, node, channels_first)
             return (newCtxt, ret)
         else:
-            raise ValueError(f'Parser {self.parser} failed - Layer is NOT parseable')
+            return ctxt, False
 
     # Don't override this. This should annotate the output node with the correct data type
     # SCHEREMO: Currently simply binds the first viable binding

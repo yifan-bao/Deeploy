@@ -203,7 +203,7 @@ def extract_padding_fun(ctxt: NetworkContext, graph: gs.Graph, match: Match, nam
     matched_nodes = [m for k, m in match.nodes_map.items()]
     attrs = {}
     conv = matched_nodes[0]
-    if 'pads' in conv.attrs:
+    if 'pads' in conv.attrs and np.sum(conv.attrs['pads'])>1:
         pads = copy.deepcopy(conv.attrs['pads'])
         shape = copy.deepcopy(conv.inputs[0].shape)
         newPads = np.zeros(2*len(shape))
@@ -245,6 +245,18 @@ class ExtractPaddingFromConvPass(ReplaceSequentialPatternPass):
         name = f"_EXTRACT_CONV_PASS"
         super().__init__(graph, extract_padding_fun, name)    
 
+class ExtractPaddingFromPoolPass(ReplaceSequentialPatternPass):
+    def __init__(self):
+        passes = []
+        graph = gs.Graph()
+        _input = gs.Variable(name='input_1')
+        output = graph.layer(inputs=[_input], outputs=['pool_out'], op='MaxPool', name='maxpool1')
+        graph.outputs.append(output)
+        graph.inputs = [_input]
+    
+        name = f"_EXTRACT_POOL_PASS"
+        super().__init__(graph, extract_padding_fun, name)    
+        
 def merge_rqs_add_fun(ctxt: NetworkContext, graph: gs.Graph, match: Match, name: str):
     matched_nodes = [m for k, m in match.nodes_map.items()]
     attrs = {}

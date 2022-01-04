@@ -51,6 +51,7 @@ RequantShiftMapper = NodeMapper(RequantShiftParser(), BasicRQSBindings)
 
 GEMM_int8_Mapper = NodeMapper(CMSISGEMMParser(), [CMSISGEMMBinding])
 Conv_int8_Mapper = NodeMapper(CMSISConv2DParser(), [CMSISConv2DBinding])
+DWConv_int8_Mapper = NodeMapper(CMSISDWConv2DParser(), [CMSISDW3x3Conv2DBinding])
 AddMapper = NodeMapper(AddParser(), BasicAddBindings)
 
 TransposeMapper = NodeMapper(TransposeParser(), BasicTransposeBindings)
@@ -60,7 +61,7 @@ MaxPool2DMapper = NodeMapper(CMSISMaxPool2DParser(), [CMSISMaxPool2DBinding])
 DummyMapper = NodeMapper(DummyParser(), [DummyBinding])
 
 CMSISMapping = {
-    'RequantizedConv' : RQSConvLayer([Conv_int8_Mapper]),
+    'RequantizedConv' : RQSConvLayer([Conv_int8_Mapper, DWConv_int8_Mapper]),
     'RequantizedGemm': RQSGEMMLayer([GEMM_int8_Mapper]),
     'RequantShift': RequantShiftLayer([RequantShiftMapper]),
     'MaxPool': MaxPoolLayer([MaxPool2DMapper]),
@@ -145,6 +146,6 @@ class SimpleStructBuffer(StructBuffer):
         return FreeTemplate.referenceLocalTemplate.generate(name=self.name)
     
     
-CMSISOptimizer = NetworkOptimizer([MHSAAlignmentPass(), MergeConstAddAndRequantPass(), ExtractPaddingFromConvPass(), ConvRequantMergePass(), GEMMRequantMergePass(), MatMulRequantMergePass()])
+CMSISOptimizer = NetworkOptimizer([MHSAAlignmentPass(), MergeConstAddAndRequantPass(), ExtractPaddingFromPoolPass(), ExtractPaddingFromConvPass(), ConvRequantMergePass(), GEMMRequantMergePass(), MatMulRequantMergePass()])
     
 CMSISPlatform = DeploymentPlatform(CMSISMapping, DataTypes, CMSISTypeInfer, SimpleNetworkBuffer, SimpleGlobalBuffer, SimpleStructBuffer)
