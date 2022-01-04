@@ -26,7 +26,8 @@
 from DumpO.DumpOTypes import NodeTemplate
 
 referenceTemplate = NodeTemplate("""
+// RQS
 for (int i=0;i<${size};i++){
-${data_out}[i] = (((int32_t)${data_in}[i] * ${mul}[i/(${size}/${channels})]) + ${add}[i/(${size}/${channels})]) >> ${log2D};
+${data_out}[i] = ( (${data_in}[i] * ${mul}[i%${channels}] + ((${data_in}[i] < 0) * ((1<<${log2D})-1)   )) + ${add}[i%${channels}]) >> ${log2D};
 }
 """)
