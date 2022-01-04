@@ -616,7 +616,6 @@ class iLayerNormParser(NodeParser):
         ret = all([
             'D' in node.attrs,
             'n_levels' in node.attrs,
-            'totScaler' in node.attrs,
             len(node.inputs) == 3,
             len(node.outputs) == 1
         ])
@@ -624,7 +623,6 @@ class iLayerNormParser(NodeParser):
 
         if ret:
             self.parserDict['n_levels'] = int(node.attrs['n_levels'].values)
-            self.parserDict['totScaler'] = int(node.attrs['totScaler'].values)
             self.parserDict['log2D'] = int(math.log2(node.attrs['D'].values))
 
         return ret
