@@ -39,7 +39,7 @@ memcpy(${data_out}+${x_offset_out}+${y_offset_out}, ${data_in}+${offset_in}, ${w
 
 referenceTemplate = NodeTemplate("""
 // Pad
-memset(${data_out}, 0, ${data_out_size}*sizeof(${data_out_type}));
+memset(${data_out}, ${value}, ${data_out_size}*sizeof(${data_out_type}));
 <%    
     y_offset_out = dim_im_out_ch*(pad_y*dim_im_out_x)
     x_offset_out = dim_im_out_ch*(pad_x)

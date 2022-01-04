@@ -27,6 +27,7 @@
 import copy
 from typing import NamedTuple
 import onnx_graphsurgeon as gs
+from functools import partial
 
 from DumpO.DumpOTypes import *
 from DumpO.Layers.BasicLayers import *
@@ -196,7 +197,7 @@ class PropagateRequantThroughAddPass(ReplaceSequentialPatternPass):
         name = f"_OPT_ADD_RQS_PASS"
         super().__init__(graph, propagate_requant_fun, name)    
 
-def extract_padding_fun(ctxt: NetworkContext, graph: gs.Graph, match: Match, name: str):
+def extract_padding_fun(ctxt: NetworkContext, graph: gs.Graph, match: Match, name: str, value = 0):
 
     ctxt = ctxt.copy()
     
@@ -224,7 +225,7 @@ def extract_padding_fun(ctxt: NetworkContext, graph: gs.Graph, match: Match, nam
         ctxt.add(ctxt.VariableBuffer().fromNode(newConvInput, ctxt.lookup(conv.inputs[0].name).nLevels))
         #valConst = gs.Constant('value', np.array(0))
         conv.attrs['pads'] = [0 for pad in conv.attrs['pads']]
-        newPad = gs.Node(op='Pad', name=name+'_pad', attrs={'pads': newPads, 'mode': 'constant', 'value': 0}, inputs=[conv.inputs[0]], outputs= [newConvInput])
+        newPad = gs.Node(op='Pad', name=name+'_pad', attrs={'pads': newPads, 'mode': 'constant', 'value': value}, inputs=[conv.inputs[0]], outputs= [newConvInput])
         
         conv.inputs[0] = newConvInput
         graph.nodes.append(newPad)
@@ -255,7 +256,8 @@ class ExtractPaddingFromPoolPass(ReplaceSequentialPatternPass):
         graph.inputs = [_input]
     
         name = f"_EXTRACT_POOL_PASS"
-        super().__init__(graph, extract_padding_fun, name)    
+        # SCHEREMO: This is a workaround!!!
+        super().__init__(graph, partial(extract_padding_fun, value=-128), name)    
         
 def merge_rqs_add_fun(ctxt: NetworkContext, graph: gs.Graph, match: Match, name: str):
     matched_nodes = [m for k, m in match.nodes_map.items()]
