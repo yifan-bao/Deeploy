@@ -48,6 +48,9 @@ class VariableBuffer():
         # Do not override - Should be written in the typechecking passes
         self._type = None
 
+        # Do not override - Should be written in the typechecking passes
+        self._signed = None
+        
         # Do not override - Should be written in the deployment passes
         self._live = False
 
@@ -199,11 +202,11 @@ class NetworkContext():
         if self.is_global(name):
             self.globalObjects[name]._type = _type
             self.globalObjects[name].nLevels = nLevels
-            self.globalObjects[name].signed = signedness
+            self.globalObjects[name].signed = bool(signedness)
         elif self.is_local(name):
             self.localObjects[name]._type = _type
             self.localObjects[name].nLevels = nLevels
-            self.localObjects[name].signed = signedness
+            self.localObjects[name].signed = bool(signedness)
         else:
             raise KeyError(f'Tried to annotate {name}, but it is in no Context')
         
@@ -327,7 +330,11 @@ class NodeTypeChecker():
     # Override this. This should compute the nLevels of each output node of the Layer
     def inferNumLevels(self, inputs: List[VariableBuffer], parserDict: Dict) -> List[int]:
         return [2**64 for type in self.output_types]
-        
+    
+    # Override this. This should compute the signednes of each output node of the Layer
+    def inferSignedness(self, inputs: List[VariableBuffer], parserDict: Dict) -> List[bool]:
+        return [True for type in self.output_types]
+    
     # Don't override this. This should check that the input n_levels are appropriate for the kernel
     def typeCheckNodeInputs(self, ctxt: NetworkContext, node: gs.ir.node.Node) -> bool:
         inputName = [i.name for i in node.inputs]
@@ -357,13 +364,19 @@ class NodeTypeChecker():
         
         inputName = [i.name for i in node.inputs]
         inputs = [newCtxt.lookup(name) for name in inputName]
-        
+
+        # numLevels propagation
         nLevelsList = self.inferNumLevels(inputs, parserDict)
+        # signedness propagation
+        signedness = self.inferSignedness(inputs, parserDict)
         
         outputNodes = node.outputs
         outputNames = [node.name for node in outputNodes]
-        for name, nLevels, output_type in zip(outputNames, nLevelsList, self.output_types):
-            newCtxt.annotateType(name, nLevels, output_type)
+        
+        for name, nLevels, output_type, sign in \
+            zip(outputNames, nLevelsList, self.output_types, signedness):
+                       
+            newCtxt.annotateType(name, nLevels, output_type, sign)
             
         return newCtxt
 
