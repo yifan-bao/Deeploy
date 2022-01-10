@@ -88,6 +88,9 @@ class ConstantBuffer(VariableBuffer):
         assert (np.abs(values - intArray)).max() < 0.001, "Constant value {name} is NOT an integer!"
         self.values = intArray
 
+        # Do not override - SCHEREMO: always assume signed constants!
+        self._signed = True
+
         # Do not override - ConstantBuffers are assumed to be always live!
         self._live = True
 
@@ -202,11 +205,11 @@ class NetworkContext():
         if self.is_global(name):
             self.globalObjects[name]._type = _type
             self.globalObjects[name].nLevels = nLevels
-            self.globalObjects[name].signed = bool(signedness)
+            self.globalObjects[name]._signed = bool(signedness)
         elif self.is_local(name):
             self.localObjects[name]._type = _type
             self.localObjects[name].nLevels = nLevels
-            self.localObjects[name].signed = bool(signedness)
+            self.localObjects[name]._signed = bool(signedness)
         else:
             raise KeyError(f'Tried to annotate {name}, but it is in no Context')
         
@@ -224,7 +227,6 @@ class NetworkContext():
                 nb.name = self._mangle(nb.name)
                 allocCode.append(nb.alloc())
 
-                
             elif self.is_global(buffer):
                 pass
             else:
@@ -247,7 +249,6 @@ class NetworkContext():
                     
                     nb.name = self._mangle(nb.name)
                     allocCode.append(nb.dealloc())
-
                     
             elif self.is_global(buffer):
                 pass
@@ -431,6 +432,10 @@ class NodeTemplate():
     #Override this. Reports internal size of the template (buffer size allocated in template) to the tool
     def internalSize(self) -> int:
         return 0
+
+    # Override this. Used to hoist optional structs, constants and so on to the GLOBAL context for specialized kernels
+    def hoistStatic(self, ctxt: NetworkContext, nodeRep: Dict) -> (NetworkContext, Dict):
+        return ctxt, nodeRep
     
     # Don't override this
     def __deepcopy__(self, memo):
@@ -455,19 +460,20 @@ class NodeBinding():
         self.template = template
 
     # Don't override this. This should annotate the output node with the correct data type
-    def bind(self, ctxt: NetworkContext, node:gs.ir.node.Node, typeInfer: Callable, parserDict) -> (NetworkContext, bool):
+    def bind(self, ctxt: NetworkContext, node:gs.ir.node.Node, typeInfer: Callable, nodeRep: Dict) -> (NetworkContext, Dict, bool):
         newCtxt = ctxt.copy()
-        newCtxt, ret = self.typeChecker.typeCheck(newCtxt, node, typeInfer, parserDict)
+        newCtxt, ret = self.typeChecker.typeCheck(newCtxt, node, typeInfer, nodeRep)
         if ret:
-            return (newCtxt, True)
+            newCtxt, nodeRep = self.template.hoistStatic(newCtxt, nodeRep)
+            return (newCtxt, nodeRep, True)
         else:
-            return (ctxt, False)
+            return (ctxt, nodeRep, False)
     
-    def generate(self, ctxt: NetworkContext, parserDict) -> List[str]:
+    def generate(self, ctxt: NetworkContext, nodeRep) -> List[str]:
 
         parseDict = {}
         
-        for key, value in parserDict.items():
+        for key, value in nodeRep.items():
             if type(value) == str and (ctxt.is_local(value) or ctxt.is_global(value)):
                 parseDict[key] = ctxt._mangle(value)
             else:
@@ -484,12 +490,15 @@ class NodeMapper():
         
         self.binder = None
         self.bound = False
+
+        self.nodeRep = None
         
     # Don't override this. Parses the networks with the correct data type
     def parse(self, ctxt: NetworkContext, node: gs.ir.node.Node, channels_first: bool) -> (NetworkContext, bool):
         hoistedCtxt, parseable = self.parser.parse(ctxt, node)
         if parseable:
             newCtxt, ret = self.parser.parseNodeCtxt(hoistedCtxt, node, channels_first)
+            self.nodeRep = self.parser.parserDict
             return (newCtxt, ret)
         else:
             return ctxt, False
@@ -499,8 +508,9 @@ class NodeMapper():
     def bind(self, ctxt: NetworkContext, node:gs.ir.node.Node, typeInfer: Callable) -> (NetworkContext, bool):
         for binder in self.bindings:
             newCtxt = ctxt.copy()
-            newCtxt, ret = binder.bind(newCtxt, node, typeInfer, self.parser.parserDict)
+            newCtxt, nodeRep, ret = binder.bind(newCtxt, node, typeInfer, self.nodeRep)
             if ret:
+                self.nodeRep = nodeRep
                 self.binder = binder
                 self.bound = True
                 return (newCtxt, True)

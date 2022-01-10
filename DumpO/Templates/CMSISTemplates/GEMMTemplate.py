@@ -23,8 +23,28 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from DumpO.DumpOTypes import NodeTemplate
+from typing import Dict
+from mako.template import Template
 
-LinearTemplate = NodeTemplate("\
-arm_fully_connected_s8(&${ctxt}, &${fc_params}, &${quant_params}, &${input_dims}, ${A}, &${filter_dims}, ${B}, &${bias_dims}, ${add}, &${output_dims}, ${data_out});\
+from DumpO.DumpOTypes import NodeTemplate, NetworkContext
+from .CMSISUtils import bindFCParams
+
+class _GEMMTemplate(NodeTemplate):
+    def __init__(self, templateStr):
+        self.template = Template(templateStr)
+
+    def hoistStatic(self, ctxt: NetworkContext, nodeRep: Dict) -> (NetworkContext, Dict):
+        inputs = ['A', 'B', 'add']
+
+        # Hoist the structs to the global ctxt
+        data_in = ctxt.lookup(nodeRep['A'])
+        data_out = ctxt.lookup(nodeRep['data_out'])
+        weight = ctxt.lookup(nodeRep['B'])
+
+        ctxt, nodeRep = bindFCParams(ctxt, nodeRep['data_out'], nodeRep['mul'], nodeRep['shift'], data_in, weight, nodeRep);
+
+        return ctxt, nodeRep
+
+LinearTemplate = _GEMMTemplate("\
+arm_fully_connected_s8(&${ctxt}, &${fc_params}, &${quant_params}, &${input_dims}, ${A}, &${filter_dims}, ${B}, &${bias_dims}, ${C}, &${output_dims}, ${data_out});\
 ")

@@ -33,7 +33,7 @@ from DumpO.Templates.CMSISTemplates import *
 
 from DumpO.Templates.BasicTemplates import AddTemplate as AddTemplate
 
-CMSISConv2DBinding = NodeBinding(CMSISConvChecker([DataTypes.int8_t, DataTypes.int8_t, DataTypes.int32_t, DataTypes.int32_t,DataTypes.int32_t], [DataTypes.int8_t]), ConvTemplate.conv2DTemplate)
+CMSISConv2DBinding = NodeBinding(CMSISConvChecker([DataTypes.int8_t, DataTypes.int8_t, DataTypes.int32_t, DataTypes.int32_t,DataTypes.int32_t], [DataTypes.int8_t]), ConvTemplate.cmsisTemplate)
 CMSISDW3x3Conv2DBinding = NodeBinding(CMSISConvChecker([DataTypes.int8_t, DataTypes.int8_t, DataTypes.int32_t, DataTypes.int32_t,DataTypes.int32_t], [DataTypes.int8_t]), DWConvTemplate.convTemplate)
 CMSISGEMMBinding = NodeBinding(CMSISLinearChecker([DataTypes.int8_t, DataTypes.int8_t, DataTypes.int32_t], [DataTypes.int8_t]), GEMMTemplate.LinearTemplate)
 CMSISMaxPool2DBinding = NodeBinding(CMSISMaxPoolChecker([DataTypes.int8_t], [DataTypes.int8_t]), MaxPool2DTemplate.cmsisTemplate)
