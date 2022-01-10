@@ -87,7 +87,7 @@ def merge_gemm_rq_fun(ctxt: NetworkContext, graph: gs.Graph, match: Match, name:
     totalShift = 31-np.log2(rqs.attrs['div'].values)
     
     rqs.inputs[-1].values = np.round(rqs.inputs[-1].values / rqs.inputs[-2].values) # normalize add
-
+    
     # Reweight multiplicators:
     # Get maximum:
     maxMult = rqs.inputs[1].values.max()

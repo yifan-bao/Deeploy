@@ -27,7 +27,7 @@ from DumpO.DumpOTypes import NodeTemplate
 
 referenceTemplate = NodeTemplate("""
 // Transpose
-${data_out_type}* dummy_${data_out} = ${data_out};
+${data_out_type._name_}* dummy_${data_out} = ${data_out};
 <% 
     dimStr = ''
     accessStr = ''
@@ -47,7 +47,7 @@ ${data_out_type}* dummy_${data_out} = ${data_out};
 %>
 for(int i_${i} = 0; i_${i}<${shape}; i_${i}++){
 % endfor
-*dummy_${data_out}++ = ((${data_in_type} (*)${shapeStr})${data_in})${accessStr};
+*dummy_${data_out}++ = ((${data_in_type._name_} (*)${shapeStr})${data_in})${accessStr};
 % for idx, i in enumerate(perm):
 }
 % endfor

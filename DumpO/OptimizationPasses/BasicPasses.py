@@ -292,3 +292,4 @@ class MergeConstAddAndRequantPass(ReplaceSequentialPatternPass):
     
         name = f"_MERGE_RQS_ADD_PASS"
         super().__init__(graph, merge_rqs_add_fun, name)    
+

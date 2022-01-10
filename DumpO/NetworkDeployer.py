@@ -89,7 +89,6 @@ class NetworkDeployer(NetworkContainer):
             newShape = []
             for i in shape:
                 newShape.append(node.shape[i])
-
             return newShape
         
         newlayerBindings = []

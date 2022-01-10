@@ -192,16 +192,18 @@ class NetworkContext():
         else:
             self.globalObjects[_buffer.name] = _buffer
             
-    def annotateType(self, name: str, nLevels: int, _type: Enum):
+    def annotateType(self, name: str, nLevels: int, _type: Enum, signedness: bool = True):
         obj = self.lookup(name)
         if 2**(_type._value_) < nLevels:
             raise ValueError(f'Tried to annotate {name} with {_type}, but {name} has {nLevels} nLevels!')
         if self.is_global(name):
             self.globalObjects[name]._type = _type
             self.globalObjects[name].nLevels = nLevels
+            self.globalObjects[name].signed = signedness
         elif self.is_local(name):
             self.localObjects[name]._type = _type
             self.localObjects[name].nLevels = nLevels
+            self.localObjects[name].signed = signedness
         else:
             raise KeyError(f'Tried to annotate {name}, but it is in no Context')
         
@@ -393,7 +395,7 @@ class NodeTypeChecker():
             # check if the referenced buffer is in the environment
             if isinstance(value, str) and value in env:
                 _buffer = ctxt.lookup(value)
-                self.typeDict[key + '_type'] = _buffer._type._name_
+                self.typeDict[key + '_type'] = _buffer._type
                     
     # Don't override this. Automated type checking
     def typeCheck(self, ctxt: NetworkContext, node: gs.ir.node.Node, typeInfer: Callable, parserDict) -> (NetworkContext, bool):

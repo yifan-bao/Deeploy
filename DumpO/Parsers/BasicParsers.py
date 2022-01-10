@@ -397,6 +397,7 @@ class ReshapeParser(NodeParser):
         for idx, outputNode in enumerate(node.outputs):
             self.parserDict[outputs[idx]] = ctxt.lookup(outputNode.name).name
 
+            
         self.parserDict['size'] = np.prod(ctxt.lookup(node.inputs[0].name).shape)
 
         return ctxt, True    

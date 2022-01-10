@@ -27,11 +27,5 @@ from DumpO.DumpOTypes import NodeTemplate
 
 referenceTemplate = NodeTemplate("""
 // RQS
-do{
-int32_t intermediate;
-for (int i=0;i<${size};i++){
-intermediate = (int32_t)${data_in}[i] * ${mul}[i%${channels}] + ${add}[i%${channels}];
-${data_out}[i] = ((intermediate + (1<<(${log2D}-1)) ) >> ${log2D});
-}
-}while(0);
+RequantShift_s${data_in_type._value_}(${data_in}, ${size}, ${mul}, ${add}, ${data_out}, ${log2D}, ${channels});
 """)
