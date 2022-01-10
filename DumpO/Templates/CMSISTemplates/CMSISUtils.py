@@ -44,24 +44,45 @@ def bindFCParams(ctxt, name, mul, shift, data_in, weight, nodeRep,  nodeRepPrefi
     nodeRep[f'{nodeRepPrefix}ctxt'] = f'{name}_ctxt'
 
     # activation
-    if nodeRep[f'signed']:
-        activationDict = {
-            'min': -(nodeRep[f'n_levels']//2),
-            'max': (nodeRep[f'n_levels']//2) - 1
-        }
-    else:
-        activationDict = {
-            'min': 0,
-            'max': (nodeRep[f'n_levels'])-1
-        }
-    ctxt.hoistStruct(activationDict, f'{name}_activation', 'cmsis_nn_activation')
-
-    fcParamsDict = {
-        'input_offset': 0,
-        'filter_offset': 0,
-        'output_offset': 0,
-        'activation': ctxt._mangle(ctxt.lookup(f'{name}_activation').name),
+    activationDict = {
+        'min': -(nodeRep[f'n_levels']//2),
+        'max': (nodeRep[f'n_levels']//2) - 1
     }
+
+    # if nodeRep[f'signed']:
+    #     activationDict = {
+    #         'min': -(nodeRep[f'n_levels']//2),
+    #         'max': (nodeRep[f'n_levels']//2) - 1
+    #     }
+    # else:
+    #     activationDict = {
+    #         'min': 0,
+    #         'max': (nodeRep[f'n_levels'])-1
+    #     }
+        
+    ctxt.hoistStruct(activationDict, f'{name}_activation', 'cmsis_nn_activation')
+    
+    data_out = ctxt.lookup(nodeRep['data_out'])
+
+    # SCHEREMO: Workaround for MHSA:
+    if not hasattr(data_in, '_signed') or not hasattr(data_out, '_signed'):
+    
+        fcParamsDict = {
+            'input_offset': 0,
+            'output_offset': 0,
+            'filter_offset': 0,
+            'activation': ctxt._mangle(ctxt.lookup(f'{name}_activation').name),
+        }
+
+    else:
+
+        fcParamsDict = {
+            'input_offset': (data_in._signed == 0) * nodeRep['n_levels']//2,
+            'output_offset': -(data_out._signed == 0) * nodeRep['n_levels']//2,
+            'filter_offset': 0,
+            'activation': ctxt._mangle(ctxt.lookup(f'{name}_activation').name),
+        }
+        
     ctxt.hoistStruct(fcParamsDict, f'{name}_fc_params', 'cmsis_nn_fc_params')
     nodeRep[f'{nodeRepPrefix}fc_params'] = ctxt.lookup(f'{name}_fc_params').name
 

@@ -2,6 +2,7 @@ from .iGELUTemplate import *
 from .iSoftmaxTemplate import *
 from .iLayernormTemplate import *
 from .RequantShiftTemplate import *
+from .ReshapeTemplate import *
 from .SkipTemplate import *
 from .AllocateTemplate import *
 from .FreeTemplate import *

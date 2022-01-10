@@ -33,7 +33,7 @@ class _MaxPool2DTemplate(NodeTemplate):
     def __init__(self, templateStr):
         self.template = Template(templateStr)
 
-    def hoistStatic(self, ctxt: NetworkContext, nodeRep: Dict) -> (NetworkContext, Dict):
+    def alignToContext(self, ctxt: NetworkContext, nodeRep: Dict) -> (NetworkContext, Dict):
         ctxt = ctxt.copy()
 
         data_out_name = nodeRep['data_out']

@@ -23,7 +23,24 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from DumpO.DumpOTypes import NodeTemplate
+from typing import Dict
+from mako.template import Template
 
-referenceTemplate = NodeTemplate("type* ${data} = ${shape};")
+from DumpO.DumpOTypes import NodeTemplate, NetworkContext
+
+class _ReshapeTemplate(NodeTemplate):
+    def __init__(self, templateStr):
+        self.template = Template(templateStr)
+
+    def alignToContext(self, ctxt: NetworkContext, nodeRep: Dict) -> (NetworkContext, Dict):
+        ctxt = ctxt.copy()
+
+        # SCHEREMO: Selectively mark 'indices' dead, since we don't need them
+        if 'indices' in nodeRep.keys():
+            ctxt.globalObjects[nodeRep['indices']]._deploy = False
+            ctxt.globalObjects[nodeRep['indices']]._live = False
+        
+        return ctxt, nodeRep
+
+referenceTemplate = _ReshapeTemplate("${data_out} = ${data_in};")
 

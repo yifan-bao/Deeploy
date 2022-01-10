@@ -33,7 +33,7 @@ class _GEMMTemplate(NodeTemplate):
     def __init__(self, templateStr):
         self.template = Template(templateStr)
 
-    def hoistStatic(self, ctxt: NetworkContext, nodeRep: Dict) -> (NetworkContext, Dict):
+    def alignToContext(self, ctxt: NetworkContext, nodeRep: Dict) -> (NetworkContext, Dict):
         inputs = ['A', 'B', 'add']
 
         # Hoist the structs to the global ctxt

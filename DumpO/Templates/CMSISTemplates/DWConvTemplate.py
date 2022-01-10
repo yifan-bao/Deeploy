@@ -33,7 +33,7 @@ class _Conv2DDWTemplate(NodeTemplate):
     def __init__(self, templateStr):
         self.template = Template(templateStr)
 
-    def hoistStatic(self, ctxt: NetworkContext, nodeRep: Dict) -> (NetworkContext, Dict):
+    def alignToContext(self, ctxt: NetworkContext, nodeRep: Dict) -> (NetworkContext, Dict):
         ctxt = ctxt.copy()
         
         # Hoist the structs to the global ctxt
@@ -72,21 +72,30 @@ class _Conv2DDWTemplate(NodeTemplate):
         }
         ctxt.hoistStruct(dilationDict, f'{data_out_name}_dilation', 'cmsis_nn_tile')
         # activation
-        if nodeRep['signed']:
-            activationDict = {
-                'min': -(nodeRep['n_levels']//2),
-                'max': (nodeRep['n_levels']//2) - 1
-            }
-        else:
-            activationDict = {
-                'min': 0,
-                'max': (nodeRep['n_levels'])-1
-            }
+        activationDict = {
+            'min': -(nodeRep['n_levels']//2),
+            'max': (nodeRep['n_levels']//2) - 1
+        }
+
+        # if nodeRep[f'signed']:
+        #     activationDict = {
+        #         'min': -(nodeRep[f'n_levels']//2),
+        #         'max': (nodeRep[f'n_levels']//2) - 1
+        #     }
+        # else:
+        #     activationDict = {
+        #         'min': 0,
+        #         'max': (nodeRep[f'n_levels'])-1
+        #     }
+            
         ctxt.hoistStruct(activationDict, f'{data_out_name}_activation', 'cmsis_nn_activation')
 
+        data_in = ctxt.lookup(nodeRep['data_in'])
+        data_out = ctxt.lookup(nodeRep['data_out'])
+        
         convParamsDict = {
-            'input_offset': 0,
-            'output_offset': 0,
+            'input_offset': (data_in._signed == 0) * nodeRep['n_levels']//2,
+            'output_offset': -(data_out._signed == 0) * nodeRep['n_levels']//2,
             'ch_mult': 1,
             'stride': ctxt._mangle(ctxt.lookup(f'{data_out_name}_stride').name),
             'padding': ctxt._mangle(ctxt.lookup(f'{data_out_name}_padding').name),

@@ -54,6 +54,10 @@ class VariableBuffer():
         # Do not override - Should be written in the deployment passes
         self._live = False
 
+        # Do not override - Set in Templates depending on platform
+        self._deploy = True
+
+        
     def init(self) -> str:
         return ''
         
@@ -388,7 +392,7 @@ class NodeTypeChecker():
         for inputNode, _type in zip(node.inputs, self.input_types):
             if isinstance(ctxt.lookup(inputNode.name),ConstantBuffer):
                 
-                # SPECIAL CASE HANDLING: CONSTANT WAS NOT FOLDED CORRECTLY                
+                # SCHEREMO: SPECIAL CASE HANDLING: CONSTANT WAS NOT FOLDED CORRECTLY                
                 if len(inputNode.inputs) == 1 and hasattr(inputNode.inputs[0], 'attrs') and 'value' in list(inputNode.inputs[0].attrs.keys()):
                     typeNode = inputNode.inputs[0].attrs['value']
                 else:
@@ -434,7 +438,7 @@ class NodeTemplate():
         return 0
 
     # Override this. Used to hoist optional structs, constants and so on to the GLOBAL context for specialized kernels
-    def hoistStatic(self, ctxt: NetworkContext, nodeRep: Dict) -> (NetworkContext, Dict):
+    def alignToContext(self, ctxt: NetworkContext, nodeRep: Dict) -> (NetworkContext, Dict):
         return ctxt, nodeRep
     
     # Don't override this
@@ -464,7 +468,7 @@ class NodeBinding():
         newCtxt = ctxt.copy()
         newCtxt, ret = self.typeChecker.typeCheck(newCtxt, node, typeInfer, nodeRep)
         if ret:
-            newCtxt, nodeRep = self.template.hoistStatic(newCtxt, nodeRep)
+            newCtxt, nodeRep = self.template.alignToContext(newCtxt, nodeRep)
             return (newCtxt, nodeRep, True)
         else:
             return (ctxt, nodeRep, False)
@@ -678,9 +682,10 @@ class NetworkContainer():
             data_name = node.name
             data_size = node.shape
             # SCHEREMO: Should be parsed from graph
-            data_type = 2**8
+            data_type = 2**7
             nb = ctxt.VariableBuffer(data_name, data_size, data_type)
             nb._type = self.Platform.DataTypes.int8_t
+            nb._signed = True
             ctxt.add(nb, 'global')
 
         for node in graph.outputs:
@@ -851,10 +856,11 @@ class NetworkContainer():
         outputNum = 0
         for node in ctxt.globalObjects.values():
             if isinstance(node, VariableBuffer) and not isinstance(node, (StructBuffer, ConstantBuffer)):
-                name = node.name
-                node.name = ctxt._mangle(node.name)
-                callStack += "extern " + node.init()
-                node.name = name
+                if node._deploy:
+                    name = node.name
+                    node.name = ctxt._mangle(node.name)
+                    callStack += "extern " + node.init()
+                    node.name = name
 
         lines = callStack.split('\n')
         lines = [line for line in lines if line.strip()]
@@ -873,10 +879,11 @@ class NetworkContainer():
         callStack = ''
         for node in ctxt.globalObjects.values():
             if isinstance(node, VariableBuffer) and not isinstance(node, StructBuffer):
-                name = node.name
-                node.name = ctxt._mangle(node.name)
-                callStack += node.init()
-                node.name = name
+                if node._deploy:
+                    name = node.name
+                    node.name = ctxt._mangle(node.name)
+                    callStack += node.init()
+                    node.name = name
 
         for node in ctxt.globalObjects.values():
             if isinstance(node, StructBuffer):
@@ -892,16 +899,19 @@ class NetworkContainer():
         return callStack
     
     def generateBufferAllocationCode(self) -> str:
+        if not self.parsed or not self.bound:
+            raise ValueError('You need to parse and bind the network before generating code!')
 
         ctxt = self.ctxt.copy()
         callStack = ''
         
         for node in ctxt.globalObjects.values():
             if isinstance(node, VariableBuffer) and not isinstance(node, StructBuffer):
-                name = node.name
-                node.name = ctxt._mangle(node.name)
-                callStack += node.alloc()
-                node.name = name
+                if node._deploy:
+                    name = node.name
+                    node.name = ctxt._mangle(node.name)
+                    callStack += node.alloc()
+                    node.name = name
 
         for node in ctxt.globalObjects.values():
             if isinstance(node, StructBuffer):
@@ -925,8 +935,9 @@ class NetworkContainer():
         
         callStack = ''
         for node in self.ctxt.globalObjects.values():
-            node.name = ctxt._mangle(node.name)
-            callStack += node.dealloc() + '\n'
+            if node._deploy:
+                node.name = ctxt._mangle(node.name)
+                callStack += node.dealloc() + '\n'
 
         lines = callStack.split('\n')
         lines = [line for line in lines if line.strip()]
@@ -943,7 +954,7 @@ class NetworkContainer():
         size = 0
         for _buffer in self.ctxt.globalObjects.values():
             # We do not count structs for now, since they are not properly modeled
-            if isinstance(_buffer, ConstantBuffer):
+            if isinstance(_buffer, ConstantBuffer) and _buffer._deploy:
                 size += int((np.prod(_buffer.shape) * _buffer._type._value_ // 8))
 
         return size

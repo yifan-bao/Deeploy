@@ -39,7 +39,8 @@ BasicGEMMBinding = NodeBinding(GEMMChecker([DataTypes.int8_t, DataTypes.int8_t],
 BasicConv2DBinding = NodeBinding(ConvChecker([DataTypes.int8_t, DataTypes.int8_t], [DataTypes.int32_t]), DummyTemplate.referenceTemplate)
 
 BasicGatherBindings = [NodeBinding(GatherChecker([type, DataTypes.int32_t],[type]), GatherTemplate.referenceTemplate) for type in DataTypes]
-BasicReshapeBindings = [NodeBinding(ReshapeChecker([type, DataTypes.int32_t],[type]), SkipTemplate.referenceTemplate) for type in DataTypes]
+BasicReshapeBindings = [NodeBinding(ReshapeChecker([type, DataTypes.int32_t],[type]), ReshapeTemplate.referenceTemplate) for type in DataTypes]
+
 BasicTransposeBindings = [NodeBinding(TransposeChecker([type],[type]), TransposeTemplate.referenceTemplate) for type in DataTypes]
 BasicRQSBindings = [NodeBinding(RequantShiftChecker([type,DataTypes.int32_t,DataTypes.int32_t], [DataTypes.int8_t]), RequantShiftTemplate.referenceTemplate) for type in DataTypes]
 

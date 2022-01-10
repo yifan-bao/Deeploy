@@ -23,9 +23,29 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from DumpO.DumpOTypes import NodeTemplate
 
-unrolledTemplate = NodeTemplate("""
+from typing import Dict
+from mako.template import Template
+
+from DumpO.DumpOTypes import NodeTemplate, NetworkContext
+
+class _Pad2DTemplate(NodeTemplate):
+    def __init__(self, templateStr):
+        self.template = Template(templateStr)
+
+    def alignToContext(self, ctxt: NetworkContext, nodeRep: Dict) -> (NetworkContext, Dict):
+        ctxt = ctxt.copy()
+
+        # Align padding value to input signedness
+
+        data_in = ctxt.lookup(nodeRep['data_in'])
+        assert data_in._signed is not None
+        if data_in._signed == False:
+            nodeRep['value'] = nodeRep['value'] - int(data_in.nLevels/2)
+
+        return ctxt, nodeRep
+
+unrolledTemplate = _Pad2DTemplate("""
 memset(${data_out}, 0, ${data_out_size}*sizeof(${data_out_type._name_}));
 % for h in range(dim_im_in_y):
 <%    
@@ -37,7 +57,7 @@ memset(${data_out}, 0, ${data_out_size}*sizeof(${data_out_type._name_}));
 memcpy(${data_out}+${x_offset_out}+${y_offset_out}, ${data_in}+${offset_in}, ${width}*sizeof(${data_out_type._name_})); 
 % endfor""")
 
-referenceTemplate = NodeTemplate("""
+referenceTemplate = _Pad2DTemplate("""
 // Pad
 memset(${data_out}, ${value}, ${data_out_size}*sizeof(${data_out_type._name_}));
 <%    

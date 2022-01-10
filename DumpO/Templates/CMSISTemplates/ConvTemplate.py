@@ -33,7 +33,7 @@ class _Conv2DTemplate(NodeTemplate):
     def __init__(self, templateStr):
         self.template = Template(templateStr)
 
-    def hoistStatic(self, ctxt: NetworkContext, nodeRep: Dict) -> (NetworkContext, Dict):
+    def alignToContext(self, ctxt: NetworkContext, nodeRep: Dict) -> (NetworkContext, Dict):
         ctxt = ctxt.copy()
 
         data_out_name = nodeRep['data_out']
@@ -72,21 +72,32 @@ class _Conv2DTemplate(NodeTemplate):
         }
         ctxt.hoistStruct(dilationDict, f'{data_out_name}_dilation', 'cmsis_nn_tile')
         # activation
-        if nodeRep['signed']:
-            activationDict = {
-                'min': -(nodeRep['n_levels']//2),
-                'max': (nodeRep['n_levels']//2) - 1
-            }
-        else:
-            activationDict = {
-                'min': 0,
-                'max': (nodeRep['n_levels'])-1
-            }
+        # if nodeRep['signed']:
+        #     activationDict = {
+        #         'min': -(nodeRep['n_levels']//2),
+        #         'max': (nodeRep['n_levels']//2) - 1
+        #     }
+        # else:
+        #     activationDict = {
+        #         'min': 0,
+        #         'max': (nodeRep['n_levels'])-1
+        #     }
+        activationDict = {
+            'min': -(nodeRep['n_levels']//2),
+            'max': (nodeRep['n_levels']//2) - 1
+        }
+
         ctxt.hoistStruct(activationDict, f'{data_out_name}_activation', 'cmsis_nn_activation')
 
+        data_in = ctxt.lookup(nodeRep['data_in'])
+        data_out = ctxt.lookup(nodeRep['data_out'])
+
+        assert data_in._signed is not None
+        assert data_out._signed is not None
+        
         convParamsDict = {
-            'input_offset': 0,
-            'output_offset': 0,
+            'input_offset': (data_in._signed == 0) * nodeRep['n_levels']//2,
+            'output_offset': -(data_out._signed == 0) * nodeRep['n_levels']//2,
             'stride': ctxt._mangle(ctxt.lookup(f'{data_out_name}_stride').name),
             'padding': ctxt._mangle(ctxt.lookup(f'{data_out_name}_padding').name),
             'dilation': ctxt._mangle(ctxt.lookup(f'{data_out_name}_dilation').name),
