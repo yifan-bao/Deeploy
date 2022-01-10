@@ -23,6 +23,23 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from DumpO.DumpOTypes import NodeTemplate
+from typing import Dict
+from mako.template import Template
 
-referenceTemplate = NodeTemplate("SoftmaxKernel_s8(${data_in}, ${data_out}, ${size}, ${lastDimLength}, ${coeffA}, ${coeffB}, ${coeffC}, ${log2}, ${n_levels});")
+from DumpO.DumpOTypes import NodeTemplate, NetworkContext
+
+class _iSoftmaxTemplate(NodeTemplate):
+    def __init__(self, templateStr):
+        self.template = Template(templateStr)
+
+    def alignToContext(self, ctxt: NetworkContext, nodeRep: Dict) -> (NetworkContext, Dict):
+        ctxt = ctxt.copy()
+        
+        data_in = ctxt.lookup(nodeRep['data_in'])
+        data_out = ctxt.lookup(nodeRep['data_out'])
+        nodeRep['input_offset'] = (data_in._signed==0) * int(data_in.nLevels/2)
+        nodeRep['output_offset'] = -(data_out._signed==0) * int(data_in.nLevels/2)
+
+        return ctxt, nodeRep
+
+referenceTemplate = _iSoftmaxTemplate("SoftmaxKernel_s8(${data_in}, ${data_out}, ${size}, ${lastDimLength}, ${coeffA}, ${coeffB}, ${coeffC}, ${log2}, ${n_levels});")

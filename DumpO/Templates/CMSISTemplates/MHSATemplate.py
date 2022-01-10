@@ -134,8 +134,7 @@ arm_fully_connected_s8(&${preattn_ctxt}, &${preattn_fc_params}, &${preattn_quant
 free(wq_buffer_transposed);
 free(wk_buffer_transposed);
 int8_t* postattn_buffer = malloc(${heads} * ${sequenceLength} * ${sequenceLength});
-SoftmaxKernel_s8(preattn_buffer, postattn_buffer, ${heads} * ${sequenceLength} * ${sequenceLength}, 
-${sequenceLength}, ${isoftmaxA}, ${isoftmaxB}, ${isoftmaxC}, ${isoftmaxlog2});
+SoftmaxKernel_s8(preattn_buffer, postattn_buffer, ${heads} * ${sequenceLength} * ${sequenceLength}, ${sequenceLength}, ${isoftmaxA}, ${isoftmaxB}, ${isoftmaxC}, ${isoftmaxlog2});
 free(preattn_buffer);
 
 int8_t* wv_buffer = malloc(${wv_output_dims}.n * ${wv_output_dims}.c);

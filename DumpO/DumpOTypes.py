@@ -692,9 +692,10 @@ class NetworkContainer():
             data_name = node.name
             data_size = node.shape
             # SCHEREMO: Should be parsed from graph
-            data_type = 2**8
+            data_type = 2**7
             nb = ctxt.VariableBuffer(data_name, data_size, data_type)
             nb._type = self.Platform.DataTypes.int8_t
+            nb._signed = False
             ctxt.add(nb, 'global')
 
         return ctxt

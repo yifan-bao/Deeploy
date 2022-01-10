@@ -25,7 +25,27 @@
 
 from DumpO.DumpOTypes import NodeTemplate
 
-referenceTemplate = NodeTemplate("""
+from typing import Dict
+from mako.template import Template
+
+from DumpO.DumpOTypes import NodeTemplate, NetworkContext
+
+class _RequantShiftTemplate(NodeTemplate):
+    def __init__(self, templateStr):
+        self.template = Template(templateStr)
+
+    def alignToContext(self, ctxt: NetworkContext, nodeRep: Dict) -> (NetworkContext, Dict):
+        ctxt = ctxt.copy()
+
+        data_in = ctxt.lookup(nodeRep['data_in'])
+        data_out = ctxt.lookup(nodeRep['data_out'])
+        nodeRep['input_offset'] = (data_in._signed==0) * int(data_in.nLevels/2)
+        nodeRep['output_offset'] = -(data_out._signed==0) * int(data_in.nLevels/2)
+
+        return ctxt, nodeRep
+
+referenceTemplate = _RequantShiftTemplate("""
 // RQS
-RequantShift_s${data_in_type._value_}(${data_in}, ${size}, ${mul}, ${add}, ${data_out}, ${log2D}, ${channels});
+
+RequantShift_s${data_in_type._value_}(${data_in}, ${size}, ${mul}, ${add}, ${data_out}, ${log2D}, ${channels}, ${input_offset}, ${output_offset});
 """)

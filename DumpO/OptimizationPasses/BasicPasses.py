@@ -272,7 +272,7 @@ def merge_rqs_add_fun(ctxt: NetworkContext, graph: gs.Graph, match: Match, name:
         else:
             idx = 0 # non-constant idx
             constantTensor = add.inputs[1]
-        if constantTensor.values.shape != tuple(add.inputs[idx].shape):
+        if constantTensor.values.shape != tuple(add.outputs[0].shape):
             rqs.inputs[2].values = (rqs.inputs[1].values*constantTensor.values) + rqs.inputs[2].values
             add.inputs[(idx+1)%2].values = add.inputs[(idx+1)%2].values * 0
             rqs.inputs[0] = add.inputs[idx]
