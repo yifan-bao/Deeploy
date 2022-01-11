@@ -29,12 +29,16 @@ from DumpO.Layers.BasicLayers import *
 from DumpO.OptimizationPasses.BasicPasses import *
         
 class NetworkDeployer(NetworkContainer):
-    def __init__(self, graph: gs.Graph, deploymentPlatform: DeploymentPlatform, loweringOptimizer: NetworkOptimizer, scheduler: Callable = lambda x: x, name: str = "DumpONetwork"):
+    def __init__(self, graph: gs.Graph, deploymentPlatform: DeploymentPlatform, \
+                 loweringOptimizer: NetworkOptimizer, scheduler: Callable = lambda x: x, \
+                 name: str = "DumpONetwork", input_n_levels : int = 256, input_signed : bool = False):
         super().__init__(graph, deploymentPlatform, scheduler, name)
         self.name = name
         self.prepared = False
         self.baseParser = NodeParser()
         self.optimizer = loweringOptimizer
+        self.input_n_levels = input_n_levels
+        self.input_signed = input_signed
         
     # Don't override this
     def lower(self, ctxt: NetworkContext, graph: gs.Graph) -> (NetworkContext, gs.Graph):

@@ -660,7 +660,9 @@ class DeploymentPlatform():
         self.StructBuffer = StructBuffer
     
 class NetworkContainer(): 
-    def __init__(self, graph: gs.Graph, platform: DeploymentPlatform, scheduler: Callable = lambda x: x, name: str = 'DumpONetwork'):
+    def __init__(self, graph: gs.Graph, platform: DeploymentPlatform, \
+                 scheduler: Callable = lambda x: x, name: str = 'DumpONetwork', \
+                 input_n_levels : int = 256, input_signed : bool = False):
         self.graph = graph
         self.scheduler = scheduler
         self.ctxt = None
@@ -669,6 +671,9 @@ class NetworkContainer():
         self.Platform = platform
         self.Platform.Mapping['Constant'] = lambda x: self.ctxt.hoistConstant(x.attrs['value'], x.outputs[0].name)
 
+        self.input_n_levels = input_n_levels
+        self.input_signed = input_signed
+        
         self.parsed = False
         self.bound = False
         self.worstCaseBufferSize = 0
@@ -681,21 +686,28 @@ class NetworkContainer():
         for node in graph.inputs:
             data_name = node.name
             data_size = node.shape
-            # SCHEREMO: Should be parsed from graph
-            data_type = 2**7
+            data_type = self.input_n_levels
             nb = ctxt.VariableBuffer(data_name, data_size, data_type)
-            nb._type = self.Platform.DataTypes.int8_t
-            nb._signed = True
+
+            # SCHEREMO: Figure out smallest assignable type here
+            smallestTypeValue = 2**32
+            for _type, value in zip(self.Platform.DataTypes, map(lambda x: x._value_, self.Platform.DataTypes)):
+                if (2**value >= self.input_n_levels) and (2**value <= smallestTypeValue):
+                    smallestType = _type
+                    smallestTypeValue = 2**smallestType._value_
+
+            nb._type = smallestType
+            nb._signed = self.input_signed
             ctxt.add(nb, 'global')
 
         for node in graph.outputs:
             data_name = node.name
             data_size = node.shape
             # SCHEREMO: Should be parsed from graph
-            data_type = 2**7
+            #data_type = 2**7
             nb = ctxt.VariableBuffer(data_name, data_size, data_type)
-            nb._type = self.Platform.DataTypes.int8_t
-            nb._signed = False
+            #nb._type = self.Platform.DataTypes.int8_t
+            #nb._signed = False
             ctxt.add(nb, 'global')
 
         return ctxt
