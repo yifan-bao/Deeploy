@@ -31,7 +31,8 @@ from DumpO.OptimizationPasses.BasicPasses import *
 class NetworkDeployer(NetworkContainer):
     def __init__(self, graph: gs.Graph, deploymentPlatform: DeploymentPlatform, \
                  loweringOptimizer: NetworkOptimizer, scheduler: Callable = lambda x: x, \
-                 name: str = "DumpONetwork", input_n_levels : int = 256, input_signed : bool = False):
+                 name: str = 'DumpONetwork', \
+                 input_n_levels : Dict[str, int] = {'input_0': 256}, input_signed : Dict[str, bool] = {'input_0':False}):
         super().__init__(graph, deploymentPlatform, scheduler, name)
         self.name = name
         self.prepared = False

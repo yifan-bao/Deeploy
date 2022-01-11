@@ -662,7 +662,7 @@ class DeploymentPlatform():
 class NetworkContainer(): 
     def __init__(self, graph: gs.Graph, platform: DeploymentPlatform, \
                  scheduler: Callable = lambda x: x, name: str = 'DumpONetwork', \
-                 input_n_levels : int = 256, input_signed : bool = False):
+                 input_n_levels : Dict[str, int] = {'input_0': 256}, input_signed : Dict[str, bool] = {'input_0':False}):
         self.graph = graph
         self.scheduler = scheduler
         self.ctxt = None
@@ -686,18 +686,18 @@ class NetworkContainer():
         for node in graph.inputs:
             data_name = node.name
             data_size = node.shape
-            data_type = self.input_n_levels
+            data_type = self.input_n_levels[node.name]
             nb = ctxt.VariableBuffer(data_name, data_size, data_type)
 
             # SCHEREMO: Figure out smallest assignable type here
             smallestTypeValue = 2**32
             for _type, value in zip(self.Platform.DataTypes, map(lambda x: x._value_, self.Platform.DataTypes)):
-                if (2**value >= self.input_n_levels) and (2**value <= smallestTypeValue):
+                if (2**value >= data_type) and (2**value <= smallestTypeValue):
                     smallestType = _type
                     smallestTypeValue = 2**smallestType._value_
 
             nb._type = smallestType
-            nb._signed = self.input_signed
+            nb._signed = self.input_signed[node.name]
             ctxt.add(nb, 'global')
 
         for node in graph.outputs:
