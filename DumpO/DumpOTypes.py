@@ -861,6 +861,8 @@ class NetworkContainer():
                     name = node.name
                     node.name = ctxt._mangle(node.name)
                     callStack += "extern " + node.init()
+                    # SCHEREMO: Borderline hacky, but on the okay side of things, I think
+                    callStack += "const static uint32_t " + node.name + "_len" + " = " + str(np.prod(node.shape)) + ";\n"
                     node.name = name
 
         lines = callStack.split('\n')
