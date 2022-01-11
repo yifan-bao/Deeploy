@@ -4,3 +4,6 @@
 [submodule "dumpocmsislibs"]
 	path = dumpocmsislibs
 	url = https://iis-git.ee.ethz.ch/scheremo/dumpocmsislibs
+[submodule "dumpotest"]
+	path = dumpotest
+	url = https://iis-git.ee.ethz.ch/scheremo/dumpotest
