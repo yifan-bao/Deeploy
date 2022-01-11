@@ -74,10 +74,11 @@ class VariableBuffer():
 
     def __repr__(self) -> str:
         return f'VariableBuffer: name: {self.name}, type: {self._type}, levels: {self.nLevels}'
-    
-    def fromNode(self, node: gs.ir.node.Node, nLevels:int):
+
+    @classmethod
+    def fromNode(cls, node: gs.ir.node.Node, nLevels:int):
         return(
-            type(self)(
+            cls(
                 name = node.name,
                 shape = node.shape if not isinstance(node, gs.Constant) else node.values.shape,
                 nLevels = nLevels
@@ -107,8 +108,9 @@ class ConstantBuffer(VariableBuffer):
     def __repr__(self) -> str:
         return f'ConstantBuffer: name: {self.name}, type: {self._type}, levels: {self.nLevels}'
     
-    def fromVariableBuffer(self, buffer: VariableBuffer, values):
-        return type(self)(name = buffer.name,
+    @classmethod   
+    def fromVariableBuffer(cls, buffer: VariableBuffer, values):
+        return cls(name = buffer.name,
                           nLevels = buffer.nLevels,
                           shape = buffer.shape,
                           values = values)
@@ -184,8 +186,8 @@ class NetworkContext():
             name = node.name
             
         # SCHEREMO: This is currently heuristic, but should be annotated in ONNX
-        localBuffer = self.VariableBuffer().fromNode(node = node, nLevels = int(node.values.max() - node.values.min()))
-        globalBuffer = self.ConstantBuffer().fromVariableBuffer(localBuffer, values=node.values)
+        localBuffer = self.VariableBuffer.fromNode(node = node, nLevels = int(node.values.max() - node.values.min()))
+        globalBuffer = self.ConstantBuffer.fromVariableBuffer(localBuffer, values=node.values)
         globalBuffer.name = name
         globalBuffer._type = type
 

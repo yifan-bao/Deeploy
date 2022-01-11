@@ -59,22 +59,29 @@ class _MHSATemplate(NodeTemplate):
 
         ctxt, nodeRep = bindFCParams(ctxt, nodeRep['data_out']+"_wv", nodeRep['wv_requant_mul'], nodeRep['wv_requant_shift'], data_in, weight, nodeRep, "wv_", bias = (np.prod(bias.shape) > 1))
 
-        data_in= np.ones((1, data_in.shape[1], nodeRep['heads']*nodeRep['dim_head']))
+
+        new_shape = (1, data_in.shape[1], nodeRep['heads']*nodeRep['dim_head'])
+        data_in = ctxt.VariableBuffer(name = 'data_in', shape = new_shape, nLevels=nodeRep['n_levels'])
+        data_in._signed = True
         bias = ctxt.lookup(nodeRep['wo_bias'])
         weight = ctxt.lookup(nodeRep['wo_weight'])
 
         ctxt, nodeRep = bindFCParams(ctxt, nodeRep['data_out']+"_wo", nodeRep['wo_requant_mul'], nodeRep['wo_requant_shift'], data_in, weight, nodeRep, "wo_", bias = (np.prod(bias.shape) > 1))
 
-        data_in = np.ones((s,nodeRep['dim_head']))
+        new_shape = (s,nodeRep['dim_head'])
+        data_in = ctxt.VariableBuffer(name = 'data_in', shape = new_shape, nLevels=nodeRep['n_levels'])
+        data_in._signed = True
         # K
         weight = np.ones((s,nodeRep['dim_head']))
-
+        
         ctxt, nodeRep = bindFCParams(ctxt, nodeRep['data_out']+"_preattn", nodeRep['preattn_requant_mul'], nodeRep['preattn_requant_shift'], data_in, weight, nodeRep, "preattn_", bias=False)
 
-        data_in = np.ones((s,s))
+        new_shape = (s,s)
+        data_in = ctxt.VariableBuffer(name = 'data_in', shape = new_shape, nLevels=nodeRep['n_levels'])
+        data_in._signed = False
         # K
         weight = np.ones((nodeRep['dim_head'],s))
-
+        
         ctxt, nodeRep = bindFCParams(ctxt, nodeRep['data_out']+"_postattn", nodeRep['postattn_requant_mul'], nodeRep['postattn_requant_shift'], data_in, weight, nodeRep, "postattn_", bias=False)
 
         return ctxt, nodeRep
@@ -86,8 +93,8 @@ do{
     sequenceLength = q_shape[1]
 %>
 // W_Q * q -> Q
-int32_t* _null = malloc(256*4);
-memset(_null, 0, 256*4);
+int32_t* _null = malloc(${dim}*4);
+memset(_null, 0, ${dim}*4);
 
 int8_t* wq_buffer = malloc(${wq_output_dims}.n * ${wq_output_dims}.c);
 arm_fully_connected_s8(&${wq_ctxt}, &${wq_fc_params}, &${wq_quant_params}, &${wq_input_dims}, ${q}, &${wq_filter_dims}, ${wq_weight}, &${wq_bias_dims}, ${wq_bias}, &${wq_output_dims}, wq_buffer);
@@ -134,7 +141,7 @@ arm_fully_connected_s8(&${preattn_ctxt}, &${preattn_fc_params}, &${preattn_quant
 free(wq_buffer_transposed);
 free(wk_buffer_transposed);
 int8_t* postattn_buffer = malloc(${heads} * ${sequenceLength} * ${sequenceLength});
-SoftmaxKernel_s8(preattn_buffer, postattn_buffer, ${heads} * ${sequenceLength} * ${sequenceLength}, ${sequenceLength}, ${isoftmaxA}, ${isoftmaxB}, ${isoftmaxC}, ${isoftmaxlog2});
+SoftmaxKernel_s8(preattn_buffer, postattn_buffer, ${heads} * ${sequenceLength} * ${sequenceLength}, ${sequenceLength}, ${isoftmaxA}, ${isoftmaxB}, ${isoftmaxC}, ${isoftmaxlog2}, ${n_levels});
 free(preattn_buffer);
 
 int8_t* wv_buffer = malloc(${wv_output_dims}.n * ${wv_output_dims}.c);
