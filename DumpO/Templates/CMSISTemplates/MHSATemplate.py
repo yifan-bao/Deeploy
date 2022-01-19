@@ -67,7 +67,7 @@ class _MHSATemplate(NodeTemplate):
         weight = ctxt.lookup(nodeRep['wo_weight'])
 
         ctxt, nodeRep = bindFCParams(ctxt, nodeRep['data_out']+"_wo", nodeRep['wo_requant_mul'], nodeRep['wo_requant_shift'], data_in, weight, nodeRep, "wo_", bias = (np.prod(bias.shape) > 1))
-
+        #*nodeRep['heads']
         new_shape = (s,nodeRep['dim_head'])
         data_in = ctxt.VariableBuffer(name = 'data_in', shape = new_shape, nLevels=nodeRep['n_levels'])
         data_in._signed = True
@@ -75,7 +75,7 @@ class _MHSATemplate(NodeTemplate):
         weight = np.ones((s,nodeRep['dim_head']))
         
         ctxt, nodeRep = bindFCParams(ctxt, nodeRep['data_out']+"_preattn", nodeRep['preattn_requant_mul'], nodeRep['preattn_requant_shift'], data_in, weight, nodeRep, "preattn_", bias=False)
-
+        #*nodeRep['heads']
         new_shape = (s,s)
         data_in = ctxt.VariableBuffer(name = 'data_in', shape = new_shape, nLevels=nodeRep['n_levels'])
         data_in._signed = False
@@ -93,8 +93,8 @@ do{
     sequenceLength = q_shape[1]
 %>
 // W_Q * q -> Q
-int32_t* _null = malloc(${dim}*4);
-memset(_null, 0, ${dim}*4);
+int32_t* _null = malloc(${dim}*${heads});
+memset(_null, 0, ${dim}*${heads});
 
 int8_t* wq_buffer = malloc(${wq_output_dims}.n * ${wq_output_dims}.c);
 arm_fully_connected_s8(&${wq_ctxt}, &${wq_fc_params}, &${wq_quant_params}, &${wq_input_dims}, ${q}, &${wq_filter_dims}, ${wq_weight}, &${wq_bias_dims}, ${wq_bias}, &${wq_output_dims}, wq_buffer);
@@ -134,6 +134,7 @@ free(wk_buffer);
 
 // ATTN Matrix -> Q*KT
 
+// QKT -> NHSS
 int8_t* preattn_buffer = malloc(${heads} * ${sequenceLength} * ${sequenceLength});
 for(int i=0; i<${heads}; i++){
 arm_fully_connected_s8(&${preattn_ctxt}, &${preattn_fc_params}, &${preattn_quant_params}, &${preattn_input_dims}, &wq_buffer_transposed[i * ${preattn_input_dims}.n * ${preattn_input_dims}.c], &${preattn_filter_dims}, &wk_buffer_transposed[i * ${preattn_filter_dims}.n * ${preattn_filter_dims}.c], &${preattn_bias_dims}, _null, &${preattn_output_dims}, &preattn_buffer[i*${preattn_output_dims}.c*${preattn_output_dims}.n]);

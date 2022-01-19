@@ -114,7 +114,7 @@ class _Conv2DTemplate(NodeTemplate):
         nodeRep['quant_params'] = ctxt.lookup(f'{data_out_name}_quant_params').name
 
         inputDimsDict = {
-            'n': 1,
+            'n': data_in.shape[0],
             'h': nodeRep['dim_im_in_x'],
             'w': nodeRep['dim_im_in_y'],
             'c': nodeRep['ch_im_in']
@@ -132,7 +132,7 @@ class _Conv2DTemplate(NodeTemplate):
         nodeRep['filter_dims'] = ctxt.lookup(f'{data_out_name}_filter_dims').name
 
         outputDimsDict = {
-            'n': 1,
+            'n': data_in.shape[0],
             'h': nodeRep['dim_im_out_x'],
             'w': nodeRep['dim_im_out_y'],
             'c': nodeRep['ch_im_out']
