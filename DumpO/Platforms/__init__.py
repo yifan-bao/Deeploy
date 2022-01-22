@@ -1,1 +1,1 @@
-from .BasicPlatform import *
+from . import *

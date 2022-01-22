@@ -27,12 +27,9 @@ from DumpO.DumpOTypes import *
 from DumpO.Parsers.BasicParsers import *
 from DumpO.Layers.BasicLayers import *
 from DumpO.OptimizationPasses.BasicPasses import *
-        
+
 class NetworkDeployer(NetworkContainer):
-    def __init__(self, graph: gs.Graph, deploymentPlatform: DeploymentPlatform, \
-                 loweringOptimizer: NetworkOptimizer, scheduler: Callable = lambda x: x, \
-                 name: str = 'DumpONetwork', \
-                 input_n_levels : Dict[str, int] = {'input_0': 256}, input_signed : Dict[str, bool] = {'input_0':False}):
+    def __init__(self, graph: gs.Graph, deploymentPlatform: DeploymentPlatform,loweringOptimizer: NetworkOptimizer, scheduler: Callable = lambda x: x,name: str = 'DumpONetwork',input_n_levels : Dict[str, int] = {'input_0': 256}, input_signed : Dict[str, bool] = {'input_0':False}):
         super().__init__(graph, deploymentPlatform, scheduler, name)
         self.name = name
         self.prepared = False
@@ -55,6 +52,10 @@ class NetworkDeployer(NetworkContainer):
 
         return newCtxt, ret
 
+    def postLoweringOptimization(self):
+        pass
+    
+    # Don't Override this
     def middleWare(self):
         
         # Rename graph inputs and outputs:
@@ -67,76 +68,19 @@ class NetworkDeployer(NetworkContainer):
         self.ctxt, ret = self.baseParse() 
         if not ret:
             raise RuntimeError("The given graph was not valid - check that it is acyclic!")
+        
         self.ctxt, self.graph = self.lower(self.ctxt, self.graph) # This lowers the graph to a deployable format
         onnx.save_model(gs.export_onnx(self.graph), "test_preturn.onnx")
-        # Insert appropriate transposes
-        self.NCHWtoNHWC()
-        # Remove duplicate transposes
-        self.ctxt, ret = self.baseParse() # This sanity checks the graph and generates a base context for lowering/optimization
-        mergeOptimizer = TransposeMergePass()
-        constOptimizer = TransposeConstOptPass()
-        _, self.graph = mergeOptimizer.apply(self.ctxt, self.graph)
-        _, self.graph = constOptimizer.apply(self.ctxt, self.graph)
-        self.graph.cleanup().toposort()
-        onnx.save_model(gs.export_onnx(self.graph), "test.onnx")
-        if not ret:
-            raise RuntimeError("Lowering of the graph failed!")
-        
+
+        self.postLoweringOptimization()
+    
+    # Don't override this
     def exportGraph(self, f):
         model = gs.export_onnx(self.graph)
         convert_model_to_external_data(model, location="model.data")
         onnx.save(model, f)
 
-
-    def NCHWtoNHWC(self):
-
-        def newShape(node, shape):
-            newShape = []
-            for i in shape:
-                newShape.append(node.shape[i])
-            return newShape
-        
-        newlayerBindings = []
-        transposeIdx = 0
-        self._bindLayers()
-        # Insert Transpose nodes for NCHW to NHWC conversion
-        for idx, layerName in enumerate(self.layerBinding):
-            
-            layer = self.layerBinding[layerName]
-            
-            if isinstance(layer, (ConvLayer, MaxPoolLayer, PadLayer)):
-                
-                inputNode = layer.node.inputs[0]
-                outputNode = layer.node.outputs[0]
-                shape = list(range(len(inputNode.shape)))
-                inPermute = shape[0:1] + shape[2:] + shape[1:2]
-                outPermute = inPermute[0:1] + inPermute[2:] + inPermute[1:2]
-                # Transpose conv input
-                inputTransposeOutput = gs.Variable("TransposeIn"+str(transposeIdx), dtype=np.float32, shape=newShape(inputNode, np.array(inPermute)))
-                outputTransposeInput = gs.Variable("TransposeOut"+str(transposeIdx+1), dtype=np.float32, shape=newShape(outputNode, np.array(inPermute)))
-
-                inputTransposeNode = gs.Node(name='Transpose'+str(transposeIdx),op="Transpose", inputs=[inputNode], outputs=[inputTransposeOutput], attrs={'perm': inPermute})
-                outputTransposeNode = gs.Node(name='Transpose'+str(transposeIdx+1),op="Transpose", inputs=[outputTransposeInput], outputs=[outputNode], attrs={'perm': outPermute})
-
-                layer.node.inputs[0] = inputTransposeOutput
-                layer.node.outputs[0] = outputTransposeInput
-
-                self.graph.nodes.append(inputTransposeNode)
-                self.graph.nodes.append(outputTransposeNode)
-
-                if isinstance(layer, ConvLayer):
-                    weightNode = layer.node.inputs[1]
-                    weightTransposeOutput = gs.Variable("TransposeWeight"+str(transposeIdx+2), dtype=np.float32, shape=newShape(weightNode, np.array(inPermute)))
-                    weightTransposeNode = gs.Node(name='Transpose'+str(transposeIdx+2),op="Transpose", inputs=[weightNode], outputs=[weightTransposeOutput], attrs={'perm': inPermute})
-                    layer.node.inputs[1] = weightTransposeOutput
-                    self.graph.nodes.append(weightTransposeNode)
-
-                    transposeIdx += 1
-                    
-                transposeIdx += 2
-                
-        self.graph.cleanup().toposort()
-                
+    # Don't override this unless you know what you are doin
     def backEnd(self, channels_first=True):
         self.parse(channels_first) # This reparses the lowered graph
         self.broadcast(channels_first) # This broadcasts all tensors offline
@@ -150,7 +94,8 @@ class NetworkDeployer(NetworkContainer):
         self.backEnd(channels_first=False)
         # FINAL TRANSFORMS 
         self.prepared = True
-        
+
+    # Don't override this
     def generateFunction(self) -> str:
         if not self.prepared:
             self.prepare()
