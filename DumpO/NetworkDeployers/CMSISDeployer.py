@@ -27,7 +27,6 @@ from DumpO.DumpOTypes import *
 from DumpO.Parsers.BasicParsers import *
 from DumpO.Layers.BasicLayers import *
 from DumpO.OptimizationPasses.BasicPasses import *
-from DumpO import NetworkDeployer
 
 class CMSISDeployer(NetworkDeployer):
     
