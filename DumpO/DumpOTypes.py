@@ -653,13 +653,24 @@ class NetworkOptimizer():
         return ctxt, graph
     
 class DeploymentPlatform():
-    def __init__(self, Mapping: Dict[str, ONNXLayer], DataTypes: Enum, TypeInfer: Callable, VariableBuffer: VariableBuffer, ConstantBuffer: ConstantBuffer, StructBuffer: StructBuffer):
+    def __init__(self, Mapping: Dict[str, ONNXLayer], DataTypes: Enum, \
+                 TypeInfer: Callable, VariableBuffer: VariableBuffer, \
+                 ConstantBuffer: ConstantBuffer, StructBuffer: StructBuffer, \
+                 includeList: List[str] = [""]):
+        
         self.Mapping = Mapping
         self.DataTypes = DataTypes
         self.TypeInfer = TypeInfer
         self.VariableBuffer = VariableBuffer
         self.ConstantBuffer = ConstantBuffer
         self.StructBuffer = StructBuffer
+        self.includeList = includeList
+
+    def getPlatformIncludes(self) -> str:
+        includeStr = []
+        for include in self.includeList:
+            includeStr += ["#include \"" + include + "\""]
+        return ("\n").join(includeStr)
     
 class NetworkContainer(): 
     def __init__(self, graph: gs.Graph, platform: DeploymentPlatform, \

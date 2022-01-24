@@ -147,5 +147,16 @@ class SimpleStructBuffer(StructBuffer):
     
     
 CMSISOptimizer = NetworkOptimizer([MHSAAlignmentPass(), MergeConstAddAndRequantPass(), ExtractPaddingFromPoolPass(), ExtractPaddingFromConvPass(), ConvRequantMergePass(), GEMMRequantMergePass(), MatMulRequantMergePass()])
-    
-CMSISPlatform = DeploymentPlatform(CMSISMapping, DataTypes, CMSISTypeInfer, SimpleNetworkBuffer, SimpleGlobalBuffer, SimpleStructBuffer)
+
+includeList = ["arm_math.h", "arm_nnfunctions.h", "am_util.h", "DumpOMath.h"]
+
+class CMSISPlatform(DeploymentPlatform):
+    def __init__(self, CMSISMapping = CMSISMapping, DataTypes = DataTypes, \
+                 CMSISTypeInfer = CMSISTypeInfer, SimpleNetworkBuffer = SimpleNetworkBuffer,\
+                 SimpleGlobalBuffer = SimpleGlobalBuffer, SimpleStructBuffer = SimpleStructBuffer,
+                 includeList : List[str] = includeList):
+        super().__init__(CMSISMapping, DataTypes, CMSISTypeInfer, \
+                         SimpleNetworkBuffer, SimpleGlobalBuffer, SimpleStructBuffer, \
+                         includeList)
+        
+        
