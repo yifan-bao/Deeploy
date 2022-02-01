@@ -29,6 +29,8 @@ from mako.template import Template
 
 from DumpO.DumpOTypes import NodeTemplate, NetworkContext
 
+# SCHEREMO: ASSUMES NHWC
+
 class _Pad2DTemplate(NodeTemplate):
     def __init__(self, templateStr):
         self.template = Template(templateStr)
@@ -70,12 +72,19 @@ memset(${data_out}, ${value}, ${data_out_size}*sizeof(${data_out_type._name_}));
 
     startPosX = y_offset_out + x_offset_out
     startPosOffset = 0
+
+batchOffsetIn = width * dim_im_in_y
+batchOffsetOut = dim_im_out_ch * dim_im_out_y * dim_im_out_x
 %>
-int32_t xoffset_${data_in} = ${startPosX};
-int32_t offset_in_${data_in} = ${startPosOffset};
+int32_t xoffset_${data_in}; 
+int32_t offset_in_${data_in};
+for(int n=0; n<${batch}; n++){
+xoffset_${data_in} = ${startPosX};
+offset_in_${data_in} = ${startPosOffset};
 for(int h=0; h<${dim_im_in_y}; h++){
-memcpy(${data_out}+xoffset_${data_in}, ${data_in}+offset_in_${data_in}, ${width}*sizeof(${data_out_type._name_})); 
+memcpy(${data_out}+xoffset_${data_in}+n*${batchOffsetOut}, ${data_in}+offset_in_${data_in}+n*${batchOffsetIn}, ${width}*sizeof(${data_out_type._name_})); 
 xoffset_${data_in} += ${addoffsetOut};
 offset_in_${data_in} += ${addoffsetIn};
+}
 }
 """)

@@ -6,7 +6,7 @@ requires = [
     "mako",
     "numpy",
     "IPython"
+    "nvidia-pyindex"
+    "onnx-graphsurgeon"
 ]
 build-backend = "setuptools.build_meta"
-
-# Also needs onnx_graphsurgeon!
