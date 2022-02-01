@@ -55,20 +55,20 @@ class _Conv2DTemplate(NodeTemplate):
         # Next the conv params
         # stride
         strideDict = {
-            'w': nodeRep['stride_x'],
-            'h': nodeRep['stride_y']
+            'h': nodeRep['stride_x'],
+            'w': nodeRep['stride_y'],
         }
         ctxt.hoistStruct(strideDict, f'{data_out_name}_stride', 'cmsis_nn_tile')
         # padding
         paddingDict = {
-            'w': nodeRep['padding_x'],
-            'h': nodeRep['padding_y']
+            'h': nodeRep['padding_x'],
+            'w': nodeRep['padding_y']
         }
         ctxt.hoistStruct(paddingDict, f'{data_out_name}_padding', 'cmsis_nn_tile')
         # dilation
         dilationDict = {
-            'w': nodeRep['dilation_x'],
-            'h': nodeRep['dilation_y']
+            'h': nodeRep['dilation_x'],
+            'w': nodeRep['dilation_y']
         }
         ctxt.hoistStruct(dilationDict, f'{data_out_name}_dilation', 'cmsis_nn_tile')
         # activation
