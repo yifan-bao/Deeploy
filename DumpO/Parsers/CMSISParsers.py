@@ -141,7 +141,8 @@ class CMSISDWConv2DParser(Conv2DParser):
 
             # SCHEREMO: Transpose weights to be num filters last
             newCtxt.globalObjects[self.parserDict['weight']].values = np.transpose(weight.values, list(range(len(weight.shape)))[1:] + [0])
-            
+
+            self.parserDict['batch'] = data_in.shape[0]
             if channels_first:
                 self.parserDict['ch_im_in'] = data_in.shape[1]
                 self.parserDict['dim_im_in_x'] = data_in.shape[2]

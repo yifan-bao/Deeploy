@@ -151,11 +151,17 @@ class _Conv2DDWTemplate(NodeTemplate):
         return ctxt, nodeRep
 
 
-convTemplate = _Conv2DDWTemplate("\
-void* _DumpO__ctxtBuffer_${ctxt} = malloc(sizeof(int8_t)*${ctxt}.size);\n\
-${ctxt}.buf = _DumpO__ctxtBuffer_${ctxt};\n\
-arm_depthwise_conv_wrapper_s8(&${ctxt}, &${dw_conv_params}, &${quant_params}, &${input_dims}, ${data_in}, &${filter_dims}, ${weight}, &${bias_dims}, ${add}, &${output_dims}, ${data_out}); \n\
-free(_DumpO__ctxtBuffer_${ctxt});\
-")
+convTemplate = _Conv2DDWTemplate("""
+<%
+batchSizeIn = ch_im_in * dim_im_in_x * dim_im_in_y
+batchSizeOut = ch_im_out * dim_im_out_x * dim_im_out_y
+%>
+void* _DumpO__ctxtBuffer_${ctxt} = malloc(sizeof(int8_t)*${ctxt}.size);
+${ctxt}.buf = _DumpO__ctxtBuffer_${ctxt};
+for(int b=0; b<${batch}; b++){
+arm_depthwise_conv_wrapper_s8(&${ctxt}, &${dw_conv_params}, &${quant_params}, &${input_dims}, (${data_in} + b*${batchSizeIn}), &${filter_dims}, ${weight}, &${bias_dims}, ${add}, &${output_dims}, (${data_out} + b*${batchSizeOut})); 
+}
+free(_DumpO__ctxtBuffer_${ctxt});
+""")
 # int8_t* bias = int8_t* malloc(sizeof(int8_t) * ${ch_im_in}); \n\
 #                free(bias); \
