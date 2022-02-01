@@ -170,8 +170,8 @@ class Pad2DParser(PadParser):
             if len(pads) == 8 and pads[0] == 0 and pads[4] == 0 \
             and pads[1] == 0 and pads[5] == 0:
                 wellFormed = True
-                self.parserDict['pad_x'] = pads[2]
-                self.parserDict['pad_y'] = pads[3]
+                self.parserDict['pad_x'] = pads[3]
+                self.parserDict['pad_y'] = pads[2]
                 
         return wellFormed
 

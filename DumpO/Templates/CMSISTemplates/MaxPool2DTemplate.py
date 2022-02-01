@@ -103,5 +103,12 @@ class _MaxPool2DTemplate(NodeTemplate):
         return ctxt, nodeRep
 
 cmsisTemplate = _MaxPool2DTemplate("""
-arm_max_pool_s8(&${ctxt}, &${pool_params}, &${input_dims}, ${data_in}, &${filter_dims}, &${output_dims}, ${data_out});
+<%
+batchSizeIn = dim_im_in_x * dim_im_in_y * ch_im_in
+batchSizeOut = dim_im_out_x * dim_im_out_y * ch_im_out
+%>
+// MaxPool2D
+for(int b=0;b<${batch};b++){
+arm_max_pool_s8(&${ctxt}, &${pool_params}, &${input_dims}, (${data_in}+b*${batchSizeIn}), &${filter_dims}, &${output_dims}, (${data_out} + b*${batchSizeOut}));
+}
 """)

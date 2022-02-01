@@ -58,6 +58,8 @@ class CMSISMaxPool2DParser(MaxPool2DParser):
             data_in = newCtxt.lookup(self.parserDict['data_in'])
             data_out = newCtxt.lookup(self.parserDict['data_out'])
 
+
+            self.parserDict['batch'] = data_in.shape[0]
             if channels_first:
                 self.parserDict['ch_im_in'] = data_in.shape[1]
                 self.parserDict['dim_im_in_x'] = data_in.shape[2]
