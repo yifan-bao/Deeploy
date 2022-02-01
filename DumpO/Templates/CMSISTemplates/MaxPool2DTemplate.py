@@ -47,14 +47,14 @@ class _MaxPool2DTemplate(NodeTemplate):
         nodeRep['ctxt'] = f'{data_out_name}_ctxt'
 
         strideDict = {
-            'w': nodeRep['stride_x'],
-            'h': nodeRep['stride_y']
+            'h': nodeRep['stride_x'],
+            'w': nodeRep['stride_y']
         }
         ctxt.hoistStruct(strideDict, f'{data_out_name}_stride', 'cmsis_nn_tile')
         # padding
         paddingDict = {
-            'w': nodeRep['padding_x'],
-            'h': nodeRep['padding_y']
+            'h': nodeRep['padding_x'],
+            'w': nodeRep['padding_y']
         }
         ctxt.hoistStruct(paddingDict, f'{data_out_name}_padding', 'cmsis_nn_tile')
 
