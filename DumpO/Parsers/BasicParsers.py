@@ -170,8 +170,8 @@ class Pad2DParser(PadParser):
             if len(pads) == 8 and pads[0] == 0 and pads[4] == 0 \
             and pads[1] == 0 and pads[5] == 0:
                 wellFormed = True
-                self.parserDict['pad_x'] = pads[3]
-                self.parserDict['pad_y'] = pads[2]
+                self.parserDict['pad_x'] = pads[2]
+                self.parserDict['pad_y'] = pads[3]
                 
         return wellFormed
 
@@ -184,6 +184,7 @@ class Pad2DParser(PadParser):
             data_out = ctxt.lookup(node.outputs[0].name)
             if len(data_in.shape) == 4:
                 wellFormed = True
+                self.parserDict['batch'] = data_in.shape[0]
                 if channels_first:
                     self.parserDict['dim_im_in_x'] = data_in.shape[2]
                     self.parserDict['dim_im_in_y'] = data_in.shape[3]

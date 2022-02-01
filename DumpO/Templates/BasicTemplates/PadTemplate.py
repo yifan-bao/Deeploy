@@ -47,42 +47,29 @@ class _Pad2DTemplate(NodeTemplate):
 
         return ctxt, nodeRep
 
-unrolledTemplate = _Pad2DTemplate("""
-memset(${data_out}, 0, ${data_out_size}*sizeof(${data_out_type._name_}));
-% for h in range(dim_im_in_y):
-<%    
-    y_offset_out = dim_im_out_ch*(pad_y*dim_im_out_x)
-    x_offset_out = dim_im_out_ch*(dim_im_out_x * h + pad_x)
-    offset_in = dim_im_in_ch*(dim_im_in_x * h)
-    width = dim_im_in_ch*dim_im_in_x
-%>
-memcpy(${data_out}+${x_offset_out}+${y_offset_out}, ${data_in}+${offset_in}, ${width}*sizeof(${data_out_type._name_})); 
-% endfor""")
-
 referenceTemplate = _Pad2DTemplate("""
 // Pad
 memset(${data_out}, ${value}, ${data_out_size}*sizeof(${data_out_type._name_}));
 <%    
-    y_offset_out = dim_im_out_ch*(pad_y*dim_im_out_x)
+    y_offset_out = dim_im_out_ch*(pad_y*dim_im_out_y)
     x_offset_out = dim_im_out_ch*(pad_x)
-    width = dim_im_in_ch*dim_im_in_x
+    width = dim_im_in_ch*dim_im_in_y
 
-    addoffsetOut = dim_im_out_ch * dim_im_out_x
-    addoffsetIn = dim_im_in_ch * dim_im_in_x
+    addoffsetOut = dim_im_out_ch * dim_im_out_y
+    addoffsetIn = dim_im_in_ch * dim_im_in_y
 
     startPosX = y_offset_out + x_offset_out
     startPosOffset = 0
 
-batchOffsetIn = width * dim_im_in_y
-batchOffsetOut = dim_im_out_ch * dim_im_out_y * dim_im_out_x
+batchOffsetIn = width * dim_im_in_x
+batchOffsetOut = dim_im_out_ch * dim_im_out_x * dim_im_out_y
 %>
-int32_t xoffset_${data_in}; 
-int32_t offset_in_${data_in};
+int32_t xoffset_${data_in};
+int32_t offset_in_${data_in} = ${startPosOffset};
 for(int n=0; n<${batch}; n++){
-xoffset_${data_in} = ${startPosX};
-offset_in_${data_in} = ${startPosOffset};
-for(int h=0; h<${dim_im_in_y}; h++){
-memcpy(${data_out}+xoffset_${data_in}+n*${batchOffsetOut}, ${data_in}+offset_in_${data_in}+n*${batchOffsetIn}, ${width}*sizeof(${data_out_type._name_})); 
+xoffset_${data_in} = n*${batchOffsetOut} + ${startPosX};
+for(int h=0; h<${dim_im_in_x}; h++){
+memcpy(${data_out}+xoffset_${data_in}, ${data_in}+offset_in_${data_in}, ${width}*sizeof(${data_out_type._name_})); 
 xoffset_${data_in} += ${addoffsetOut};
 offset_in_${data_in} += ${addoffsetIn};
 }
