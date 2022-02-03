@@ -26,7 +26,6 @@ build-job:       # This job runs in the build stage, which runs first.
     - source ./testenv/bin/activate
     - wget https://bootstrap.pypa.io/pip/3.6/get-pip.py
     - python ./get-pip.py
-    - git submodule update --init --recursive
     - python testenv/bin/easy_install cmake
     - pip install -e .
   artifacts:
@@ -37,6 +36,7 @@ build-job:       # This job runs in the build stage, which runs first.
 network-test-job:   # This job runs in the test stage.
   stage: test    # It only starts when the job in the build stage completes successfully.
   script:
+    - git submodule update --init --recursive
     - source ./testenv/bin/activate
     - cd dumpotest
     - python generateNetwork.py -t Tests/simpleRegression
