@@ -21,6 +21,7 @@ build-job:       # This job runs in the build stage, which runs first.
   stage: build
   script:
     - echo "Updating dependencies"
+    - git submodule update --init --recursive
     - git checkout dumpotest
     - git checkout dumpocmsislibs
     - python setup.py install
