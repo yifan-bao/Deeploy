@@ -25,6 +25,10 @@ build-job:       # This job runs in the build stage, which runs first.
     - source ./env/bin/activate
     - git submodule update --init --recursive
     - python setup.py install
+  artifacts:
+    name: "$CI_JOB_NAME-$CI_COMMIT_REF_NAME-$CI_COMMIT_SHORT_SHA"
+    paths:
+      - ./env
 
 network-test-job:   # This job runs in the test stage.
   stage: test    # It only starts when the job in the build stage completes successfully.
@@ -33,4 +37,8 @@ network-test-job:   # This job runs in the test stage.
     - cd dumpotest
     - python generateNetwork.py -t Tests/simpleRegression
     - cd ..
-    - make -C dumpotest/Platforms/QEMU_ARM/ clean all run
+    - make -C dumpotest/Platforms/QEMU_ARM/ clean all run >> ./out.txt
+  artifacts:
+    name: "$CI_JOB_NAME-$CI_COMMIT_REF_NAME-$CI_COMMIT_SHORT_SHA"
+    paths:
+      - ./out.txt
