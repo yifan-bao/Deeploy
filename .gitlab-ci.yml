@@ -21,7 +21,7 @@ build-job:       # This job runs in the build stage, which runs first.
   stage: build
   script:
     - echo "Updating dependencies"
-    - python3.6 -m venv ./testenv
+    - python3.6 -m venv ./testenv --without-pip
     - source ./testenv/bin/activate
     - wget https://bootstrap.pypa.io/pip/3.6/get-pip.py
     - python ./get-pip.py
