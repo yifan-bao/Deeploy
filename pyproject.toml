@@ -1,12 +1,6 @@
 [build-system]
 requires = [
     "setuptools>=42",
-    "wheel",
-    "onnx",
-    "mako",
-    "numpy",
-    "IPython"
-    "nvidia-pyindex"
-    "onnx-graphsurgeon"
+    "wheel"
 ]
 build-backend = "setuptools.build_meta"
