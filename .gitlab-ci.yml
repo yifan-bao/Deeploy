@@ -21,7 +21,7 @@ build-job:       # This job runs in the build stage, which runs first.
   stage: build
   script:
     - echo "Updating dependencies"
-    - python -m venv ./env
+    - python3 -m venv ./env
     - source ./env/bin/activate
     - git submodule update --init --recursive
     - git checkout dumpotest
