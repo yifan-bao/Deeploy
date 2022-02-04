@@ -21,6 +21,7 @@ build-job:       # This job runs in the build stage, which runs first.
   stage: build
   script:
     - echo "Updating dependencies"
+    - bash
     - conda activate dumpoci
     - pip install -e .
   artifacts:
