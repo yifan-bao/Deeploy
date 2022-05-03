@@ -2,8 +2,8 @@
 #
 # File: BasicLayers.py
 #
-# Last edited: 17.12.2021        
-# 
+# Last edited: 17.12.2021
+#
 # Copyright (C) 2021, ETH Zurich and University of Bologna.
 #
 # Author: Moritz Scherer, ETH Zurich
@@ -33,23 +33,23 @@ class ReshapeLayer(ONNXLayer):
     def __init__(self, maps : List[NodeMapper]):
         super().__init__(maps)
 
-    def generate(self, ctxt: NetworkContext) -> (NetworkContext, List[str]):        
+    def generate(self, ctxt: NetworkContext) -> (NetworkContext, List[str]):
         outputs = [node for node in self.node.outputs]
         inputs = [node for node in self.node.inputs]
-        
+
         outputNames = [node.name for node in outputs]
         inputNames = [node.name for node in inputs]
-        
+
         alloc = ctxt.allocLocal(self.node.name, outputNames)
         call = self.mapper.generate(ctxt)
         dealloc = ctxt.freeLocal(self.node.name, inputNames)
-        
+
         return (ctxt, [call])
-    
+
 class GatherLayer(ONNXLayer):
     def __init__(self, maps : List[NodeMapper]):
         super().__init__(maps)
-    
+
 class iGELULayer(ONNXLayer):
     def __init__(self, maps : List[NodeMapper]):
         super().__init__(maps)
@@ -57,7 +57,7 @@ class iGELULayer(ONNXLayer):
 class iSoftmaxLayer(ONNXLayer):
     def __init__(self, maps : List[NodeMapper]):
         super().__init__(maps)
-        
+
 class RequantShiftLayer(ONNXLayer):
     def __init__(self, maps : List[NodeMapper]):
         super().__init__(maps)
@@ -67,9 +67,9 @@ class RequantShiftLayer(ONNXLayer):
         channel_dim = inputShapes[0][1]
         inputShapes[2]  = [inputShapes[0][0], channel_dim] + list(inputShapes[1][1:])
         inputShapes[1] = [inputShapes[0][0], channel_dim] + list(inputShapes[1][1:])
-            
+
         return (inputShapes, outputShapes)
-        
+
 class AddLayer(ONNXLayer):
     def __init__(self, maps : List[NodeMapper]):
         super().__init__(maps)
@@ -81,7 +81,7 @@ class AddLayer(ONNXLayer):
             inputShapes[0] = inputShapes[1]
 
         return (inputShapes, outputShapes)
-            
+
 class GEMMLayer(ONNXLayer):
     def __init__(self, maps : List[NodeMapper]):
         super().__init__(maps)
@@ -99,9 +99,9 @@ class GEMMLayer(ONNXLayer):
 
         if len(inputShapes) == 3:
             inputShapes[2] = [M,N]
-            
+
         return (inputShapes, outputShapes)
-    
+
 class ConvLayer(ONNXLayer):
     def __init__(self, maps : List[NodeMapper]):
         super().__init__(maps)
@@ -111,6 +111,7 @@ class ConvLayer(ONNXLayer):
             inputShapes[2] = inputShapes[1][-1]
         return (inputShapes, outputShapes)
 
+
 class PadLayer(ONNXLayer):
     def __init__(self, maps : List[NodeMapper]):
         super().__init__(maps)
@@ -118,7 +119,7 @@ class PadLayer(ONNXLayer):
 class MaxPoolLayer(ONNXLayer):
     def __init__(self, maps : List[NodeMapper]):
         super().__init__(maps)
-        
+
 class iLayerNormLayer(ONNXLayer):
     def __init__(self, maps : List[NodeMapper]):
         super().__init__(maps)

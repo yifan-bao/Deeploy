@@ -2,8 +2,8 @@
 #
 # File: BasicPasses.py
 #
-# Last edited: 20.12.2021        
-# 
+# Last edited: 20.12.2021
+#
 # Copyright (C) 2021, ETH Zurich and University of Bologna.
 #
 # Author: Moritz Scherer, ETH Zurich
@@ -39,7 +39,7 @@ def merge_transposes_fun(ctxt: NetworkContext, graph: gs.Graph, match: Match, na
     t2 = matched_nodes[1]
 
     #import IPython; IPython.embed()
-    
+
     # Transpose forth and back - delete both nodes
     if (t1.inputs[0].shape == t2.outputs[0].shape):
         graph.deleteNode(t1)
@@ -51,7 +51,7 @@ def merge_transposes_fun(ctxt: NetworkContext, graph: gs.Graph, match: Match, na
         p1 = t1.attrs['perm']
         p2 = t2.attrs['perm']
         newPerm = [p1[idx] for idx in p2]
-        
+
     _inputs = list(t1.inputs)
     _outputs = list(t2.outputs)
 
@@ -59,7 +59,7 @@ def merge_transposes_fun(ctxt: NetworkContext, graph: gs.Graph, match: Match, na
     graph.replaceInsertNode(_inputs, _outputs, newTrans)
     graph.cleanup().toposort()
     return ctxt, graph
-    
+
 class TransposeMergePass(ReplaceSequentialPatternPass):
     def __init__(self):
         passes = []
@@ -69,9 +69,9 @@ class TransposeMergePass(ReplaceSequentialPatternPass):
         output = graph.layer(inputs=output, outputs=['t2_out'], op='Transpose', name='t2')
         graph.outputs.append(output)
         graph.inputs.append(_input)
-    
-        name = f"_MERGE_TRANSPOSES_PASS"
-        super().__init__(graph, merge_transposes_fun, name)    
+
+        name = "_MERGE_TRANSPOSES_PASS"
+        super().__init__(graph, merge_transposes_fun, name)
 
 def const_opt_transposes_fun(ctxt: NetworkContext, graph: gs.Graph, match: Match, name: str):
     matched_nodes = [m for k, m in match.nodes_map.items()]
@@ -80,9 +80,9 @@ def const_opt_transposes_fun(ctxt: NetworkContext, graph: gs.Graph, match: Match
     if isinstance(t1.inputs[0], gs.Constant):
         t1.inputs[0].values = np.transpose(t1.inputs[0].values, t1.attrs['perm'])
         graph.deleteNode(t1)
-    
+
     return ctxt, graph
-    
+
 class TransposeConstOptPass(ReplaceSequentialPatternPass):
     def __init__(self):
         passes = []
@@ -91,9 +91,9 @@ class TransposeConstOptPass(ReplaceSequentialPatternPass):
         output = graph.layer(inputs=[_input], outputs=['t1_out'], op='Transpose', name='t1')
         graph.outputs.append(output)
         graph.inputs.append(_input)
-    
-        name = f"_CONST_OPT_TRANSPOSES_PASS"
-        super().__init__(graph, const_opt_transposes_fun, name)    
+
+        name = "_CONST_OPT_TRANSPOSES_PASS"
+        super().__init__(graph, const_opt_transposes_fun, name)
 
 def merge_requant_fun(ctxt: NetworkContext, graph: gs.Graph, match: Match, name: str):
     matched_nodes = [m for k, m in match.nodes_map.items()]
@@ -111,7 +111,7 @@ def merge_requant_fun(ctxt: NetworkContext, graph: gs.Graph, match: Match, name:
     attrs['div'] = gs.Constant(name='div', values=newDiv)
     attrs['n_levels'] = gs.Constant(name='n_levels',values=nLevels)
     attrs['signed'] = gs.Constant(name='signed', values=signed)
-    
+
     if isinstance(rqs1.inputs[1], gs.Constant) and isinstance(rqs1.inputs[2], gs.Constant) and \
        isinstance(rqs2.inputs[1], gs.Constant) and isinstance(rqs2.inputs[2], gs.Constant):
         mul1 = rqs1.inputs[1].values
@@ -124,15 +124,15 @@ def merge_requant_fun(ctxt: NetworkContext, graph: gs.Graph, match: Match, name:
 
         newMul = gs.Constant(name=rqs1.name+name+'_mul',values = np.array(np.round(newMul / minDiv)))
         newAdd = gs.Constant(name=rqs1.name+name+'_add',values = np.array(np.round(newAdd / minDiv)))
-        
+
         _inputs = [rqs1.inputs[0], newMul, newAdd]
         _outputs = rqs2.outputs
         newTrans = gs.Node(op='RequantShift', name=name, attrs=attrs)
         graph.replaceInsertNode(_inputs, _outputs, newTrans)
         return ctxt, graph
-    else:    
+    else:
         return ctxt, graph
-    
+
 class MergeRequantPass(ReplaceSequentialPatternPass):
     def __init__(self):
         passes = []
@@ -142,14 +142,14 @@ class MergeRequantPass(ReplaceSequentialPatternPass):
         output = graph.layer(inputs=output, outputs=['r2_out'], op='RequantShift', name='r2')
         graph.outputs.append(output)
         graph.inputs.append(_input)
-    
-        name = f"_OPT_RQS_PASS"
-        super().__init__(graph, merge_requant_fun, name)    
+
+        name = "_OPT_RQS_PASS"
+        super().__init__(graph, merge_requant_fun, name)
 
 def propagate_requant_fun(ctxt: NetworkContext, graph: gs.Graph, match: Match, name: str):
 
     ctxt = ctxt.copy()
-    
+
     matched_nodes = [m for k, m in match.nodes_map.items()]
     attrs = {}
     add = matched_nodes[0]
@@ -157,7 +157,7 @@ def propagate_requant_fun(ctxt: NetworkContext, graph: gs.Graph, match: Match, n
 
     inputNode1 = add.inputs[0]
     inputNode2 = add.inputs[1]
-    
+
     newAdd1 = gs.Constant(name=name+'_rqs1_add', values=rqs.inputs[2].values)
     newAdd2 = gs.Constant(name=name+'_rqs2_add', values=rqs.inputs[2].values)
     newMul1 = gs.Constant(name=name+'_rqs1_mul', values=rqs.inputs[1].values)
@@ -168,10 +168,10 @@ def propagate_requant_fun(ctxt: NetworkContext, graph: gs.Graph, match: Match, n
 
     node1 = ctxt.VariableBuffer().fromNode(newAddInput1, rqs.attrs['n_levels'])
     node2 = ctxt.VariableBuffer().fromNode(newAddInput2, rqs.attrs['n_levels'])
-    
+
     ctxt.add(node1,'local')
     ctxt.add(node2,'local')
-    
+
     newRQS1 = gs.Node(op='RequantShift', name=name+'_rqs1', attrs=rqs.attrs, inputs=[inputNode1, newMul1, newAdd1], outputs= [newAddInput1])
     newRQS2 = gs.Node(op='RequantShift', name=name+'_rqs2', attrs=rqs.attrs, inputs=[inputNode2, newMul2, newAdd2], outputs= [newAddInput2])
 
@@ -182,7 +182,7 @@ def propagate_requant_fun(ctxt: NetworkContext, graph: gs.Graph, match: Match, n
     graph.deleteNode(rqs)
 
     return ctxt, graph
-    
+
 class PropagateRequantThroughAddPass(ReplaceSequentialPatternPass):
     def __init__(self):
         passes = []
@@ -193,14 +193,14 @@ class PropagateRequantThroughAddPass(ReplaceSequentialPatternPass):
         output = graph.layer(inputs=output, outputs=['r1_out'], op='RequantShift', name='r1')
         graph.outputs.append(output)
         graph.inputs = [_input, _input2]
-    
-        name = f"_OPT_ADD_RQS_PASS"
-        super().__init__(graph, propagate_requant_fun, name)    
+
+        name = "_OPT_ADD_RQS_PASS"
+        super().__init__(graph, propagate_requant_fun, name)
 
 def extract_padding_fun(ctxt: NetworkContext, graph: gs.Graph, match: Match, name: str, value = 0):
 
     ctxt = ctxt.copy()
-    
+
     matched_nodes = [m for k, m in match.nodes_map.items()]
     attrs = {}
     conv = matched_nodes[0]
@@ -220,18 +220,18 @@ def extract_padding_fun(ctxt: NetworkContext, graph: gs.Graph, match: Match, nam
         for idx, i in enumerate(endPads):
             newShape[2+idx] = newShape[2+idx] + i
             newPads[len(newPads)//2+2+idx] = i
-            
+
         newConvInput = gs.Variable(name+'_padded_input', dtype=np.float32, shape=newShape)
         ctxt.add(ctxt.VariableBuffer().fromNode(newConvInput, ctxt.lookup(conv.inputs[0].name).nLevels))
         #valConst = gs.Constant('value', np.array(0))
         conv.attrs['pads'] = [0 for pad in conv.attrs['pads']]
         newPad = gs.Node(op='Pad', name=name+'_pad', attrs={'pads': newPads, 'mode': 'constant', 'value': value}, inputs=[conv.inputs[0]], outputs= [newConvInput])
-        
+
         conv.inputs[0] = newConvInput
         graph.nodes.append(newPad)
         graph.cleanup().toposort()
         #import IPython; IPython.embed()
-        
+
     return ctxt, graph
 
 class ExtractPaddingFromConvPass(ReplaceSequentialPatternPass):
@@ -242,9 +242,9 @@ class ExtractPaddingFromConvPass(ReplaceSequentialPatternPass):
         output = graph.layer(inputs=[_input], outputs=['conv_out'], op='Conv', name='conv1')
         graph.outputs.append(output)
         graph.inputs = [_input]
-    
-        name = f"_EXTRACT_CONV_PASS"
-        super().__init__(graph, extract_padding_fun, name)    
+
+        name = "_EXTRACT_CONV_PASS"
+        super().__init__(graph, extract_padding_fun, name)
 
 class ExtractPaddingFromPoolPass(ReplaceSequentialPatternPass):
     def __init__(self):
@@ -254,11 +254,11 @@ class ExtractPaddingFromPoolPass(ReplaceSequentialPatternPass):
         output = graph.layer(inputs=[_input], outputs=['pool_out'], op='MaxPool', name='maxpool1')
         graph.outputs.append(output)
         graph.inputs = [_input]
-    
-        name = f"_EXTRACT_POOL_PASS"
+
+        name = "_EXTRACT_POOL_PASS"
         # SCHEREMO: This is a workaround!!!
-        super().__init__(graph, partial(extract_padding_fun, value=-128), name)    
-        
+        super().__init__(graph, partial(extract_padding_fun, value=-128), name)
+
 def merge_rqs_add_fun(ctxt: NetworkContext, graph: gs.Graph, match: Match, name: str):
     matched_nodes = [m for k, m in match.nodes_map.items()]
     attrs = {}
@@ -277,9 +277,9 @@ def merge_rqs_add_fun(ctxt: NetworkContext, graph: gs.Graph, match: Match, name:
             add.inputs[(idx+1)%2].values = add.inputs[(idx+1)%2].values * 0
             rqs.inputs[0] = add.inputs[idx]
         return ctxt, graph
-    else:    
+    else:
         return ctxt, graph
-        
+
 class MergeConstAddAndRequantPass(ReplaceSequentialPatternPass):
     def __init__(self):
         passes = []
@@ -289,7 +289,6 @@ class MergeConstAddAndRequantPass(ReplaceSequentialPatternPass):
         output = graph.layer(inputs=output, outputs=['rqs_out'], op='RequantShift', name='rqs1')
         graph.outputs.append(output)
         graph.inputs = [_input]
-    
-        name = f"_MERGE_RQS_ADD_PASS"
-        super().__init__(graph, merge_rqs_add_fun, name)    
 
+        name = "_MERGE_RQS_ADD_PASS"
+        super().__init__(graph, merge_rqs_add_fun, name)

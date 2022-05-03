@@ -2,8 +2,8 @@
 #
 # File: CMSISLayers.py
 #
-# Last edited: 22.12.2021        
-# 
+# Last edited: 22.12.2021
+#
 # Copyright (C) 2021, ETH Zurich and University of Bologna.
 #
 # Author: Moritz Scherer, ETH Zurich
@@ -36,6 +36,16 @@ class RQSConvLayer(ConvLayer):
         inputShapes[4] = inputShapes[1][0] # Channels out dimension of Kernel
         return (inputShapes, outputShapes)
 
+    def computeMACs(self):
+        if hasattr(self.mapper.nodeRep, "groups"):
+            groups = self.mapper.nodeRep['groups']
+        else:
+            groups = 1
+        opsPerPx = int(np.prod(self.mapper.nodeRep['kernel_shape']) * self.mapper.nodeRep['ch_im_in'] * self.mapper.nodeRep['ch_im_out'] / groups)
+        numPx = self.mapper.nodeRep['dim_im_out_x'] * self.mapper.nodeRep['dim_im_out_y']
+        return numPx * opsPerPx
+
+
 class RQSGEMMLayer(GEMMLayer):
     def __init__(self, maps : List[NodeMapper]):
         super().__init__(maps)
@@ -45,3 +55,7 @@ class RQSGEMMLayer(GEMMLayer):
         # inputShapes[3] = inputShapes[1][-1] # Channels out dimension of Kernel
         # inputShapes[4] = inputShapes[1][-1] # Channels out dimension of Kernel
         return (inputShapes, outputShapes)
+
+    def computeMACs(self):
+        ops = self.mapper.nodeRep['in_N'] * self.mapper.nodeRep['in_C'] * self.mapper.nodeRep['weight_C']
+        return ops
