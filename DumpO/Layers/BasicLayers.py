@@ -54,6 +54,18 @@ class iGELULayer(ONNXLayer):
     def __init__(self, maps : List[NodeMapper]):
         super().__init__(maps)
 
+    def computeOps(self):
+        compAbs = self.mapper.nodeRep['size']
+        compAdd = self.mapper.nodeRep['size']
+        compSqr = self.mapper.nodeRep['size']
+        compMul = self.mapper.nodeRep['size']
+        compAdd = self.mapper.nodeRep['size']
+        compMul2 = self.mapper.nodeRep['size']
+        compAdd2 = self.mapper.nodeRep['size']
+        compDiv = self.mapper.nodeRep['size']
+        return compAbs + compAdd + compSqr + compMul + compAdd + compMul2 + compAdd2 + compDiv
+
+
 class iSoftmaxLayer(ONNXLayer):
     def __init__(self, maps : List[NodeMapper]):
         super().__init__(maps)
@@ -70,6 +82,9 @@ class RequantShiftLayer(ONNXLayer):
 
         return (inputShapes, outputShapes)
 
+    def computeOps(self):
+        return self.mapper.nodeRep['size'] * 3 # One add, one mul, one div
+
 class AddLayer(ONNXLayer):
     def __init__(self, maps : List[NodeMapper]):
         super().__init__(maps)
@@ -81,6 +96,9 @@ class AddLayer(ONNXLayer):
             inputShapes[0] = inputShapes[1]
 
         return (inputShapes, outputShapes)
+
+    def computeOps(self):
+        return self.mapper.nodeRep['size']
 
 class GEMMLayer(ONNXLayer):
     def __init__(self, maps : List[NodeMapper]):
@@ -124,6 +142,15 @@ class iLayerNormLayer(ONNXLayer):
     def __init__(self, maps : List[NodeMapper]):
         super().__init__(maps)
 
+    def computeOps(self):
+        compAverage = self.mapper.nodeRep['size']
+        compNormalize = self.mapper.nodeRep['size']
+        compSqr = self.mapper.nodeRep['size']
+        compSum = self.mapper.nodeRep['size']
+        compSqrt = self.mapper.nodeRep['size']
+        compDiv = self.mapper.nodeRep['size']
+        return compAverage + compNormalize + compSqr + compSum + compSqrt + compDiv
+
 class TransposeLayer(ONNXLayer):
     def __init__(self, maps : List[NodeMapper]):
         super().__init__(maps)
@@ -138,3 +165,17 @@ class MHSALayer(ONNXLayer):
         inputShapes[10] = inputShapes[9][0]
 
         return(inputShapes, outputShapes)
+
+    def computeOps(self):
+        seqLen = self.mapper.nodeRep['in_C']
+        dim = self.mapper.nodeRep['dim']
+        dim_head = self.mapper.nodeRep['dim_head']
+        heads = self.mapper.nodeRep['heads']
+        QOps = seqLen * dim * dim_head * heads * 2
+        KOps = seqLen * dim * dim_head * heads * 2
+        VOps = seqLen * dim * dim_head * heads * 2
+        QKOps = seqLen * seqLen * dim_head * heads * 2
+        AVOps = seqLen * seqLen * dim_head * heads * 2
+        OutOps = seqLen * dim_head * heads * dim * 2
+        totOps = QOps + KOps + VOps + QKOps + AVOps + OutOps
+        return totOps

@@ -536,8 +536,8 @@ class ONNXLayer():
         self.mapper = None
         self.node = None
 
-    def computeMACs(self):
-        assert self.mapper is not None, "To compute MACs, network must first be parsed!"
+    def computeOps(self):
+        assert self.mapper is not None, "To compute Ops, network must first be parsed!"
 
         return 0
 
@@ -1000,14 +1000,14 @@ class NetworkContainer():
 
         return self.getParameterSize() + self.getWorstCaseBufferSize()
 
-    def numberOfMACs(self, verbose: bool = False) -> int:
+    def numberOfOps(self, verbose: bool = False) -> int:
         if not self.parsed or not self.bound:
             raise ValueError('You need to parse and bind the network before getting number of operations!')
         totalSum = 0
         for i in self.layerBinding.values():
-            totalSum += i.computeMACs()
+            totalSum += i.computeOps()
             if verbose:
-                print("Layer " + str(i.node.name) + str("\nNumber of operations: \t\t") + str("%12s\n" % i.computeMACs()))
+                print("Layer " + str(i.node.name) + str("\nNumber of operations: \t\t") + str("%12s\n" % i.computeOps()))
         return totalSum
 
 class NetworkDeployer(NetworkContainer):

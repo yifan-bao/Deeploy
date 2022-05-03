@@ -36,12 +36,12 @@ class RQSConvLayer(ConvLayer):
         inputShapes[4] = inputShapes[1][0] # Channels out dimension of Kernel
         return (inputShapes, outputShapes)
 
-    def computeMACs(self):
-        if hasattr(self.mapper.nodeRep, "groups"):
-            groups = self.mapper.nodeRep['groups']
+    def computeOps(self):
+        if "group" in self.mapper.nodeRep.keys():
+            groups = self.mapper.nodeRep['group']
         else:
             groups = 1
-        opsPerPx = int(np.prod(self.mapper.nodeRep['kernel_shape']) * self.mapper.nodeRep['ch_im_in'] * self.mapper.nodeRep['ch_im_out'] / groups)
+        opsPerPx = int(np.prod(self.mapper.nodeRep['kernel_shape']) * self.mapper.nodeRep['ch_im_in'] * self.mapper.nodeRep['ch_im_out'] / groups) * 2
         numPx = self.mapper.nodeRep['dim_im_out_x'] * self.mapper.nodeRep['dim_im_out_y']
         return numPx * opsPerPx
 
@@ -56,6 +56,6 @@ class RQSGEMMLayer(GEMMLayer):
         # inputShapes[4] = inputShapes[1][-1] # Channels out dimension of Kernel
         return (inputShapes, outputShapes)
 
-    def computeMACs(self):
-        ops = self.mapper.nodeRep['in_N'] * self.mapper.nodeRep['in_C'] * self.mapper.nodeRep['weight_C']
+    def computeOps(self):
+        ops = self.mapper.nodeRep['in_N'] * self.mapper.nodeRep['in_C'] * self.mapper.nodeRep['weight_C'] * 2
         return ops
