@@ -2,8 +2,8 @@
 #
 # File: CMSISPlatform.py
 #
-# Last edited: 18.12.2021        
-# 
+# Last edited: 18.12.2021
+#
 # Copyright (C) 2021, ETH Zurich and University of Bologna.
 #
 # Author: Moritz Scherer, ETH Zurich
@@ -43,35 +43,43 @@ GELU_int8_Mapper = NodeMapper(iGELUParser(), [BasicGELUBinding])
 Softmax_int8_Mapper = NodeMapper(iSoftmaxParser(), [BasicSoftmaxBinding])
 iLayerNorm_int8_Mapper = NodeMapper(iLayerNormParser(), [CMSISLayerNormBinding])
 MHSA_int8_Mapper = NodeMapper(CMSISMHSAParser(), [CMSISMHSABinding])
+LinearAttention_int16_Mapper = NodeMapper(CMSISLinearAttentionParser(), [CMSISLinearAttentionBinding])
 
 GatherMapper = NodeMapper(GatherParser(), BasicGatherBindings)
 ReshapeMapper = NodeMapper(ReshapeParser(), BasicReshapeBindings)
 FlattenMapper = NodeMapper(FlattenParser(), BasicReshapeBindings)
 RequantShiftMapper = NodeMapper(RequantShiftParser(), BasicRQSBindings)
-
+ReduceMeanMapper = NodeMapper(ReduceMeanParser(), BasicReduceMeanBindings)
 GEMM_int8_Mapper = NodeMapper(CMSISGEMMParser(), [CMSISGEMMBinding])
-Conv_int8_Mapper = NodeMapper(CMSISConv2DParser(), [CMSISConv2DBinding])
-DWConv_int8_Mapper = NodeMapper(CMSISDWConv2DParser(), [CMSISDW3x3Conv2DBinding])
+Conv2D_int8_Mapper = NodeMapper(CMSISConv2DParser(), [CMSISConv2DBinding])
+DWConv2D_int8_Mapper = NodeMapper(CMSISDWConv2DParser(), [CMSISDW3x3Conv2DBinding])
+
+Conv1D_Mapper = NodeMapper(CMSISConv1DParser(), CMSISConv1DBindings)
+DWConv1D_Mapper = NodeMapper(CMSISDWConv1DParser(), CMSISDW3x3Conv1DBindings)
+
 AddMapper = NodeMapper(AddParser(), BasicAddBindings)
 
 TransposeMapper = NodeMapper(TransposeParser(), BasicTransposeBindings)
-PadMapper = NodeMapper(Pad2DParser(), BasicPadBindings)
+Pad2DMapper = NodeMapper(Pad2DParser(), BasicPad2DBindings)
+Pad1DMapper = NodeMapper(Pad1DParser(), BasicPad1DBindings)
 MaxPool2DMapper = NodeMapper(CMSISMaxPool2DParser(), [CMSISMaxPool2DBinding])
 
 DummyMapper = NodeMapper(DummyParser(), [DummyBinding])
 
 CMSISMapping = {
-    'RequantizedConv' : RQSConvLayer([Conv_int8_Mapper, DWConv_int8_Mapper]),
+    'RequantizedConv' : RQSConvLayer([Conv2D_int8_Mapper, DWConv2D_int8_Mapper, Conv1D_Mapper, DWConv1D_Mapper]),
     'RequantizedGemm': RQSGEMMLayer([GEMM_int8_Mapper]),
     'RequantShift': RequantShiftLayer([RequantShiftMapper]),
+    'ReduceMean': ReduceMeanLayer([ReduceMeanMapper]),
     'MaxPool': MaxPoolLayer([MaxPool2DMapper]),
     'iLayerNorm': iLayerNormLayer([iLayerNorm_int8_Mapper]),
     'MultiHeadSelfAttention': MHSALayer([MHSA_int8_Mapper]),
+    'LinearAttention': LinearAttentionLayer([LinearAttention_int16_Mapper]),
     'iGELU' : iGELULayer([GELU_int8_Mapper]),
     'iSoftmax' : iSoftmaxLayer([Softmax_int8_Mapper]),
     'Transpose': TransposeLayer([TransposeMapper]),
     'Gather': GatherLayer([GatherMapper]),
-    'Pad': PadLayer([PadMapper]),
+    'Pad': PadLayer([Pad1DMapper, Pad2DMapper]),
     'Add': AddLayer([AddMapper]),
     'Reshape': ReshapeLayer([ReshapeMapper]),
     'Flatten': ReshapeLayer([FlattenMapper]),
@@ -89,14 +97,14 @@ def CMSISTypeInfer(node: gs.ir.node.Node):
         signed = True
     else:
         signed = False
-    
+
     for _type in DataTypes:
-        if signed and outNode.values.max() < 2**(_type._value_-1) and outNode.values.min() >= -2**(_type._value_-1): 
+        if signed and outNode.values.max() < 2**(_type._value_-1) and outNode.values.min() >= -2**(_type._value_-1):
             return _type
         # For nor we only have signed kernels :(
-        elif not signed and outNode.values.max() < 2**(_type._value_-1): 
+        elif not signed and outNode.values.max() < 2**(_type._value_-1):
             return _type
-            
+
     raise TypeError(f'Could not infer type of node {node.name}')
 
 class SimpleNetworkBuffer(VariableBuffer):
@@ -105,7 +113,7 @@ class SimpleNetworkBuffer(VariableBuffer):
 
     def init(self):
         return AllocateTemplate.referenceInitTemplate.generate(type=self._type._name_, name=self.name)
-        
+
     def alloc(self):
         return AllocateTemplate.referenceAllocateTemplate.generate(type = self._type._name_, name=self.name, size = np.prod(self.shape))
 
@@ -121,12 +129,12 @@ class SimpleGlobalBuffer(ConstantBuffer):
         strValues = [str(value) for value in values]
         valueString = ', '.join(strValues)
         return AllocateTemplate.referenceGlobalInitTemplate.generate(type=self._type._name_, name=self.name, size = int(np.prod(self.shape)), values = valueString)
-        
+
     def alloc(self):
         values = list(self.values.reshape(-1))
         strValues = [str(value) for value in values]
         valueString = ', '.join(strValues)
-        
+
         return AllocateTemplate.referenceGlobalAllocateTemplate.generate(type = self._type._name_, name=self.name, size = int(np.prod(self.shape)), values = valueString)
 
     def dealloc(self):
@@ -138,15 +146,15 @@ class SimpleStructBuffer(StructBuffer):
 
     def init(self):
         return AllocateTemplate.referenceStructInitTemplate.generate(type=self._type, name=self.name, structDict = self.structDict)
-        
+
     def alloc(self) -> str:
         return AllocateTemplate.referenceStructAllocateTemplate.generate(type=self._type, name=self.name, structDict=self.structDict)
 
     def dealloc(self) -> str:
         return FreeTemplate.referenceLocalTemplate.generate(name=self.name)
-    
-    
-CMSISOptimizer = NetworkOptimizer([MHSAAlignmentPass(), MergeConstAddAndRequantPass(), ExtractPaddingFromPoolPass(), ExtractPaddingFromConvPass(), ConvRequantMergePass(), GEMMRequantMergePass(), MatMulRequantMergePass()])
+
+
+CMSISOptimizer = NetworkOptimizer([LinearAttentionAlignmentPass(), MHSAAlignmentPass(), MergeConstAddAndRequantPass(), ExtractPaddingFromPoolPass(), ExtractPaddingFromConvPass(), ConvRequantMergePass(), GEMMRequantMergePass(), MatMulRequantMergePass()])
 
 includeList = ["arm_math.h", "arm_nnfunctions.h", "DumpOMath.h"]
 
@@ -158,5 +166,3 @@ class CMSISPlatform(DeploymentPlatform):
         super().__init__(CMSISMapping, DataTypes, CMSISTypeInfer, \
                          SimpleNetworkBuffer, SimpleGlobalBuffer, SimpleStructBuffer, \
                          includeList)
-        
-        

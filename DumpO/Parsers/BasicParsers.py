@@ -2,8 +2,8 @@
 #
 # File: BasicParsers.py
 #
-# Last edited: 15.12.2021        
-# 
+# Last edited: 15.12.2021
+#
 # Copyright (C) 2021, ETH Zurich and University of Bologna.
 #
 # Author: Moritz Scherer, ETH Zurich
@@ -48,8 +48,8 @@ class TransposeParser(NodeParser):
     def parseNodeCtxt(self, ctxt: NetworkContext, node: gs.ir.node.Node, channels_first: bool = True) -> (NetworkContext, bool):
 
         ctxt = ctxt.copy()
-        
-        data_in = ctxt.lookup(node.inputs[0].name)            
+
+        data_in = ctxt.lookup(node.inputs[0].name)
         data_out = ctxt.lookup(node.outputs[0].name)
         self.parserDict['data_in_shape'] = data_in.shape
         self.parserDict['data_out_shape'] = data_out.shape
@@ -57,7 +57,7 @@ class TransposeParser(NodeParser):
         self.parserDict['data_out'] = data_out.name
         self.parserDict['data_in_size'] = np.prod(data_in.shape)
         self.parserDict['data_out_size'] = np.prod(data_out.shape)
-        
+
         return ctxt, True
 
 class MaxPoolParser(NodeParser):
@@ -84,24 +84,24 @@ class MaxPoolParser(NodeParser):
         return ret
 
     def parseNodeCtxt(self, ctxt: NetworkContext, node: gs.ir.node.Node, channels_first: bool = True) -> (NetworkContext, bool):
-        
+
         ctxt = ctxt.copy()
-        
-        data_in = ctxt.lookup(node.inputs[0].name)            
+
+        data_in = ctxt.lookup(node.inputs[0].name)
         data_out = ctxt.lookup(node.outputs[0].name)
         self.parserDict['data_in'] = data_in.name
         self.parserDict['data_out'] = data_out.name
         self.parserDict['data_in_size'] = np.prod(data_in.shape)
         self.parserDict['data_out_size'] = np.prod(data_out.shape)
-        
+
         return ctxt, True
 
 class MaxPool2DParser(MaxPoolParser):
     def __init__(self):
         super().__init__()
-        
+
     def parseNode(self, node: gs.ir.node.Node) -> bool:
-        
+
         ret = super().parseNode(node)
         wellFormed = False
         if ret:
@@ -112,7 +112,7 @@ class MaxPool2DParser(MaxPoolParser):
         return wellFormed
 
     def parseNodeCtxt(self, ctxt: NetworkContext, node: gs.ir.node.Node, channels_first: bool = True) -> (NetworkContext, bool):
-        
+
         ctxt, ret = super().parseNodeCtxt(ctxt, node)
         wellFormed = False
         if ret:
@@ -123,7 +123,7 @@ class MaxPool2DParser(MaxPoolParser):
 
         return ctxt, wellFormed
 
-    
+
 class PadParser(NodeParser):
     def __init__(self):
         super().__init__()
@@ -147,22 +147,22 @@ class PadParser(NodeParser):
 
     def parseNodeCtxt(self, ctxt: NetworkContext, node: gs.ir.node.Node, channels_first: bool = True) -> (NetworkContext, bool):
         ctxt = ctxt.copy()
-        
-        data_in = ctxt.lookup(node.inputs[0].name)            
+
+        data_in = ctxt.lookup(node.inputs[0].name)
         data_out = ctxt.lookup(node.outputs[0].name)
         self.parserDict['data_in'] = data_in.name
         self.parserDict['data_out'] = data_out.name
         self.parserDict['data_in_size'] = np.prod(data_in.shape)
         self.parserDict['data_out_size'] = np.prod(data_out.shape)
-        
+
         return ctxt, True
 
 class Pad2DParser(PadParser):
     def __init__(self):
         super().__init__()
-        
+
     def parseNode(self, node: gs.ir.node.Node) -> bool:
-        
+
         ret = super().parseNode(node)
         wellFormed = False
         if ret:
@@ -172,11 +172,11 @@ class Pad2DParser(PadParser):
                 wellFormed = True
                 self.parserDict['pad_x'] = pads[3]
                 self.parserDict['pad_y'] = pads[2]
-                
+
         return wellFormed
 
     def parseNodeCtxt(self, ctxt: NetworkContext, node: gs.ir.node.Node, channels_first: bool = True) -> (NetworkContext, bool):
-        
+
         ctxt, ret = super().parseNodeCtxt(ctxt, node)
         wellFormed = False
         if ret:
@@ -198,7 +198,46 @@ class Pad2DParser(PadParser):
                     self.parserDict['dim_im_in_ch'] = data_in.shape[3]
                     self.parserDict['dim_im_out_x'] = data_out.shape[1]
                     self.parserDict['dim_im_out_y'] = data_out.shape[2]
-                    self.parserDict['dim_im_out_ch'] = data_out.shape[3]                    
+                    self.parserDict['dim_im_out_ch'] = data_out.shape[3]
+        return ctxt, wellFormed
+
+class Pad1DParser(PadParser):
+    def __init__(self):
+        super().__init__()
+
+    def parseNode(self, node: gs.ir.node.Node) -> bool:
+
+        ret = super().parseNode(node)
+        wellFormed = False
+        if ret:
+            pads = self.parserDict['pads']
+            if len(pads) == 6 and pads[0] == 0 and pads[3] == 0 \
+            and pads[1] == 0 and pads[4] == 0:
+                wellFormed = True
+                self.parserDict['pad_x'] = pads[2]
+
+        return wellFormed
+
+    def parseNodeCtxt(self, ctxt: NetworkContext, node: gs.ir.node.Node, channels_first: bool = True) -> (NetworkContext, bool):
+
+        ctxt, ret = super().parseNodeCtxt(ctxt, node)
+        wellFormed = False
+        if ret:
+            data_in = ctxt.lookup(node.inputs[0].name)
+            data_out = ctxt.lookup(node.outputs[0].name)
+            if len(data_in.shape) == 3:
+                wellFormed = True
+                self.parserDict['batch'] = data_in.shape[0]
+                if channels_first:
+                    self.parserDict['dim_im_in_x'] = data_in.shape[2]
+                    self.parserDict['dim_im_in_ch'] = data_in.shape[1]
+                    self.parserDict['dim_im_out_x'] = data_out.shape[2]
+                    self.parserDict['dim_im_out_ch'] = data_out.shape[1]
+                else:
+                    self.parserDict['dim_im_in_x'] = data_in.shape[1]
+                    self.parserDict['dim_im_in_ch'] = data_in.shape[2]
+                    self.parserDict['dim_im_out_x'] = data_out.shape[1]
+                    self.parserDict['dim_im_out_ch'] = data_out.shape[2]
         return ctxt, wellFormed
 
 
@@ -216,9 +255,9 @@ class AddParser(NodeParser):
         return ret
 
     def parseNodeCtxt(self, ctxt: NetworkContext, node: gs.ir.node.Node, channels_first: bool = True) -> (NetworkContext, bool):
-        
+
         ctxt = ctxt.copy()
-        
+
         data_in_1 = ctxt.lookup(node.inputs[0].name)
         data_in_2 = ctxt.lookup(node.inputs[1].name)
         data_out = ctxt.lookup(node.outputs[0].name)
@@ -226,7 +265,41 @@ class AddParser(NodeParser):
         self.parserDict['data_in_2'] = data_in_2.name
         self.parserDict['data_out'] = data_out.name
         self.parserDict['size'] = np.prod(data_in_1.shape)
-        
+
+        return ctxt, True
+
+class ReduceMeanParser(NodeParser):
+    def __init__(self):
+        super().__init__()
+
+    def parseNode(self, node: gs.ir.node.Node) -> bool:
+
+        ret = all([
+            'axes' in node.attrs,
+            'keepdims' in node.attrs,
+            len(node.inputs) == 1,
+            len(node.outputs) == 1
+        ])
+
+        if ret:
+            self.parserDict['axes'] = node.attrs['axes']
+            self.parserDict['keepdims'] = int(node.attrs['keepdims'])
+
+        return ret
+
+    def parseNodeCtxt(self, ctxt: NetworkContext, node: gs.ir.node.Node, channels_first: bool = True) -> (NetworkContext, bool):
+
+        ctxt = ctxt.copy()
+
+        data_in = ctxt.lookup(node.inputs[0].name)
+        data_out = ctxt.lookup(node.outputs[0].name)
+        self.parserDict['data_in'] = data_in.name
+        self.parserDict['data_out'] = data_out.name
+        self.parserDict['data_in_shape'] = data_in.shape
+        self.parserDict['data_out_shape'] = data_out.shape
+        self.parserDict['size'] = np.prod(data_in.shape)
+        self.parserDict['axisLength'] = data_in.shape[self.parserDict['axes'][0]]
+
         return ctxt, True
 
 class iSoftmaxParser(NodeParser):
@@ -253,16 +326,16 @@ class iSoftmaxParser(NodeParser):
         return ret
 
     def parseNodeCtxt(self, ctxt: NetworkContext, node: gs.ir.node.Node, channels_first: bool = True) -> (NetworkContext, bool):
-        
+
         ctxt = ctxt.copy()
-        
+
         data_in = ctxt.lookup(node.inputs[0].name)
         data_out = ctxt.lookup(node.outputs[0].name)
         self.parserDict['data_in'] = data_in.name
         self.parserDict['data_out'] = data_out.name
         self.parserDict['size'] = np.prod(data_in.shape)
         self.parserDict['lastDimLength'] = data_in.shape[-1]
-        
+
         return ctxt, True
 
 class iGELUParser(NodeParser):
@@ -291,15 +364,15 @@ class iGELUParser(NodeParser):
         return ret
 
     def parseNodeCtxt(self, ctxt: NetworkContext, node: gs.ir.node.Node, channels_first: bool = True) -> (NetworkContext, bool):
-        
+
         ctxt = ctxt.copy()
-        
+
         data_in = ctxt.lookup(node.inputs[0].name)
         data_out = ctxt.lookup(node.outputs[0].name)
         self.parserDict['data_in'] = data_in.name
         self.parserDict['data_out'] = data_out.name
         self.parserDict['size'] = np.prod(data_in.shape)
-        
+
         return ctxt, True
 
 class GatherParser(NodeParser):
@@ -313,20 +386,20 @@ class GatherParser(NodeParser):
             len(node.inputs) == 2,
             len(node.outputs) == 1
         ])
-        
+
 
         if ret:
             self.parserDict['axis'] = node.attrs['axis']
 
         return ret
-    
+
     def parseNodeCtxt(self, ctxt: NetworkContext, node: gs.ir.node.Node, channels_first: bool = True) -> (NetworkContext, bool):
-        
+
         ctxt = ctxt.copy()
 
         inputs = ['data_in', 'indices']
         outputs = ['data_out']
-        
+
         for idx, inputNode in enumerate(node.inputs):
             self.parserDict[inputs[idx]] = ctxt.lookup(inputNode.name).name
         for idx, outputNode in enumerate(node.outputs):
@@ -354,25 +427,25 @@ class FlattenParser(NodeParser):
 
         if ret:
             self.parserDict['axis'] = node.attrs['axis']
-        
+
         return ret
-    
+
     def parseNodeCtxt(self, ctxt: NetworkContext, node: gs.ir.node.Node, channels_first: bool = True) -> (NetworkContext, bool):
-        
+
         ctxt = ctxt.copy()
 
         inputs = ['data_in']
         outputs = ['data_out']
-        
+
         for idx, inputNode in enumerate(node.inputs):
             self.parserDict[inputs[idx]] = ctxt.lookup(inputNode.name).name
         for idx, outputNode in enumerate(node.outputs):
             self.parserDict[outputs[idx]] = ctxt.lookup(outputNode.name).name
 
 
-        return ctxt, True    
+        return ctxt, True
 
-    
+
 class ReshapeParser(NodeParser):
     def __init__(self):
         super().__init__()
@@ -383,26 +456,26 @@ class ReshapeParser(NodeParser):
             len(node.inputs) == 2,
             len(node.outputs) == 1
         ])
-        
+
         return ret
-    
+
     def parseNodeCtxt(self, ctxt: NetworkContext, node: gs.ir.node.Node, channels_first: bool = True) -> (NetworkContext, bool):
-        
+
         ctxt = ctxt.copy()
 
         inputs = ['data_in', 'indices']
         outputs = ['data_out']
-        
+
         for idx, inputNode in enumerate(node.inputs):
             self.parserDict[inputs[idx]] = ctxt.lookup(inputNode.name).name
         for idx, outputNode in enumerate(node.outputs):
             self.parserDict[outputs[idx]] = ctxt.lookup(outputNode.name).name
 
-            
+
         self.parserDict['size'] = np.prod(ctxt.lookup(node.inputs[0].name).shape)
 
-        return ctxt, True    
-    
+        return ctxt, True
+
 class RequantShiftParser(NodeParser):
     def __init__(self):
         super().__init__()
@@ -411,31 +484,36 @@ class RequantShiftParser(NodeParser):
 
         ret = all([
             'div' in node.attrs,
-            'n_levels' in node.attrs,
+            any(['n_levels' in node.attrs,
+                'n_levels_out' in node.attrs
+                 ]),
             'signed' in node.attrs,
             len(node.inputs) == 3,
             len(node.outputs) == 1
         ])
 
         if ret:
-            self.parserDict['n_levels'] = int(node.attrs['n_levels'].values)
+            if hasattr(node, 'n_levels'):
+                self.parserDict['n_levels'] = int(node.attrs['n_levels'].values)
+            else:
+                self.parserDict['n_levels'] = int(node.attrs['n_levels_out'].values)
             self.parserDict['signed'] = int(node.attrs['signed'].values)
             self.parserDict['log2D'] = int(math.log2(node.attrs['div'].values))
 
         return ret
-    
+
     def parseNodeCtxt(self, ctxt: NetworkContext, node: gs.ir.node.Node, channels_first: bool = True) -> (NetworkContext, bool):
-        
+
         ctxt = ctxt.copy()
 
         inputs = ['data_in', 'mul', 'add']
         outputs = ['data_out']
-        
+
         for idx, inputNode in enumerate(node.inputs):
             self.parserDict[inputs[idx]] = ctxt.lookup(inputNode.name).name
         for idx, outputNode in enumerate(node.outputs):
             self.parserDict[outputs[idx]] = ctxt.lookup(outputNode.name).name
-            
+
         self.parserDict['size'] = np.prod(ctxt.lookup(node.inputs[0].name).shape)
         self.parserDict['channels'] = ctxt.lookup(node.inputs[0].name).shape[1]
 
@@ -458,7 +536,7 @@ class ConvParser(NodeParser):
         ])
         if self.noBiasHoisting:
             wellFormed = wellFormed
-        
+
         if wellFormed:
             self.parserDict['group'] = node.attrs['group']
             self.parserDict['kernel_shape'] = node.attrs['kernel_shape']
@@ -467,14 +545,14 @@ class ConvParser(NodeParser):
             self.parserDict['dilations'] = node.attrs['dilations']
 
         return wellFormed
-    
+
     def parseNodeCtxt(self, ctxt: NetworkContext, node: gs.ir.node.Node, channels_first: bool = True) -> (NetworkContext, bool):
-        
+
         ctxt = ctxt.copy()
 
         inputs = ['data_in', 'weight']
         outputs = ['data_out']
-        
+
         for idx, inputNode in enumerate(node.inputs):
             if idx < len(inputs):
                 self.parserDict[inputs[idx]] = ctxt.lookup(inputNode.name).name
@@ -490,7 +568,7 @@ class ConvParser(NodeParser):
                 ctxt.hoistConstant(zeroTensor)
                 node.inputs.append(zeroTensor)
                 self.parserDict['bias'] = f'{node.name}_Bias_Tensor'
-            
+
         self.parserDict['size'] = np.prod(ctxt.lookup(node.inputs[0].name).shape)
 
         return ctxt, True
@@ -498,12 +576,12 @@ class ConvParser(NodeParser):
 class Conv2DParser(ConvParser):
     def __init__(self, noBiasHoisting = True):
         super().__init__(noBiasHoisting)
-        
+
     def parseNode(self, node: gs.ir.node.Node) -> (bool):
 
         wellFormed = super().parseNode(node)
         ret = False
-        
+
         if wellFormed:
             ret = all([
                 # Make sure kernel is 2D
@@ -515,21 +593,57 @@ class Conv2DParser(ConvParser):
             ])
 
         return ret
-    
+
     def parseNodeCtxt(self, ctxt: NetworkContext, node: gs.ir.node.Node, channels_first: bool = True) -> (NetworkContext, bool):
-        
+
         ctxt = ctxt.copy()
 
         newCtxt, ret = super().parseNodeCtxt(ctxt, node)
-        
+
         if ret:
             data_in = newCtxt.lookup(self.parserDict['data_in'])
             weight = newCtxt.lookup(self.parserDict['weight'])
             if len(data_in.shape) == 4 and len(weight.shape) == 4:
                 return newCtxt, True
-            
+
         return ctxt, False
-        
+
+class Conv1DParser(ConvParser):
+    def __init__(self, noBiasHoisting = True):
+        super().__init__(noBiasHoisting)
+
+    def parseNode(self, node: gs.ir.node.Node) -> (bool):
+
+        wellFormed = super().parseNode(node)
+        ret = False
+
+        if wellFormed:
+            ret = all([
+                # Make sure kernel is 2D
+                len(node.attrs['kernel_shape']) == 1,
+                # Make sure strides are 2D
+                len(node.attrs['strides']) == 1,
+                len(node.attrs['pads']) == 2,
+                len(node.attrs['dilations']) == 1,
+            ])
+
+        return ret
+
+    def parseNodeCtxt(self, ctxt: NetworkContext, node: gs.ir.node.Node, channels_first: bool = True) -> (NetworkContext, bool):
+
+        ctxt = ctxt.copy()
+
+        newCtxt, ret = super().parseNodeCtxt(ctxt, node)
+
+        if ret:
+            data_in = newCtxt.lookup(self.parserDict['data_in'])
+            weight = newCtxt.lookup(self.parserDict['weight'])
+            if len(data_in.shape) == 3 and len(weight.shape) == 3:
+                return newCtxt, True
+
+        return ctxt, False
+
+
 class MHSAParser(NodeParser):
     def __init__(self):
         super().__init__()
@@ -560,26 +674,26 @@ class MHSAParser(NodeParser):
             len(node.inputs) == 11,
             len(node.outputs) == 1
         ])
-        
+
 
         if ret:
-            self.parserDict['preattn_requant_mul'] = int(node.attrs['preattn_requant_mul'].values) 
-            self.parserDict['preattn_requant_shift'] = int(node.attrs['preattn_requant_shift'].values)           
+            self.parserDict['preattn_requant_mul'] = int(node.attrs['preattn_requant_mul'].values)
+            self.parserDict['preattn_requant_shift'] = int(node.attrs['preattn_requant_shift'].values)
             self.parserDict['preattn_requant_div'] = int(math.log2(int(node.attrs['preattn_requant_div'].values)))
             self.parserDict['postattn_requant_mul'] = int(node.attrs['postattn_requant_mul'].values)
-            self.parserDict['postattn_requant_shift'] = int(node.attrs['postattn_requant_shift'].values)            
+            self.parserDict['postattn_requant_shift'] = int(node.attrs['postattn_requant_shift'].values)
             self.parserDict['postattn_requant_div'] = int(math.log2(int(node.attrs['postattn_requant_div'].values)))
             self.parserDict['wo_requant_mul'] = int(node.attrs['wo_requant_mul'].values)
-            self.parserDict['wo_requant_shift'] = int(node.attrs['wo_requant_shift'].values)            
+            self.parserDict['wo_requant_shift'] = int(node.attrs['wo_requant_shift'].values)
             self.parserDict['wo_requant_div'] = int(math.log2(int(node.attrs['wo_requant_div'].values)))
             self.parserDict['wq_requant_mul'] = int(node.attrs['wq_requant_mul'].values)
-            self.parserDict['wq_requant_shift'] = int(node.attrs['wq_requant_shift'].values)            
+            self.parserDict['wq_requant_shift'] = int(node.attrs['wq_requant_shift'].values)
             self.parserDict['wq_requant_div'] = int(math.log2(int(node.attrs['wq_requant_div'].values)))
             self.parserDict['wk_requant_mul'] = int(node.attrs['wk_requant_mul'].values)
             self.parserDict['wk_requant_shift'] = int(node.attrs['wk_requant_shift'].values)
             self.parserDict['wk_requant_div'] = int(math.log2(int(node.attrs['wk_requant_div'].values)))
             self.parserDict['wv_requant_mul'] = int(node.attrs['wv_requant_mul'].values)
-            self.parserDict['wv_requant_shift'] = int(node.attrs['wv_requant_shift'].values)            
+            self.parserDict['wv_requant_shift'] = int(node.attrs['wv_requant_shift'].values)
             self.parserDict['wv_requant_div'] = int(math.log2(int(node.attrs['wv_requant_div'].values)))
             self.parserDict['isoftmaxA'] = int(node.attrs['isoftmaxA'].values)
             self.parserDict['isoftmaxB'] = int(node.attrs['isoftmaxB'].values)
@@ -589,21 +703,103 @@ class MHSAParser(NodeParser):
             self.parserDict['dim'] = int(node.attrs['dim'].values)
             self.parserDict['dim_head'] = int(node.attrs['dim_head'].values)
             self.parserDict['heads'] = int(node.attrs['heads'].values)
-            
+
         return ret
-    
+
     def parseNodeCtxt(self, ctxt: NetworkContext, node: gs.ir.node.Node, channels_first: bool = True) -> (NetworkContext, bool):
-        
+
         ctxt = ctxt.copy()
 
         inputs = ['q', 'k', 'v', 'wq_weight', 'wq_bias', 'wk_weight', 'wk_bias' , 'wv_weight', 'wv_bias', 'wo_weight', 'wo_bias']
         outputs = ['data_out']
-        
+
         for idx, inputNode in enumerate(node.inputs):
             self.parserDict[inputs[idx]] = ctxt.lookup(inputNode.name).name
         for idx, outputNode in enumerate(node.outputs):
             self.parserDict[outputs[idx]] = ctxt.lookup(outputNode.name).name
-            
+
+        self.parserDict['size'] = np.prod(ctxt.lookup(node.inputs[0].name).shape)
+        self.parserDict['q_shape'] = ctxt.lookup(node.inputs[0].name).shape
+
+        return ctxt, True
+
+class LinearAttentionParser(NodeParser):
+    def __init__(self):
+        super().__init__()
+
+    def parseNode(self, node: gs.ir.node.Node) -> (bool):
+
+        ret = all([
+            'preattn_requant_mul' in node.attrs,
+            'preattn_requant_div' in node.attrs,
+            'normalizer_requant_mul' in node.attrs,
+            'normalizer_requant_div' in node.attrs,
+            'postattn_requant_mul' in node.attrs,
+            'postattn_requant_div' in node.attrs,
+            'wo_requant_mul' in node.attrs,
+            'wo_requant_div' in node.attrs,
+            'wq_requant_mul' in node.attrs,
+            'wq_requant_div' in node.attrs,
+            'wk_requant_mul' in node.attrs,
+            'wk_requant_div' in node.attrs,
+            'wv_requant_mul' in node.attrs,
+            'wv_requant_div' in node.attrs,
+            'Delta' in node.attrs,
+            'eps' in node.attrs,
+            'act_type' in node.attrs,
+            'n_levels' in node.attrs,
+            'dim' in node.attrs,
+            'dim_head' in node.attrs,
+            'heads' in node.attrs,
+            len(node.inputs) == 11,
+            len(node.outputs) == 1
+        ])
+
+
+        if ret:
+            self.parserDict['preattn_requant_mul'] = int(node.attrs['preattn_requant_mul'].values)
+            self.parserDict['preattn_requant_shift'] = int(node.attrs['preattn_requant_shift'].values)
+            self.parserDict['preattn_requant_div'] = int(math.log2(int(node.attrs['preattn_requant_div'].values)))
+            self.parserDict['normalizer_requant_mul'] = int(node.attrs['normalizer_requant_mul'].values)
+            self.parserDict['normalizer_requant_shift'] = int(node.attrs['normalizer_requant_shift'].values)
+            self.parserDict['normalizer_requant_div'] = int(math.log2(int(node.attrs['normalizer_requant_div'].values)))
+            self.parserDict['postattn_requant_mul'] = int(node.attrs['postattn_requant_mul'].values)
+            self.parserDict['postattn_requant_shift'] = int(node.attrs['postattn_requant_shift'].values)
+            self.parserDict['postattn_requant_div'] = int(math.log2(int(node.attrs['postattn_requant_div'].values)))
+            self.parserDict['wo_requant_mul'] = int(node.attrs['wo_requant_mul'].values)
+            self.parserDict['wo_requant_shift'] = int(node.attrs['wo_requant_shift'].values)
+            self.parserDict['wo_requant_div'] = int(math.log2(int(node.attrs['wo_requant_div'].values)))
+            self.parserDict['wq_requant_mul'] = int(node.attrs['wq_requant_mul'].values)
+            self.parserDict['wq_requant_shift'] = int(node.attrs['wq_requant_shift'].values)
+            self.parserDict['wq_requant_div'] = int(math.log2(int(node.attrs['wq_requant_div'].values)))
+            self.parserDict['wk_requant_mul'] = int(node.attrs['wk_requant_mul'].values)
+            self.parserDict['wk_requant_shift'] = int(node.attrs['wk_requant_shift'].values)
+            self.parserDict['wk_requant_div'] = int(math.log2(int(node.attrs['wk_requant_div'].values)))
+            self.parserDict['wv_requant_mul'] = int(node.attrs['wv_requant_mul'].values)
+            self.parserDict['wv_requant_shift'] = int(node.attrs['wv_requant_shift'].values)
+            self.parserDict['wv_requant_div'] = int(math.log2(int(node.attrs['wv_requant_div'].values)))
+            self.parserDict['Delta'] = int(node.attrs['Delta'])
+            self.parserDict['eps'] = int(node.attrs['eps'])
+            self.parserDict['act_type'] = int(node.attrs['act_type'])
+            self.parserDict['n_levels'] = int(node.attrs['n_levels'].values)
+            self.parserDict['dim'] = int(node.attrs['dim'].values)
+            self.parserDict['dim_head'] = int(node.attrs['dim_head'].values)
+            self.parserDict['heads'] = int(node.attrs['heads'].values)
+
+        return ret
+
+    def parseNodeCtxt(self, ctxt: NetworkContext, node: gs.ir.node.Node, channels_first: bool = True) -> (NetworkContext, bool):
+
+        ctxt = ctxt.copy()
+
+        inputs = ['q', 'k', 'v', 'wq_weight', 'wq_bias', 'wk_weight', 'wk_bias' , 'wv_weight', 'wv_bias', 'wo_weight', 'wo_bias']
+        outputs = ['data_out']
+
+        for idx, inputNode in enumerate(node.inputs):
+            self.parserDict[inputs[idx]] = ctxt.lookup(inputNode.name).name
+        for idx, outputNode in enumerate(node.outputs):
+            self.parserDict[outputs[idx]] = ctxt.lookup(outputNode.name).name
+
         self.parserDict['size'] = np.prod(ctxt.lookup(node.inputs[0].name).shape)
         self.parserDict['q_shape'] = ctxt.lookup(node.inputs[0].name).shape
 
@@ -621,26 +817,26 @@ class iLayerNormParser(NodeParser):
             len(node.inputs) == 3,
             len(node.outputs) == 1
         ])
-        
+
 
         if ret:
             self.parserDict['n_levels'] = int(node.attrs['n_levels'].values)
             self.parserDict['log2D'] = int(math.log2(node.attrs['D'].values))
 
         return ret
-    
+
     def parseNodeCtxt(self, ctxt: NetworkContext, node: gs.ir.node.Node, channels_first: bool = True) -> (NetworkContext, bool):
-        
+
         ctxt = ctxt.copy()
 
         inputs = ['data_in', 'weight', 'bias']
         outputs = ['data_out']
-        
+
         for idx, inputNode in enumerate(node.inputs):
             self.parserDict[inputs[idx]] = ctxt.lookup(inputNode.name).name
         for idx, outputNode in enumerate(node.outputs):
             self.parserDict[outputs[idx]] = ctxt.lookup(outputNode.name).name
-            
+
         self.parserDict['size'] = np.prod(ctxt.lookup(node.inputs[0].name).shape)
         self.parserDict['lastDimLength'] = ctxt.lookup(node.inputs[0].name).shape[-1]
 
@@ -665,14 +861,14 @@ class MatMulParser(NodeParser):
             self.parserDict['transA'] = 0
 
         return ret
-    
+
     def parseNodeCtxt(self, ctxt: NetworkContext, node: gs.ir.node.Node, channels_first: bool = True) -> (NetworkContext, bool):
-        
+
         ctxt = ctxt.copy()
 
         inputs = ['A', 'B']
         outputs = ['data_out']
-        
+
         for idx, inputNode in enumerate(node.inputs):
             self.parserDict[inputs[idx]] = ctxt.lookup(inputNode.name).name
         for idx, outputNode in enumerate(node.outputs):
@@ -685,10 +881,10 @@ class MatMulParser(NodeParser):
             ctxt.hoistConstant(zeroTensor)
             node.inputs.append(zeroTensor)
             self.parserDict['C'] = f'{node.name}_C_Tensor'
-            
+
         self.parserDict['size'] = np.prod(ctxt.lookup(node.inputs[0].name).shape)
 
-        return ctxt, True    
+        return ctxt, True
 
 # This parser combines Matmul nodes and GEMM nodes to the more general GEMM nodes
 class GEMMParser(MatMulParser):
@@ -709,7 +905,7 @@ class GEMMParser(MatMulParser):
         if ret:
             self.parserDict['alpha'] = node.attrs['alpha']
             self.parserDict['beta'] = node.attrs['beta']
-            
+
             if 'transA' in node.attrs:
                 self.parserDict['transA'] = node.attrs['transA']
             else:
@@ -725,9 +921,9 @@ class GEMMParser(MatMulParser):
         else:
             return super().parseNode(node)
 
-    
+
     def parseNodeCtxt(self, ctxt: NetworkContext, node: gs.ir.node.Node, channels_first: bool = True) -> (NetworkContext, bool):
-        
+
         ctxt = ctxt.copy()
         wellFormed = self.parseNode(node)
 
@@ -749,33 +945,33 @@ class GEMMParser(MatMulParser):
                 zeroTensor = gs.Constant(f'{node.name}_C_Tensor', values=values)
                 ctxt.hoistConstant(zeroTensor)
                 self.parserDict['C'] = f'{node.name}_C_Tensor'
-                
+
             self.parserDict['size'] = np.prod(ctxt.lookup(node.inputs[0].name).shape)
 
             return ctxt, True
-        
+
         # We are a matmul, so behave like one
         else:
             return super().parseNodeCtxt(ctxt, node)
-    
+
 class DummyParser(NodeParser):
     def __init__(self):
         super().__init__()
 
     def parseNode(self, node: gs.ir.node.Node) -> bool:
         return ret
-        
+
     def parseNodeCtxt(self, ctxt: NetworkContext, node: gs.ir.node.Node, channels_first: bool = True) -> (NetworkContext, bool):
-        
+
         inputs = []
         outputs = []
         for i in node.inputs:
             inputs.append(ctxt.lookup(i.name))
         for i in node.outputs:
             outputs.append(ctxt.lookup(i.name))
-            
+
         self.parserDict['data_in'] = inputs[0].name
         self.parserDict['data_out'] = outputs[0].name
         self.parserDict['size'] = np.prod(inputs[0].shape)
-        
+
         return ctxt, True

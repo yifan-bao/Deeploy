@@ -2,8 +2,8 @@
 #
 # File: CMSISCheckers.py
 #
-# Last edited: 18.12.2021        
-# 
+# Last edited: 18.12.2021
+#
 # Copyright (C) 2021, ETH Zurich and University of Bologna.
 #
 # Author: Moritz Scherer, ETH Zurich
@@ -32,14 +32,14 @@ class CMSISSaturatingAddChecker(NodeTypeChecker):
         super().__init__(input_types, output_types)
 
     def inferNumLevels(self, inputs: List[VariableBuffer], parserDict: Dict) -> List[int]:
-        return [min(inputs[0].nLevels + inputs[1].nLevels, 2**(self.input_types[0]._value_))]    
+        return [min(inputs[0].nLevels + inputs[1].nLevels, 2**(self.input_types[0]._value_))]
 
     def inferSignedness(self, inputs: List[VariableBuffer], parserDict: Dict) -> List[bool]:
         if inputs[0]._signed or inputs[1]._signed:
             return [True]
         else:
             return [False]
-    
+
 class CMSISLinearChecker(NodeTypeChecker):
     def __init__(self, input_types: List[Enum], output_types: List[Enum]):
         super().__init__(input_types, output_types)
@@ -49,7 +49,7 @@ class CMSISLinearChecker(NodeTypeChecker):
 
     def inferSignedness(self, inputs: List[VariableBuffer], parserDict: Dict) -> List[bool]:
         return [bool(parserDict["signed"])]
-    
+
 class CMSISConvChecker(NodeTypeChecker):
     def __init__(self, input_types: List[Enum], output_types: List[Enum]):
         super().__init__(input_types, output_types)
@@ -59,7 +59,7 @@ class CMSISConvChecker(NodeTypeChecker):
 
     def inferSignedness(self, inputs: List[VariableBuffer], parserDict: Dict) -> List[bool]:
         return [bool(parserDict["signed"])]
-    
+
 class CMSISMaxPoolChecker(NodeTypeChecker):
     def __init__(self, input_types: List[Enum], output_types: List[Enum]):
         super().__init__(input_types, output_types)

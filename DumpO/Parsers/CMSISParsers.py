@@ -2,8 +2,8 @@
 #
 # File: CMSISParsers.py
 #
-# Last edited: 17.12.2021        
-# 
+# Last edited: 17.12.2021
+#
 # Copyright (C) 2021, ETH Zurich and University of Bologna.
 #
 # Author: Moritz Scherer, ETH Zurich
@@ -35,7 +35,7 @@ class CMSISMaxPool2DParser(MaxPool2DParser):
         super().__init__()
 
     def parseNode(self, node: gs.ir.node.Node) -> bool:
-        
+
         ret = super().parseNode(node)
         wellFormed = all([
             self.parserDict['pads'][0] == 0,
@@ -51,7 +51,7 @@ class CMSISMaxPool2DParser(MaxPool2DParser):
         return wellFormed
 
     def parseNodeCtxt(self, ctxt: NetworkContext, node: gs.ir.node.Node, channels_first: bool = True) -> (NetworkContext, bool):
-        
+
         newCtxt, ret = super().parseNodeCtxt(ctxt, node)
         if ret:
 
@@ -74,13 +74,13 @@ class CMSISMaxPool2DParser(MaxPool2DParser):
                 self.parserDict['ch_im_out'] = data_out.shape[3]
                 self.parserDict['dim_im_out_x'] = data_out.shape[1]
                 self.parserDict['dim_im_out_y'] = data_out.shape[2]
-                
+
         return newCtxt, ret
 
 class CMSISDWConv2DParser(Conv2DParser):
     def __init__(self, noBiasHoisting = True):
         super().__init__(noBiasHoisting)
-    
+
     def parseNode(self, node: gs.ir.node.Node) -> (bool):
 
         wellFormed = super().parseNode(node)
@@ -96,10 +96,13 @@ class CMSISDWConv2DParser(Conv2DParser):
                 #all([coeff == 1 for coeff in self.parserDict['dilations']]),
                 len(node.inputs) == 5,
                 'div' in node.attrs,
-                'n_levels' in node.attrs,
+                any(['n_levels' in node.attrs,
+                    'n_levels_out' in node.attrs
+                     ]),
+
                 'signed' in node.attrs
             ])
-            
+
             if ret:
                 self.parserDict['dim_kernel_x'] = int(self.parserDict['kernel_shape'][0])
                 self.parserDict['dim_kernel_y'] = int(self.parserDict['kernel_shape'][1])
@@ -112,17 +115,20 @@ class CMSISDWConv2DParser(Conv2DParser):
                 self.parserDict['bias_shift'] = int(0)
                 self.parserDict['out_shift'] = int(0)
 
-                self.parserDict['n_levels'] = int(node.attrs['n_levels'].values)
+                if hasattr(node, 'n_levels'):
+                    self.parserDict['n_levels'] = int(node.attrs['n_levels'].values)
+                else:
+                    self.parserDict['n_levels'] = int(node.attrs['n_levels_out'].values)
                 self.parserDict['signed'] = int(node.attrs['signed'].values)
                 self.parserDict['log2D'] = int(math.log2(node.attrs['div'].values))
-                
+
             return ret
-    
+
     def parseNodeCtxt(self, ctxt: NetworkContext, node: gs.ir.node.Node, channels_first: bool = True) -> (NetworkContext, bool):
-        
+
         ctxt = ctxt.copy()
         newCtxt, ret = super().parseNodeCtxt(ctxt, node)
-            
+
         if ret:
 
             if not self.parserDict['group'] == newCtxt.lookup(self.parserDict['weight']).shape[0]:
@@ -131,7 +137,7 @@ class CMSISDWConv2DParser(Conv2DParser):
             inputs = ['data_in', 'weight', 'mul', 'add', 'shift']
             for idx, inputNode in enumerate(node.inputs):
                 self.parserDict[inputs[idx]] = newCtxt.lookup(inputNode.name).name
-                
+
             data_in = newCtxt.lookup(self.parserDict['data_in'])
             data_out = newCtxt.lookup(self.parserDict['data_out'])
             weight = newCtxt.lookup(self.parserDict['weight'])
@@ -156,17 +162,17 @@ class CMSISDWConv2DParser(Conv2DParser):
                 self.parserDict['dim_im_in_y'] = data_in.shape[2]
                 self.parserDict['ch_im_out'] = data_out.shape[3]
                 self.parserDict['dim_im_out_x'] = data_out.shape[1]
-                self.parserDict['dim_im_out_y'] = data_out.shape[2]                
-            
+                self.parserDict['dim_im_out_y'] = data_out.shape[2]
+
             return newCtxt, True
-        
+
         return ctxt, False
 
 
 class CMSISConv2DParser(Conv2DParser):
     def __init__(self, noBiasHoisting = True):
         super().__init__(noBiasHoisting)
-    
+
     def parseNode(self, node: gs.ir.node.Node) -> (bool):
 
         wellFormed = super().parseNode(node)
@@ -183,10 +189,12 @@ class CMSISConv2DParser(Conv2DParser):
                 #all([coeff == 1 for coeff in self.parserDict['dilations']]),
                 len(node.inputs) == 5,
                 'div' in node.attrs,
-                'n_levels' in node.attrs,
+                any(['n_levels' in node.attrs,
+                    'n_levels_out' in node.attrs
+                     ]),
                 'signed' in node.attrs
             ])
-            
+
             if ret:
                 self.parserDict['dim_kernel_x'] = int(self.parserDict['kernel_shape'][0])
                 self.parserDict['dim_kernel_y'] = int(self.parserDict['kernel_shape'][1])
@@ -199,26 +207,30 @@ class CMSISConv2DParser(Conv2DParser):
                 self.parserDict['bias_shift'] = int(0)
                 self.parserDict['out_shift'] = int(0)
 
-                self.parserDict['n_levels'] = int(node.attrs['n_levels'].values)
+                if hasattr(node, 'n_levels'):
+                    self.parserDict['n_levels'] = int(node.attrs['n_levels'].values)
+                else:
+                    self.parserDict['n_levels'] = int(node.attrs['n_levels_out'].values)
+
                 self.parserDict['signed'] = int(node.attrs['signed'].values)
                 self.parserDict['log2D'] = int(math.log2(node.attrs['div'].values))
-                
+
             return ret
-    
+
     def parseNodeCtxt(self, ctxt: NetworkContext, node: gs.ir.node.Node, channels_first: bool = True) -> (NetworkContext, bool):
-        
+
         ctxt = ctxt.copy()
         newCtxt, ret = super().parseNodeCtxt(ctxt, node)
-            
+
         if ret:
             inputs = ['data_in', 'weight', 'mul', 'add', 'shift']
             for idx, inputNode in enumerate(node.inputs):
                 self.parserDict[inputs[idx]] = ctxt.lookup(inputNode.name).name
-                
+
             data_in = newCtxt.lookup(self.parserDict['data_in'])
             data_out = newCtxt.lookup(self.parserDict['data_out'])
             weight = newCtxt.lookup(self.parserDict['weight'])
-            
+
             if channels_first:
                 self.parserDict['ch_im_in'] = data_in.shape[1]
                 self.parserDict['dim_im_in_x'] = data_in.shape[2]
@@ -233,23 +245,177 @@ class CMSISConv2DParser(Conv2DParser):
                 self.parserDict['ch_im_out'] = data_out.shape[3]
                 self.parserDict['dim_im_out_x'] = data_out.shape[1]
                 self.parserDict['dim_im_out_y'] = data_out.shape[2]
-                            
+
             return newCtxt, True
-        
+
         return ctxt, False
-    
+
+class CMSISDWConv1DParser(Conv1DParser):
+    def __init__(self, noBiasHoisting = True):
+        super().__init__(noBiasHoisting)
+
+    def parseNode(self, node: gs.ir.node.Node) -> (bool):
+
+        wellFormed = super().parseNode(node)
+        if wellFormed:
+            ret = all([
+                # Make sure padding is square
+                node.op == 'RequantizedConv',
+                self.parserDict['pads'][0] == self.parserDict['pads'][1],
+                self.parserDict['pads'][0] == 0,
+                # Don't support dilations
+                #all([coeff == 1 for coeff in self.parserDict['dilations']]),
+                len(node.inputs) == 5,
+                'div' in node.attrs,
+                any(['n_levels' in node.attrs,
+                    'n_levels_out' in node.attrs
+                     ]),
+
+                'signed' in node.attrs
+            ])
+
+            if ret:
+                self.parserDict['dim_kernel_x'] = int(self.parserDict['kernel_shape'][0])
+                self.parserDict['dilation_x'] = int(self.parserDict['dilations'][0])
+                self.parserDict['padding_x'] = int(self.parserDict['pads'][0])
+                self.parserDict['stride_x'] = int(self.parserDict['strides'][0])
+                self.parserDict['bias_shift'] = int(0)
+                self.parserDict['out_shift'] = int(0)
+
+                if hasattr(node, 'n_levels'):
+                    self.parserDict['n_levels'] = int(node.attrs['n_levels'].values)
+                else:
+                    self.parserDict['n_levels'] = int(node.attrs['n_levels_out'].values)
+                self.parserDict['signed'] = int(node.attrs['signed'].values)
+                self.parserDict['log2D'] = int(math.log2(node.attrs['div'].values))
+
+            return ret
+
+    def parseNodeCtxt(self, ctxt: NetworkContext, node: gs.ir.node.Node, channels_first: bool = True) -> (NetworkContext, bool):
+
+        ctxt = ctxt.copy()
+        newCtxt, ret = super().parseNodeCtxt(ctxt, node)
+
+        if ret:
+
+            if not self.parserDict['group'] == newCtxt.lookup(self.parserDict['weight']).shape[0]:
+                return ctxt, False
+
+            inputs = ['data_in', 'weight', 'mul', 'add', 'shift']
+            for idx, inputNode in enumerate(node.inputs):
+                self.parserDict[inputs[idx]] = newCtxt.lookup(inputNode.name).name
+
+            data_in = newCtxt.lookup(self.parserDict['data_in'])
+            data_out = newCtxt.lookup(self.parserDict['data_out'])
+            weight = newCtxt.lookup(self.parserDict['weight'])
+
+            if not newCtxt.is_global(self.parserDict['weight']):
+                return ctxt, False
+
+            # SCHEREMO: Transpose weights to be num filters last
+            newCtxt.globalObjects[self.parserDict['weight']].values = np.transpose(weight.values, list(range(len(weight.shape)))[1:] + [0])
+
+            self.parserDict['batch'] = data_in.shape[0]
+            if channels_first:
+                self.parserDict['ch_im_in'] = data_in.shape[1]
+                self.parserDict['dim_im_in_x'] = data_in.shape[2]
+                self.parserDict['ch_im_out'] = data_out.shape[1]
+                self.parserDict['dim_im_out_x'] = data_out.shape[2]
+            else:
+                self.parserDict['ch_im_in'] = data_in.shape[2]
+                self.parserDict['dim_im_in_x'] = data_in.shape[1]
+                self.parserDict['ch_im_out'] = data_out.shape[2]
+                self.parserDict['dim_im_out_x'] = data_out.shape[1]
+
+            return newCtxt, True
+
+        return ctxt, False
+
+
+class CMSISConv1DParser(Conv1DParser):
+    def __init__(self, noBiasHoisting = True):
+        super().__init__(noBiasHoisting)
+
+    def parseNode(self, node: gs.ir.node.Node) -> (bool):
+
+        wellFormed = super().parseNode(node)
+        if wellFormed:
+            ret = all([
+                # Make sure padding is square
+                node.op == 'RequantizedConv',
+                self.parserDict['group'] == 1,
+                self.parserDict['pads'][0] == self.parserDict['pads'][1],
+                self.parserDict['pads'][0] == 0,
+                # Don't support dilations
+                #all([coeff == 1 for coeff in self.parserDict['dilations']]),
+                len(node.inputs) == 5,
+                'div' in node.attrs,
+                any(['n_levels' in node.attrs,
+                    'n_levels_out' in node.attrs
+                     ]),
+                'signed' in node.attrs
+            ])
+
+            if ret:
+                self.parserDict['dim_kernel_x'] = int(self.parserDict['kernel_shape'][0])
+                self.parserDict['dilation_x'] = int(self.parserDict['dilations'][0])
+                self.parserDict['padding_x'] = int(self.parserDict['pads'][0])
+                self.parserDict['stride_x'] = int(self.parserDict['strides'][0])
+                self.parserDict['bias_shift'] = int(0)
+                self.parserDict['out_shift'] = int(0)
+
+                if hasattr(node, 'n_levels'):
+                    self.parserDict['n_levels'] = int(node.attrs['n_levels'].values)
+                else:
+                    self.parserDict['n_levels'] = int(node.attrs['n_levels_out'].values)
+
+                self.parserDict['signed'] = int(node.attrs['signed'].values)
+                self.parserDict['log2D'] = int(math.log2(node.attrs['div'].values))
+
+            return ret
+
+    def parseNodeCtxt(self, ctxt: NetworkContext, node: gs.ir.node.Node, channels_first: bool = True) -> (NetworkContext, bool):
+
+        ctxt = ctxt.copy()
+        newCtxt, ret = super().parseNodeCtxt(ctxt, node)
+
+        if ret:
+            inputs = ['data_in', 'weight', 'mul', 'add', 'shift']
+            for idx, inputNode in enumerate(node.inputs):
+                self.parserDict[inputs[idx]] = ctxt.lookup(inputNode.name).name
+
+            data_in = newCtxt.lookup(self.parserDict['data_in'])
+            data_out = newCtxt.lookup(self.parserDict['data_out'])
+            weight = newCtxt.lookup(self.parserDict['weight'])
+
+            if channels_first:
+                self.parserDict['ch_im_in'] = data_in.shape[1]
+                self.parserDict['dim_im_in_x'] = data_in.shape[2]
+                self.parserDict['ch_im_out'] = data_out.shape[1]
+                self.parserDict['dim_im_out_x'] = data_out.shape[2]
+            else:
+                self.parserDict['ch_im_in'] = data_in.shape[2]
+                self.parserDict['dim_im_in_x'] = data_in.shape[1]
+                self.parserDict['ch_im_out'] = data_out.shape[2]
+                self.parserDict['dim_im_out_x'] = data_out.shape[1]
+
+            return newCtxt, True
+
+        return ctxt, False
+
+
 class CMSISLinearParser(GEMMParser):
 
     def __init__(self, noBiasHoisting = True):
         super().__init__(noBiasHoisting)
-    
+
     def parseNode(self, node: gs.ir.node.Node) -> (bool):
 
         wellFormed = super().parseNode(node)
         return wellFormed
-    
+
     def parseNodeCtxt(self, ctxt: NetworkContext, node: gs.ir.node.Node, channels_first: bool = True) -> (NetworkContext, bool):
-        
+
         ctxt = ctxt.copy()
         newCtxt, ret = super().parseNodeCtxt(ctxt, node)
         if ret:
@@ -264,7 +430,7 @@ class CMSISLinearParser(GEMMParser):
                     newCtxt.globalObjects[nameA].values = newA
                     self.parserDict['transA'] = 0
                 else:
-                    return newCtxt, False    
+                    return newCtxt, False
 
             # Try to transpose B offline if possible, else fail
             # SCHEREMO: Magic trick - CMSIS works a bit weirdly with matmuls...
@@ -278,7 +444,7 @@ class CMSISLinearParser(GEMMParser):
                     newCtxt.globalObjects[nameB].shape = newB.shape
                     self.parserDict['transB'] = 1
                 else:
-                    return newCtxt, False    
+                    return newCtxt, False
 
             # Try to scale A offline if possible, else fail
             if self.parserDict['alpha'] != 1.0:
@@ -291,7 +457,7 @@ class CMSISLinearParser(GEMMParser):
                     self.parserDict['alpha'] = 1.0
                 else:
                     return newCtxt, False
-                
+
             # Try to scale B offline if possible, else fail
             if self.parserDict['beta'] != 1.0:
                 nameB = self.parserDict['B']
@@ -302,24 +468,26 @@ class CMSISLinearParser(GEMMParser):
                     newCtxt.globalObjects[nameB].values = newB
                     self.parserDict['beta'] = 1.0
                 else:
-                    return newCtxt, False    
-                
+                    return newCtxt, False
+
             return newCtxt, True
-        
+
         return ctxt, False
-    
+
 class CMSISGEMMParser(CMSISLinearParser):
     def __init__(self):
         super().__init__(noBiasHoisting=True)
-    
+
     def parseNode(self, node: gs.ir.node.Node) -> (bool):
 
         wellFormed = super().parseNode(node)
-        
+
         if wellFormed:
             ret = all([
                 'div' in node.attrs,
-                'n_levels' in node.attrs,
+                any(['n_levels' in node.attrs,
+                    'n_levels_out' in node.attrs
+                     ]),
                 'signed' in node.attrs,
                 'mul' in node.attrs,
                 'shift' in node.attrs,
@@ -327,31 +495,34 @@ class CMSISGEMMParser(CMSISLinearParser):
         ])
 
             if ret:
-                self.parserDict['n_levels'] = int(node.attrs['n_levels'].values)
+                if hasattr(node, 'n_levels'):
+                    self.parserDict['n_levels'] = int(node.attrs['n_levels'].values)
+                else:
+                    self.parserDict['n_levels'] = int(node.attrs['n_levels_out'].values)
                 self.parserDict['signed'] = int(node.attrs['signed'].values)
                 self.parserDict['log2D'] = int(math.log2(node.attrs['div'].values))
                 self.parserDict['mul'] = int(node.attrs['mul'].values)
                 self.parserDict['shift'] = int(node.attrs['shift'].values)
-                
+
             return ret
-        
+
         return False
-    
+
     def parseNodeCtxt(self, ctxt: NetworkContext, node: gs.ir.node.Node, channels_first: bool = True) -> (NetworkContext, bool):
-        
+
         ctxt = ctxt.copy()
         newCtxt, ret = super().parseNodeCtxt(ctxt, node)
-        
+
         if ret:
             return newCtxt, True
-        
+
         else:
             return ctxt, False
 
 class CMSISMHSAParser(MHSAParser):
     def __init__(self):
         super().__init__()
-    
+
     def parseNode(self, node: gs.ir.node.Node) -> (bool):
 
         wellFormed = super().parseNode(node)
@@ -359,7 +530,27 @@ class CMSISMHSAParser(MHSAParser):
         return wellFormed
 
     def parseNodeCtxt(self, ctxt: NetworkContext, node: gs.ir.node.Node, channels_first: bool = True) -> (NetworkContext, bool):
-        
+
+        ctxt = ctxt.copy()
+        newCtxt, ret = super().parseNodeCtxt(ctxt, node)
+
+        if ret:
+            return newCtxt, ret
+        else:
+            return ctxt, False
+
+class CMSISLinearAttentionParser(LinearAttentionParser):
+    def __init__(self):
+        super().__init__()
+
+    def parseNode(self, node: gs.ir.node.Node) -> (bool):
+
+        wellFormed = super().parseNode(node)
+        self.parserDict['signed'] = 1
+        return wellFormed
+
+    def parseNodeCtxt(self, ctxt: NetworkContext, node: gs.ir.node.Node, channels_first: bool = True) -> (NetworkContext, bool):
+
         ctxt = ctxt.copy()
         newCtxt, ret = super().parseNodeCtxt(ctxt, node)
 

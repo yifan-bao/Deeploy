@@ -38,12 +38,12 @@ def merge_transposes_fun(ctxt: NetworkContext, graph: gs.Graph, match: Match, na
     t1 = matched_nodes[0]
     t2 = matched_nodes[1]
 
-    #import IPython; IPython.embed()
+    #Transpose forth and back - delete both nodes
 
-    # Transpose forth and back - delete both nodes
     if (t1.inputs[0].shape == t2.outputs[0].shape):
-        graph.deleteNode(t1)
+        # Find Nodes-to-be-replaced
         graph.deleteNode(t2)
+        graph.deleteNode(t1)
         graph.cleanup().toposort()
         return ctxt, graph
     # Net the transpose

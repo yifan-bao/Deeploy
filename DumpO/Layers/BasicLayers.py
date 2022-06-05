@@ -33,7 +33,7 @@ class ReshapeLayer(ONNXLayer):
     def __init__(self, maps : List[NodeMapper]):
         super().__init__(maps)
 
-    def generate(self, ctxt: NetworkContext) -> (NetworkContext, List[str]):
+    def generate(self, ctxt: NetworkContext, verbose: bool = False) -> (NetworkContext, List[str]):
         outputs = [node for node in self.node.outputs]
         inputs = [node for node in self.node.inputs]
 
@@ -41,7 +41,7 @@ class ReshapeLayer(ONNXLayer):
         inputNames = [node.name for node in inputs]
 
         alloc = ctxt.allocLocal(self.node.name, outputNames)
-        call = self.mapper.generate(ctxt)
+        call = self.mapper.generate(ctxt, verbose=verbose)
         dealloc = ctxt.freeLocal(self.node.name, inputNames)
 
         return (ctxt, [call])
@@ -138,6 +138,10 @@ class MaxPoolLayer(ONNXLayer):
     def __init__(self, maps : List[NodeMapper]):
         super().__init__(maps)
 
+class ReduceMeanLayer(ONNXLayer):
+    def __init__(self, maps : List[NodeMapper]):
+        super().__init__(maps)
+
 class iLayerNormLayer(ONNXLayer):
     def __init__(self, maps : List[NodeMapper]):
         super().__init__(maps)
@@ -154,6 +158,37 @@ class iLayerNormLayer(ONNXLayer):
 class TransposeLayer(ONNXLayer):
     def __init__(self, maps : List[NodeMapper]):
         super().__init__(maps)
+
+class LinearAttentionLayer(ONNXLayer):
+    def __init__(self, maps : List[NodeMapper]):
+        super().__init__(maps)
+    def computeShapes(self, inputShapes: List[np.shape], outputShapes: List[np.shape], parserDict, channels_first) -> (List[np.shape], List[np.shape]):
+        inputShapes[4] = inputShapes[3][0]
+        inputShapes[6] = inputShapes[5][0]
+        inputShapes[8] = inputShapes[7][0]
+        inputShapes[10] = inputShapes[9][0]
+
+        return(inputShapes, outputShapes)
+
+    def computeOps(self):
+        seqLen = self.mapper.nodeRep['in_C']
+        dim = self.mapper.nodeRep['dim']
+        dim_head = self.mapper.nodeRep['dim_head']
+        heads = self.mapper.nodeRep['heads']
+        QOps = seqLen * dim * dim_head * heads * 2
+        # WQ * Q (H )
+        KOps = seqLen * dim * dim_head * heads * 2
+        # WK * K
+        VOps = seqLen * dim * dim_head * heads * 2
+        # WV * V
+        KVOps = seqLen * dim_head * dim_head * heads * 2
+        # Q * KT
+        QKVOps = seqLen * dim_head * dim_head * heads * 2
+        # N H S S * N H S D -> N H S D
+        OutOps = seqLen * dim_head * heads * dim * 2
+        # WO * O
+        totOps = QOps + KOps + VOps + KVOps + QKVOps + OutOps
+        return totOps
 
 class MHSALayer(ONNXLayer):
     def __init__(self, maps : List[NodeMapper]):
@@ -172,10 +207,16 @@ class MHSALayer(ONNXLayer):
         dim_head = self.mapper.nodeRep['dim_head']
         heads = self.mapper.nodeRep['heads']
         QOps = seqLen * dim * dim_head * heads * 2
+        # WQ * Q (H )
         KOps = seqLen * dim * dim_head * heads * 2
+        # WK * K
         VOps = seqLen * dim * dim_head * heads * 2
+        # WV * V
         QKOps = seqLen * seqLen * dim_head * heads * 2
+        # Q * KT
         AVOps = seqLen * seqLen * dim_head * heads * 2
+        # N H S S * N H S D -> N H S D
         OutOps = seqLen * dim_head * heads * dim * 2
+        # WO * O
         totOps = QOps + KOps + VOps + QKOps + AVOps + OutOps
         return totOps

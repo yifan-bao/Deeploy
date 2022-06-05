@@ -136,7 +136,11 @@ class NetworkContext():
         self.name = name
 
     def _mangle(self, name: str) -> str:
-        return re.sub('\.','_',self.name) + '_DumpO_BUFFER_'  + re.sub('\.','_',name)
+        repStr = name
+        repStr = re.sub('\.','_',repStr)
+        repStr = re.sub(':','_',repStr)
+        repStr = re.sub('\.','_',self.name) + '_DumpO_BUFFER_'  + repStr
+        return repStr
 
     def add(self, obj : VariableBuffer, ctxt = 'local'):
         if ctxt == 'local':
@@ -347,8 +351,6 @@ class NodeTypeChecker():
         inputName = [i.name for i in node.inputs]
         inputs = [ctxt.lookup(name) for name in inputName]
 
-        #import IPython; IPython.embed()
-
         return all(
             [node.nLevels <= 2**(input_type._value_) for node, input_type in zip(inputs, self.input_types)]
         )
@@ -450,8 +452,17 @@ class NodeTemplate():
 
         return _copy
 
+    def generateStartTimer(self) -> str:
+        return """StartTimer(); """
+
+    def generateStopTimer(self) -> str:
+        return """StopTimer();"""
+
+    def generateGetCyclesTimer(self) -> str:
+        return """am_util_stdio_printf("%8u cycles\\r\\n", getCycles());"""
+
     # Don't override this
-    def generate(self, **nodeRep) -> str:
+    def generate(self, verbose : bool = False, **nodeRep) -> str:
         #print(kwargs)
         try:
             return self.template.render(**nodeRep)
@@ -475,7 +486,7 @@ class NodeBinding():
         else:
             return (ctxt, nodeRep, False)
 
-    def generate(self, ctxt: NetworkContext, nodeRep) -> List[str]:
+    def generate(self, ctxt: NetworkContext, nodeRep: Dict, verbose: bool = False) -> List[str]:
 
         parseDict = {}
 
@@ -485,8 +496,14 @@ class NodeBinding():
             else:
                 parseDict[key] = value
 
-        return [self.template.generate(**{**parseDict, **self.typeChecker.typeDict})]
-
+        nodeCall = self.template.generate(**{**parseDict, **self.typeChecker.typeDict})
+        if verbose:
+            startTimer = self.template.generateStartTimer()
+            stopTimer = self.template.generateStopTimer()
+            getCycles = self.template.generateGetCyclesTimer()
+            return [startTimer, nodeCall, stopTimer, getCycles]
+        else:
+            return [nodeCall]
 
 # Don't change anything here!
 class NodeMapper():
@@ -523,10 +540,10 @@ class NodeMapper():
 
         return (ctxt, False)
 
-    def generate(self, ctxt: NetworkContext) -> List[str]:
+    def generate(self, ctxt: NetworkContext, verbose : bool = False) -> List[str]:
         if not self.bound:
             raise RuntimeError("Bind layer before generating code!")
-        return self.binder.generate(ctxt, self.parser.parserDict)
+        return self.binder.generate(ctxt, self.parser.parserDict, verbose=verbose)
 
 class ONNXLayer():
 
@@ -554,8 +571,6 @@ class ONNXLayer():
         outputShapes = [ctxt.lookup(node.name).shape for node in self.node.outputs]
 
         newInputShapes, newOutputShapes = self.computeShapes(inputShapes, outputShapes, self.mapper.parser.parserDict, channels_first)
-
-        #import IPython; IPython.embed()
 
         for node, newShape, oldShape in zip(self.node.inputs + self.node.outputs, newInputShapes + newOutputShapes, inputShapes + outputShapes):
             #if newShape != oldShape:
@@ -626,7 +641,7 @@ class ONNXLayer():
 
     # Do not override unless you know what you're doin - this generates code + buffer allocation / de-allocation
     # parseIO has to be called in advance!
-    def generate(self, ctxt: NetworkContext) -> (NetworkContext, List[str]):
+    def generate(self, ctxt: NetworkContext, verbose:bool=False) -> (NetworkContext, List[str]):
 
         outputs = [node for node in self.node.outputs]
         inputs = [node for node in self.node.inputs]
@@ -635,7 +650,7 @@ class ONNXLayer():
         inputNames = [node.name for node in inputs]
 
         alloc = ctxt.allocLocal(self.node.name, outputNames)
-        call = self.mapper.generate(ctxt)
+        call = self.mapper.generate(ctxt, verbose=verbose)
         dealloc = ctxt.freeLocal(self.node.name, inputNames)
 
         generated_code = [alloc, call, dealloc]
@@ -817,7 +832,8 @@ class NetworkContainer():
 
                 for section in code:
                     for substr in section:
-                        callStack += substr + '\n'
+                        callStack += substr+ '\n'
+
 
             for _buffer in self.ctxt.localObjects.values():
                 assert _buffer._live == False, f'There is a memory leak in buffer {_buffer.name} in the generated forward pass!'
@@ -825,7 +841,7 @@ class NetworkContainer():
         return self.worstCaseBufferSize
 
     # Don't override this
-    def generateInferenceCode(self) -> str:
+    def generateInferenceCode(self, verbose:bool = False) -> str:
         if not self.parsed or not self.bound:
             raise ValueError('You need to parse and bind the network before generating code!')
 
@@ -834,7 +850,9 @@ class NetworkContainer():
 
         callStack = ''
         for key, node in self.layerBinding.items():
-            self.ctxt, code = node.generate(self.ctxt)
+            self.ctxt, code = node.generate(self.ctxt, verbose=verbose)
+            if verbose:
+                code = [[f"""am_util_stdio_printf("Layer {node.node.name}\\r\\n%8u ops\\r\\n", {node.computeOps()});"""]] + code
 
             currentBufferSize = 0
             for _buffer in self.ctxt.localObjects.values():
@@ -845,8 +863,10 @@ class NetworkContainer():
 
             for section in code:
                 for substr in section:
-                    callStack += substr + '\n'
-
+                    try:
+                        callStack += substr + '\n'
+                    except:
+                        import IPython; IPython.embed()
         for _buffer in self.ctxt.localObjects.values():
             assert _buffer._live == False, f'There is a memory leak in buffer {_buffer.name} in the generated forward pass!'
 
@@ -1055,7 +1075,6 @@ class NetworkDeployer(NetworkContainer):
             raise RuntimeError("The given graph was not valid - check that it is acyclic!")
 
         self.ctxt, self.graph = self.lower(self.ctxt, self.graph) # This lowers the graph to a deployable format
-        onnx.save_model(gs.export_onnx(self.graph), "test_preturn.onnx")
 
         self.postLoweringOptimization()
 
@@ -1070,19 +1089,21 @@ class NetworkDeployer(NetworkContainer):
         self.parse(channels_first) # This reparses the lowered graph
         self.broadcast(channels_first) # This broadcasts all tensors offline
         self.bind() # This binds the graph to the node templates
+        onnx.save_model(gs.export_onnx(self.graph), "final_implementation.onnx")
 
     # Don't override this
     def prepare(self):
         # MIDDLE END
         self.middleWare()
+        onnx.save_model(gs.export_onnx(self.graph), "preParse_implementation.onnx")
         # BACK END - Inherited from NetworkContainer
         self.backEnd(channels_first=False)
         # FINAL TRANSFORMS
         self.prepared = True
 
     # Don't override this
-    def generateFunction(self) -> str:
+    def generateFunction(self, verbose : bool = False) -> str:
         if not self.prepared:
             self.prepare()
 
-        return self.generateInferenceCode()
+        return self.generateInferenceCode(verbose=verbose)

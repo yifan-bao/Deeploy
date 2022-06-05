@@ -2,8 +2,8 @@
 #
 # File: BasicBindings.py
 #
-# Last edited: 21.12.2021        
-# 
+# Last edited: 21.12.2021
+#
 # Copyright (C) 2021, ETH Zurich and University of Bologna.
 #
 # Author: Moritz Scherer, ETH Zurich
@@ -38,6 +38,8 @@ BasicSoftmaxBinding = NodeBinding(SoftmaxChecker([DataTypes.int8_t], [DataTypes.
 BasicGEMMBinding = NodeBinding(GEMMChecker([DataTypes.int8_t, DataTypes.int8_t], [DataTypes.int32_t]), GEMMTemplate.referenceTemplate)
 BasicConv2DBinding = NodeBinding(ConvChecker([DataTypes.int8_t, DataTypes.int8_t], [DataTypes.int32_t]), DummyTemplate.referenceTemplate)
 
+BasicReduceMeanBindings = NodeBinding(ReduceMeanChecker([DataTypes.int16_t], [DataTypes.int16_t]), ReduceMeanTemplate.referenceTemplate)
+
 BasicGatherBindings = [NodeBinding(GatherChecker([type, DataTypes.int32_t],[type]), GatherTemplate.referenceTemplate) for type in DataTypes]
 BasicReshapeBindings = [NodeBinding(ReshapeChecker([type, DataTypes.int32_t],[type]), ReshapeTemplate.referenceTemplate) for type in DataTypes]
 
@@ -47,6 +49,8 @@ BasicRQSBindings = [NodeBinding(RequantShiftChecker([type,DataTypes.int32_t,Data
 BasicAddBindings = [NodeBinding(AddChecker([DataTypes.int8_t, DataTypes.int8_t], [DataTypes.int16_t]), AddTemplate.referenceTemplate)]
 BasicAddBindings += [NodeBinding(AddChecker([DataTypes.int16_t, DataTypes.int16_t], [DataTypes.int32_t]), AddTemplate.referenceTemplate) for type in DataTypes]
 
-BasicPadBindings = [NodeBinding(PadChecker([type], [type]), PadTemplate.referenceTemplate) for type in DataTypes]
+BasicPad2DBindings = [NodeBinding(PadChecker([type], [type]), PadTemplate.reference2DTemplate) for type in DataTypes]
+
+BasicPad1DBindings = [NodeBinding(PadChecker([type], [type]), PadTemplate.reference1DTemplate) for type in DataTypes]
 
 DummyBinding = NodeBinding(DummyChecker([DataTypes.int8_t],[DataTypes.int8_t]), DummyTemplate.referenceTemplate)

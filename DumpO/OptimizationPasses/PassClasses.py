@@ -2,8 +2,8 @@
 #
 # File: PassClasses.py
 #
-# Last edited: 28.12.2021        
-# 
+# Last edited: 28.12.2021
+#
 # Copyright (C) 2021, ETH Zurich and University of Bologna.
 #
 # Author: Moritz Scherer, ETH Zurich
@@ -32,20 +32,21 @@ from DumpO.Layers.BasicLayers import *
 
 @gs.Graph.register()
 def deleteNode(self, node):
-        
+
     inputNode = node.inputs[0]
     outputNode = node.outputs[0]
-    
-    outputLayer = node.o()
-    newInputs = []
 
-    for i in outputLayer.inputs:
-        if i == outputNode:
-            newInputs.append(inputNode)
-        else:
-            newInputs.append(i)
+    # SCHEREMO : Ugly workaround, assume single output
+    while(len(node.outputs[0].outputs) > 0):
+        newInputs = []
+        outputLayer = node.outputs[0].outputs[0]
+        for i in outputLayer.inputs:
+            if i == outputNode:
+                newInputs.append(inputNode)
+            else:
+                newInputs.append(i)
+        outputLayer.inputs = newInputs
 
-    outputLayer.inputs = newInputs
     node.inputs.clear()
     node.outputs.clear()
 
@@ -57,11 +58,11 @@ def replaceInsertNode(self, inputs, outputs, node):
     #     inp.outputs.clear()
 
     ret = self.layer(op=node.op, name=node.name, attrs=node.attrs, inputs=inputs, outputs=outputs)
-    
+
     # Disconnect input nodes of all output tensors
     for out in outputs:
         out.inputs = out.inputs[-1:]
-        
+
     return ret
 
 class Match(NamedTuple):
@@ -150,11 +151,11 @@ class SequentialMatcher:
     def __init__(self, pattern : gs.Graph):
         # This checking is sufficient - iff the graph is acyclic and connected (checked by parser)
         # and every node has one output, the graph is sequential
-        
+
         assert len(pattern.outputs) == 1, "Found more than one output"
         for node in pattern.nodes:
             assert len(node.outputs) == 1, "Graph needs to be purely sequential!"
-        
+
         # we need to have access to both the pattern graph (using the output
         # node as an entry point) as well as the
         # enclosing GraphModule to correctly match call_module ops
@@ -174,11 +175,11 @@ class SequentialMatcher:
         #TODO: is this really a nice way to return the results? (None if no
         # match, Match object if match)
         match = self._match_nodes(ctxt, self.pattern_anchor, anchor, len(self.p.nodes))
-        
+
         if match is not None:
             mm = Match(anchor=anchor, nodes_map=match)
         else:
-            mm = None 
+            mm = None
         return mm
 
     def _match_nodes(self, ctxt: NetworkContext, pn : gs.ir.node.Node, gn : gs.ir.node.Node, remaining_pattern_length : int, nodes_map : dict = None):
@@ -187,17 +188,17 @@ class SequentialMatcher:
         # as we do sequential traversal, the first step (checking if nodes
         # already traversed) of the original _match_nodes function can be
         # discarded
-        
+
         # the following submethod is a modified version of the one from the
         # original SubgraphMatcher
         def attributes_are_equal(pn: gs.ir.node.Node, gn: gs.ir.node.Node) -> bool:
             return pn.op == gn.op
-        
-                
+
+
         # from here on, proceed as in the original implementation.
         if not attributes_are_equal(pn, gn):
             return None
-        
+
         nodes_map[pn.name] = gn
 
         # if we are in the "active" pattern, the graph node has to be
@@ -212,12 +213,12 @@ class SequentialMatcher:
 
         if remaining_pattern_length == 1:
             return nodes_map
-    
+
         # otherwise we are on a "matching track", so move one node down in
         # pattern and graph. We know that gn has only 1 input!
         if len(pn.outputs[0].outputs) < 1 or len(gn.outputs[0].outputs) < 1:
             return None
-        
+
         return self._match_nodes(ctxt, pn.outputs[0].outputs[0], gn.outputs[0].outputs[0], remaining_pattern_length-1, nodes_map)
 
     def match_graph(self, ctxt: NetworkContext, graph: gs.Graph):
@@ -229,7 +230,7 @@ class SequentialMatcher:
         matched_nodes = set()
         def match_overlaps_with_previous(match):
             return any(n.name in matched_nodes for k, n in match.nodes_map.items())
-        
+
         for node in self.searched_graph.nodes:
             match = self.matches_subgraph_from_anchor(ctxt,node)
             if match is not None:
@@ -254,7 +255,7 @@ class ReplaceMatchWithModulePass(GSPass):
             graph.replaceInsertNode(self.replacementNode)
         return ctxt, graph
 
-            
+
 class ReplaceSequentialPatternPass(SequentialPass):
     # finds all instances of pattern in the graph, calls the replacement_fn on
     # the matches and replaces the matched nodes with the module returned by
@@ -276,4 +277,3 @@ class ReplaceSequentialPatternPass(SequentialPass):
             ctxt, graph = self.replacement_fn(ctxt, graph, m, f"{self.name}_{i}", **self.kwargs)
         graph.cleanup().toposort()
         return ctxt, graph
-

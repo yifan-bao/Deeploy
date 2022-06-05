@@ -2,8 +2,8 @@
 #
 # File: BasicCheckers.py
 #
-# Last edited: 16.12.2021        
-# 
+# Last edited: 16.12.2021
+#
 # Copyright (C) 2021, ETH Zurich and University of Bologna.
 #
 # Author: Moritz Scherer, ETH Zurich
@@ -52,7 +52,7 @@ class PadChecker(NodeTypeChecker):
             return [True]
         else:
             return [False]
-    
+
 class AddChecker(NodeTypeChecker):
     def __init__(self, input_types: List[Enum], output_types: List[Enum]):
         super().__init__(input_types, output_types)
@@ -65,11 +65,11 @@ class AddChecker(NodeTypeChecker):
             return [True]
         else:
             return [False]
-    
+
 class GatherChecker(NodeTypeChecker):
     def __init__(self, input_types: List[Enum], output_types: List[Enum]):
         super().__init__(input_types, output_types)
-        
+
     def inferNumLevels(self, inputs: List[VariableBuffer], parserDict: Dict) -> List[int]:
         return [inputs[0].nLevels]
 
@@ -82,7 +82,7 @@ class GatherChecker(NodeTypeChecker):
 class ReshapeChecker(NodeTypeChecker):
     def __init__(self, input_types: List[Enum], output_types: List[Enum]):
         super().__init__(input_types, output_types)
-        
+
     def inferNumLevels(self, inputs: List[VariableBuffer], parserDict: Dict) -> List[int]:
         return [inputs[0].nLevels]
 
@@ -95,7 +95,17 @@ class ReshapeChecker(NodeTypeChecker):
 class MHSAChecker(NodeTypeChecker):
     def __init__(self, input_types: List[Enum], output_types: List[Enum]):
         super().__init__(input_types, output_types)
-        
+
+    def inferNumLevels(self, inputs: List[VariableBuffer], parserDict: Dict) -> List[int]:
+        return [2**(self.input_types[0]._value_)]
+
+    def inferSignedness(self, inputs: List[VariableBuffer], parserDict: Dict) -> List[bool]:
+        return [True]
+
+class LinearAttentionChecker(NodeTypeChecker):
+    def __init__(self, input_types: List[Enum], output_types: List[Enum]):
+        super().__init__(input_types, output_types)
+
     def inferNumLevels(self, inputs: List[VariableBuffer], parserDict: Dict) -> List[int]:
         return [2**(self.input_types[0]._value_)]
 
@@ -105,37 +115,27 @@ class MHSAChecker(NodeTypeChecker):
 class GEMMChecker(NodeTypeChecker):
     def __init__(self, input_types: List[Enum], output_types: List[Enum]):
         super().__init__(input_types, output_types)
-        
+
     def inferNumLevels(self, inputs: List[VariableBuffer], parserDict: Dict) -> List[int]:
         return [2**((self.input_types[0]._value_)*2) * inputs[0].shape[-1 - parserDict['transA']]]
 
     def inferSignedness(self, inputs: List[VariableBuffer], parserDict: Dict) -> List[bool]:
         return [True]
-    
+
 class iLayerNormChecker(NodeTypeChecker):
     def __init__(self, input_types: List[Enum], output_types: List[Enum]):
         super().__init__(input_types, output_types)
-        
+
     def inferNumLevels(self, inputs: List[VariableBuffer], parserDict: Dict) -> List[int]:
         return [2**(self.input_types[0]._value_)]
 
     def inferSignedness(self, inputs: List[VariableBuffer], parserDict: Dict) -> List[bool]:
         return [True]
-    
-class SoftmaxChecker(NodeTypeChecker):
-    def __init__(self, input_types: List[Enum], output_types: List[Enum]):
-        super().__init__(input_types, output_types)
-        
-    def inferNumLevels(self, inputs: List[VariableBuffer], parserDict: Dict) -> List[int]:
-        return [2**(self.input_types[0]._value_)]
 
-    def inferSignedness(self, inputs: List[VariableBuffer], parserDict: Dict) -> List[bool]:
-        return [False]
-    
-class GELUChecker(NodeTypeChecker):
+class ReduceMeanChecker(NodeTypeChecker):
     def __init__(self, input_types: List[Enum], output_types: List[Enum]):
         super().__init__(input_types, output_types)
-        
+
     def inferNumLevels(self, inputs: List[VariableBuffer], parserDict: Dict) -> List[int]:
         return [2**(self.input_types[0]._value_)]
 
@@ -144,31 +144,53 @@ class GELUChecker(NodeTypeChecker):
             return [True]
         else:
             return [False]
-        
+
+class SoftmaxChecker(NodeTypeChecker):
+    def __init__(self, input_types: List[Enum], output_types: List[Enum]):
+        super().__init__(input_types, output_types)
+
+    def inferNumLevels(self, inputs: List[VariableBuffer], parserDict: Dict) -> List[int]:
+        return [2**(self.input_types[0]._value_)]
+
+    def inferSignedness(self, inputs: List[VariableBuffer], parserDict: Dict) -> List[bool]:
+        return [False]
+
+class GELUChecker(NodeTypeChecker):
+    def __init__(self, input_types: List[Enum], output_types: List[Enum]):
+        super().__init__(input_types, output_types)
+
+    def inferNumLevels(self, inputs: List[VariableBuffer], parserDict: Dict) -> List[int]:
+        return [2**(self.input_types[0]._value_)]
+
+    def inferSignedness(self, inputs: List[VariableBuffer], parserDict: Dict) -> List[bool]:
+        if inputs[0]._signed:
+            return [True]
+        else:
+            return [False]
+
 class ConvChecker(NodeTypeChecker):
     def __init__(self, input_types: List[Enum], output_types: List[Enum]):
         super().__init__(input_types, output_types)
-        
+
     def inferNumLevels(self, inputs: List[VariableBuffer], parserDict: Dict) -> List[int]:
         weight = inputs[1]
         return [np.prod(parserDict['kernel_shape']) * weight.shape[1] * 2**(self.input_types[0]._value_)]
     def inferSignedness(self, inputs: List[VariableBuffer], parserDict: Dict) -> List[bool]:
         return [True]
-    
+
 class RequantShiftChecker(NodeTypeChecker):
     def __init__(self, input_types: List[Enum], output_types: List[Enum]):
         super().__init__(input_types, output_types)
-        
+
     def inferNumLevels(self, inputs: List[VariableBuffer], parserDict: Dict) -> List[int]:
         return [2**8]
 
     def inferSignedness(self, inputs: List[VariableBuffer], parserDict: Dict) -> List[bool]:
         return [parserDict["signed"]]
-    
+
 class DummyChecker(NodeTypeChecker):
     def __init__(self, input_types: List[Enum], output_types: List[Enum]):
         super().__init__(input_types, output_types)
-        
+
     def inferNumLevels(self, inputs: List[VariableBuffer], parserDict: Dict) -> List[int]:
         return [2**(self.input_types[0]._value_)]
-        
