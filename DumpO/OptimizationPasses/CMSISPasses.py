@@ -155,7 +155,7 @@ def align_mhsa_fun(ctxt: NetworkContext, graph: gs.Graph, match: Match, name: st
         # Get maximum:
         maxMult = mhsa.attrs[f'{name}_requant_mul'].values.max()
         # Get maximum shift possible:
-        MultShift = min(totalShift, np.floor(np.log2(2**31 - maxMult)))
+        MultShift = min(totalShift, np.floor(np.log2(2**31/maxMult)))
         # get remaining shift:
         remainingShift = totalShift - MultShift
 
@@ -189,7 +189,10 @@ def align_linear_attention_fun(ctxt: NetworkContext, graph: gs.Graph, match: Mat
         # Get maximum:
         maxMult = linearattn.attrs[f'{name}_requant_mul'].values.max()
         # Get maximum shift possible:
-        MultShift = min(totalShift, np.floor(np.log2(2**31 - maxMult)))
+        assert maxMult < 2**31, "{linearattn.name} requant mul is too large!"
+        MultShift = min(totalShift, np.floor(np.log2(2**31/maxMult)))
+
+
         # get remaining shift:
         remainingShift = totalShift - MultShift
 

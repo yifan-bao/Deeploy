@@ -2,8 +2,8 @@
 #
 # File: DWConvTemplate.py
 #
-# Last edited: 04.01.2022        
-# 
+# Last edited: 04.01.2022
+#
 # Copyright (C) 2022, ETH Zurich and University of Bologna.
 #
 # Author: Moritz Scherer, ETH Zurich
@@ -29,13 +29,13 @@ from mako.template import Template
 from DumpO.DumpOTypes import NodeTemplate, NetworkContext
 from .CMSISUtils import bindFCParams
 
-class _Conv2DDWTemplate(NodeTemplate):
+class _Conv2DDW_8_Template(NodeTemplate):
     def __init__(self, templateStr):
         self.template = Template(templateStr)
 
     def alignToContext(self, ctxt: NetworkContext, nodeRep: Dict) -> (NetworkContext, Dict):
         ctxt = ctxt.copy()
-        
+
         # Hoist the structs to the global ctxt
 
         # First the context
@@ -43,12 +43,12 @@ class _Conv2DDWTemplate(NodeTemplate):
         bufferSize = 2*nodeRep['ch_im_in']*nodeRep['dim_kernel_x']*nodeRep['dim_kernel_y']*2 + 4
 
         data_out_name = nodeRep['data_out']
-        
+
         ctxtDict = {
-            'buf': 0, #f'{node.name}_ctxt_buffer',  
+            'buf': 0, #f'{node.name}_ctxt_buffer',
             'size': bufferSize
         }
-        
+
         ctxt.hoistStruct(ctxtDict, f'{data_out_name}_ctxt', 'cmsis_nn_context')
         nodeRep['ctxt'] = f'{data_out_name}_ctxt'
 
@@ -87,12 +87,12 @@ class _Conv2DDWTemplate(NodeTemplate):
         #         'min': 0,
         #         'max': (nodeRep[f'n_levels'])-1
         #     }
-            
+
         ctxt.hoistStruct(activationDict, f'{data_out_name}_activation', 'cmsis_nn_activation')
 
         data_in = ctxt.lookup(nodeRep['data_in'])
         data_out = ctxt.lookup(nodeRep['data_out'])
-        
+
         convParamsDict = {
             'input_offset': (data_in._signed == 0) * nodeRep['n_levels']//2,
             'output_offset': -(data_out._signed == 0) * nodeRep['n_levels']//2,
@@ -108,7 +108,7 @@ class _Conv2DDWTemplate(NodeTemplate):
         convQuantDict = {
             'multiplier': ctxt._mangle(nodeRep['mul']),
             'shift': ctxt._mangle(nodeRep['shift']),
-        }            
+        }
         ctxt.hoistStruct(convQuantDict, f'{data_out_name}_quant_params', 'cmsis_nn_per_channel_quant_params')
         nodeRep['quant_params'] = ctxt.lookup(f'{data_out_name}_quant_params').name
 
@@ -117,7 +117,7 @@ class _Conv2DDWTemplate(NodeTemplate):
             'h': nodeRep['dim_im_in_x'],
             'w': nodeRep['dim_im_in_y'],
             'c': nodeRep['ch_im_in']
-        }            
+        }
         ctxt.hoistStruct(inputDimsDict, f'{data_out_name}_input_dims', 'cmsis_nn_dims')
         nodeRep['input_dims'] = ctxt.lookup(f'{data_out_name}_input_dims').name
 
@@ -151,7 +151,7 @@ class _Conv2DDWTemplate(NodeTemplate):
         return ctxt, nodeRep
 
 
-convTemplate = _Conv2DDWTemplate("""
+conv2D_8_Template = _Conv2DDW_8_Template("""
 <%
 batchSizeIn = ch_im_in * dim_im_in_x * dim_im_in_y
 batchSizeOut = ch_im_out * dim_im_out_x * dim_im_out_y
@@ -159,9 +159,30 @@ batchSizeOut = ch_im_out * dim_im_out_x * dim_im_out_y
 void* _DumpO__ctxtBuffer_${ctxt} = malloc(sizeof(int8_t)*${ctxt}.size);
 ${ctxt}.buf = _DumpO__ctxtBuffer_${ctxt};
 for(int b=0; b<${batch}; b++){
-arm_depthwise_conv_wrapper_s8(&${ctxt}, &${dw_conv_params}, &${quant_params}, &${input_dims}, (${data_in} + b*${batchSizeIn}), &${filter_dims}, ${weight}, &${bias_dims}, ${add}, &${output_dims}, (${data_out} + b*${batchSizeOut})); 
+arm_depthwise_conv_wrapper_s8(&${ctxt}, &${dw_conv_params}, &${quant_params}, &${input_dims}, (${data_in} + b*${batchSizeIn}), &${filter_dims}, ${weight}, &${bias_dims}, ${add}, &${output_dims}, (${data_out} + b*${batchSizeOut}));
 }
 free(_DumpO__ctxtBuffer_${ctxt});
+""")
+# int8_t* bias = int8_t* malloc(sizeof(int8_t) * ${ch_im_in}); \n\
+#                free(bias); \
+
+
+class _Conv1DDW_16_Template(NodeTemplate):
+    def __init__(self, templateStr):
+        self.template = Template(templateStr)
+
+    def alignToContext(self, ctxt: NetworkContext, nodeRep: Dict) -> (NetworkContext, Dict):
+        ctxt = ctxt.copy()
+
+        return ctxt, nodeRep
+
+
+conv1D_16_Template = _Conv1DDW_16_Template("""
+// PLACEHOLDER CONV1D 16 Bit
+""")
+
+conv1D_8_Template = _Conv1DDW_16_Template("""
+// PLACEHOLDER CONV1D 8 Bit
 """)
 # int8_t* bias = int8_t* malloc(sizeof(int8_t) * ${ch_im_in}); \n\
 #                free(bias); \

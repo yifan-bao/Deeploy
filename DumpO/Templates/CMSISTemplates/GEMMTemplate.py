@@ -2,8 +2,8 @@
 #
 # File: GEMMTemplate.py
 #
-# Last edited: 20.12.2021        
-# 
+# Last edited: 20.12.2021
+#
 # Copyright (C) 2021, ETH Zurich and University of Bologna.
 #
 # Author: Moritz Scherer, ETH Zurich
@@ -29,7 +29,7 @@ from mako.template import Template
 from DumpO.DumpOTypes import NodeTemplate, NetworkContext
 from .CMSISUtils import bindFCParams
 
-class _GEMMTemplate(NodeTemplate):
+class _GEMM_8_Template(NodeTemplate):
     def __init__(self, templateStr):
         self.template = Template(templateStr)
 
@@ -45,6 +45,26 @@ class _GEMMTemplate(NodeTemplate):
 
         return ctxt, nodeRep
 
-LinearTemplate = _GEMMTemplate("\
+Linear_8_Template = _GEMM_8_Template("\
 arm_fully_connected_s8(&${ctxt}, &${fc_params}, &${quant_params}, &${input_dims}, ${A}, &${filter_dims}, ${B}, &${bias_dims}, ${C}, &${output_dims}, ${data_out});\
 ")
+
+class _GEMM_16_Template(NodeTemplate):
+    def __init__(self, templateStr):
+        self.template = Template(templateStr)
+
+    def alignToContext(self, ctxt: NetworkContext, nodeRep: Dict) -> (NetworkContext, Dict):
+        inputs = ['A', 'B', 'add']
+
+        # Hoist the structs to the global ctxt
+        data_in = ctxt.lookup(nodeRep['A'])
+        data_out = ctxt.lookup(nodeRep['data_out'])
+        weight = ctxt.lookup(nodeRep['B'])
+
+        ctxt, nodeRep = bindFCParams(ctxt, nodeRep['data_out'], nodeRep['mul'], nodeRep['shift'], data_in, weight, nodeRep);
+
+        return ctxt, nodeRep
+
+Linear_16_Template = _GEMM_16_Template("""
+// PLACEHOLDER GEMM 16
+""")

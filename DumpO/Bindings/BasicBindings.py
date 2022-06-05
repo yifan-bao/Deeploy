@@ -31,6 +31,7 @@ class DataTypes(Enum):
     int8_t = 8
     int16_t = 16
     int32_t = 32
+    int64_t = 64
 
 BasicGELUBinding = NodeBinding(GELUChecker([DataTypes.int8_t], [DataTypes.int8_t]), iGELUTemplate.referenceTemplate)
 BasicSoftmaxBinding = NodeBinding(SoftmaxChecker([DataTypes.int8_t], [DataTypes.int8_t]), iSoftmaxTemplate.referenceTemplate)
@@ -38,7 +39,7 @@ BasicSoftmaxBinding = NodeBinding(SoftmaxChecker([DataTypes.int8_t], [DataTypes.
 BasicGEMMBinding = NodeBinding(GEMMChecker([DataTypes.int8_t, DataTypes.int8_t], [DataTypes.int32_t]), GEMMTemplate.referenceTemplate)
 BasicConv2DBinding = NodeBinding(ConvChecker([DataTypes.int8_t, DataTypes.int8_t], [DataTypes.int32_t]), DummyTemplate.referenceTemplate)
 
-BasicReduceMeanBindings = NodeBinding(ReduceMeanChecker([DataTypes.int16_t], [DataTypes.int16_t]), ReduceMeanTemplate.referenceTemplate)
+BasicReduceMeanBindings = [NodeBinding(ReduceMeanChecker([type], [type]), ReduceMeanTemplate.referenceTemplate) for type in DataTypes]
 
 BasicGatherBindings = [NodeBinding(GatherChecker([type, DataTypes.int32_t],[type]), GatherTemplate.referenceTemplate) for type in DataTypes]
 BasicReshapeBindings = [NodeBinding(ReshapeChecker([type, DataTypes.int32_t],[type]), ReshapeTemplate.referenceTemplate) for type in DataTypes]

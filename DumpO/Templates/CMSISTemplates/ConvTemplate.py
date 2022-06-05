@@ -2,8 +2,8 @@
 #
 # File: ConvTemplate.py
 #
-# Last edited: 17.12.2021        
-# 
+# Last edited: 17.12.2021
+#
 # Copyright (C) 2021, ETH Zurich and University of Bologna.
 #
 # Author: Moritz Scherer, ETH Zurich
@@ -29,7 +29,7 @@ from mako.template import Template
 from DumpO.DumpOTypes import NodeTemplate, NetworkContext
 from .CMSISUtils import bindFCParams
 
-class _Conv2DTemplate(NodeTemplate):
+class _Conv2D_8_Template(NodeTemplate):
     def __init__(self, templateStr):
         self.template = Template(templateStr)
 
@@ -37,15 +37,15 @@ class _Conv2DTemplate(NodeTemplate):
         ctxt = ctxt.copy()
 
         data_out_name = nodeRep['data_out']
-        
+
          # Hoist the structs to the global ctxt
 
         # First the context
         # https://review.trustedfirmware.org/plugins/gitiles/mirror/ARM-software/CMSIS_5/+/refs/heads/bias_for_conv/CMSIS/NN/Source/ConvolutionFunctions/arm_convolve_s8.c
-        bufferSize = 2*nodeRep['ch_im_in']*nodeRep['dim_kernel_x']*nodeRep['dim_kernel_y']*2 
+        bufferSize = 2*nodeRep['ch_im_in']*nodeRep['dim_kernel_x']*nodeRep['dim_kernel_y']*2
 
         ctxtDict = {
-            'buf': 0, #f'{data_out_name}_ctxt_buffer',  
+            'buf': 0, #f'{data_out_name}_ctxt_buffer',
             'size': bufferSize
         }
 
@@ -94,7 +94,7 @@ class _Conv2DTemplate(NodeTemplate):
 
         assert data_in._signed is not None
         assert data_out._signed is not None
-        
+
         convParamsDict = {
             'input_offset': (data_in._signed == 0) * nodeRep['n_levels']//2,
             'output_offset': -(data_out._signed == 0) * nodeRep['n_levels']//2,
@@ -109,7 +109,7 @@ class _Conv2DTemplate(NodeTemplate):
         convQuantDict = {
             'multiplier': ctxt._mangle(nodeRep['mul']),
             'shift': ctxt._mangle(nodeRep['shift']),
-        }            
+        }
         ctxt.hoistStruct(convQuantDict, f'{data_out_name}_quant_params', 'cmsis_nn_per_channel_quant_params')
         nodeRep['quant_params'] = ctxt.lookup(f'{data_out_name}_quant_params').name
 
@@ -118,7 +118,7 @@ class _Conv2DTemplate(NodeTemplate):
             'h': nodeRep['dim_im_in_x'],
             'w': nodeRep['dim_im_in_y'],
             'c': nodeRep['ch_im_in']
-        }            
+        }
         ctxt.hoistStruct(inputDimsDict, f'{data_out_name}_input_dims', 'cmsis_nn_dims')
         nodeRep['input_dims'] = ctxt.lookup(f'{data_out_name}_input_dims').name
 
@@ -152,9 +152,25 @@ class _Conv2DTemplate(NodeTemplate):
         return ctxt, nodeRep
 
 
-cmsisTemplate = _Conv2DTemplate("\
+cmsis2D_8_Template = _Conv2D_8_Template("\
 void* _DumpO__ctxtBuffer_${ctxt} = malloc(sizeof(int8_t)*${ctxt}.size);\n\
 ${ctxt}.buf = _DumpO__ctxtBuffer_${ctxt};\n\
 arm_convolve_wrapper_s8(&${ctxt}, &${conv_params}, &${quant_params}, &${input_dims}, ${data_in}, &${filter_dims}, ${weight}, &${bias_dims}, ${add}, &${output_dims}, ${data_out}); \n\
 free(_DumpO__ctxtBuffer_${ctxt});\
 ")
+
+class _Conv1D_16_Template(NodeTemplate):
+    def __init__(self, templateStr):
+        self.template = Template(templateStr)
+
+    def alignToContext(self, ctxt: NetworkContext, nodeRep: Dict) -> (NetworkContext, Dict):
+        return ctxt, nodeRep
+
+
+cmsis1D_16_Template = _Conv1D_16_Template("""
+// PLACEHOLDER: CONV1D 16 Bit
+""")
+
+cmsis1D_8_Template = _Conv1D_16_Template("""
+// PLACEHOLDER: CONV1D 8 Bit
+""")

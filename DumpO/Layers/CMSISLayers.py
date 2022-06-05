@@ -42,7 +42,10 @@ class RQSConvLayer(ConvLayer):
         else:
             groups = 1
         opsPerPx = int(np.prod(self.mapper.nodeRep['kernel_shape']) * self.mapper.nodeRep['ch_im_in'] * self.mapper.nodeRep['ch_im_out'] / groups) * 2
-        numPx = self.mapper.nodeRep['dim_im_out_x'] * self.mapper.nodeRep['dim_im_out_y']
+        if 'dim_im_out_y' in self.mapper.nodeRep.keys():
+            numPx = self.mapper.nodeRep['dim_im_out_x'] * self.mapper.nodeRep['dim_im_out_y']
+        else:
+            numPx = self.mapper.nodeRep['dim_im_out_x']
         return numPx * opsPerPx
 
 

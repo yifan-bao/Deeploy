@@ -50,7 +50,7 @@ ReshapeMapper = NodeMapper(ReshapeParser(), BasicReshapeBindings)
 FlattenMapper = NodeMapper(FlattenParser(), BasicReshapeBindings)
 RequantShiftMapper = NodeMapper(RequantShiftParser(), BasicRQSBindings)
 ReduceMeanMapper = NodeMapper(ReduceMeanParser(), BasicReduceMeanBindings)
-GEMM_int8_Mapper = NodeMapper(CMSISGEMMParser(), [CMSISGEMMBinding])
+GEMMMapper = NodeMapper(CMSISGEMMParser(), CMSISGEMMBindings)
 Conv2D_int8_Mapper = NodeMapper(CMSISConv2DParser(), [CMSISConv2DBinding])
 DWConv2D_int8_Mapper = NodeMapper(CMSISDWConv2DParser(), [CMSISDW3x3Conv2DBinding])
 
@@ -68,7 +68,7 @@ DummyMapper = NodeMapper(DummyParser(), [DummyBinding])
 
 CMSISMapping = {
     'RequantizedConv' : RQSConvLayer([Conv2D_int8_Mapper, DWConv2D_int8_Mapper, Conv1D_Mapper, DWConv1D_Mapper]),
-    'RequantizedGemm': RQSGEMMLayer([GEMM_int8_Mapper]),
+    'RequantizedGemm': RQSGEMMLayer([GEMMMapper]),
     'RequantShift': RequantShiftLayer([RequantShiftMapper]),
     'ReduceMean': ReduceMeanLayer([ReduceMeanMapper]),
     'MaxPool': MaxPoolLayer([MaxPool2DMapper]),

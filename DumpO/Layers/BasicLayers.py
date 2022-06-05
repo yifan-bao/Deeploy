@@ -171,25 +171,26 @@ class LinearAttentionLayer(ONNXLayer):
         return(inputShapes, outputShapes)
 
     def computeOps(self):
-        seqLen = self.mapper.nodeRep['in_C']
-        dim = self.mapper.nodeRep['dim']
-        dim_head = self.mapper.nodeRep['dim_head']
-        heads = self.mapper.nodeRep['heads']
-        QOps = seqLen * dim * dim_head * heads * 2
-        # WQ * Q (H )
-        KOps = seqLen * dim * dim_head * heads * 2
-        # WK * K
-        VOps = seqLen * dim * dim_head * heads * 2
-        # WV * V
-        KVOps = seqLen * dim_head * dim_head * heads * 2
-        # Q * KT
-        QKVOps = seqLen * dim_head * dim_head * heads * 2
-        # N H S S * N H S D -> N H S D
-        OutOps = seqLen * dim_head * heads * dim * 2
-        # WO * O
-        totOps = QOps + KOps + VOps + KVOps + QKVOps + OutOps
-        return totOps
+        # seqLen = self.mapper.nodeRep['in_C']
+        # dim = self.mapper.nodeRep['dim']
+        # dim_head = self.mapper.nodeRep['dim_head']
+        # heads = self.mapper.nodeRep['heads']
+        # QOps = seqLen * dim * dim_head * heads * 2
+        # # WQ * Q (H )
+        # KOps = seqLen * dim * dim_head * heads * 2
+        # # WK * K
+        # VOps = seqLen * dim * dim_head * heads * 2
+        # # WV * V
+        # KVOps = seqLen * dim_head * dim_head * heads * 2
+        # # Q * KT
+        # QKVOps = seqLen * dim_head * dim_head * heads * 2
+        # # N H S S * N H S D -> N H S D
+        # OutOps = seqLen * dim_head * heads * dim * 2
+        # # WO * O
+        # totOps = QOps + KOps + VOps + KVOps + QKVOps + OutOps
+        # return totOps
 
+        return 0
 class MHSALayer(ONNXLayer):
     def __init__(self, maps : List[NodeMapper]):
         super().__init__(maps)
