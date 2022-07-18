@@ -214,7 +214,8 @@ class Pad1DParser(PadParser):
             if len(pads) == 6 and pads[0] == 0 and pads[3] == 0 \
             and pads[1] == 0 and pads[4] == 0:
                 wellFormed = True
-                self.parserDict['pad_x'] = pads[2]
+                self.parserDict['pad_y'] = pads[2]
+                self.parserDict['pad_x'] = 0
 
         return wellFormed
 
@@ -228,15 +229,17 @@ class Pad1DParser(PadParser):
             if len(data_in.shape) == 3:
                 wellFormed = True
                 self.parserDict['batch'] = data_in.shape[0]
+                self.parserDict['dim_im_in_x'] = 1
+                self.parserDict['dim_im_out_x'] = 1
                 if channels_first:
-                    self.parserDict['dim_im_in_x'] = data_in.shape[2]
+                    self.parserDict['dim_im_in_y'] = data_in.shape[2]
                     self.parserDict['dim_im_in_ch'] = data_in.shape[1]
-                    self.parserDict['dim_im_out_x'] = data_out.shape[2]
+                    self.parserDict['dim_im_out_y'] = data_out.shape[2]
                     self.parserDict['dim_im_out_ch'] = data_out.shape[1]
                 else:
-                    self.parserDict['dim_im_in_x'] = data_in.shape[1]
+                    self.parserDict['dim_im_in_y'] = data_in.shape[1]
                     self.parserDict['dim_im_in_ch'] = data_in.shape[2]
-                    self.parserDict['dim_im_out_x'] = data_out.shape[1]
+                    self.parserDict['dim_im_out_y'] = data_out.shape[1]
                     self.parserDict['dim_im_out_ch'] = data_out.shape[2]
         return ctxt, wellFormed
 
@@ -493,7 +496,7 @@ class RequantShiftParser(NodeParser):
         ])
 
         if ret:
-            if hasattr(node, 'n_levels'):
+            if 'n_levels' in node.attrs:
                 self.parserDict['n_levels'] = int(node.attrs['n_levels'].values)
             else:
                 self.parserDict['n_levels'] = int(node.attrs['n_levels_out'].values)

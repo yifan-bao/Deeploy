@@ -96,8 +96,8 @@ reference1DTemplate = _Pad1DTemplate("""
 // Pad
 memset(${data_out}, ${value}, ${data_out_size}*sizeof(${data_out_type._name_}));
 <%
-    x_offset_out = dim_im_out_ch*(pad_x)
-    width = dim_im_in_ch
+    x_offset_out = dim_im_out_ch*(pad_y)
+    width = dim_im_in_ch*dim_im_in_y
 
     addoffsetOut = dim_im_out_ch
     addoffsetIn = dim_im_in_ch
@@ -105,8 +105,8 @@ memset(${data_out}, ${value}, ${data_out_size}*sizeof(${data_out_type._name_}));
     startPosX = x_offset_out
     startPosOffset = 0
 
-batchOffsetIn = width * dim_im_in_x
-batchOffsetOut = dim_im_out_ch * dim_im_out_x
+batchOffsetIn = width * dim_im_in_y
+batchOffsetOut = dim_im_out_ch * dim_im_out_y
 %>
 int32_t xoffset_${data_in};
 int32_t offset_in_${data_in} = ${startPosOffset};

@@ -66,5 +66,6 @@ class _GEMM_16_Template(NodeTemplate):
         return ctxt, nodeRep
 
 Linear_16_Template = _GEMM_16_Template("""
-// PLACEHOLDER GEMM 16
+// FC
+arm_fully_connected_s16(&${ctxt}, &${fc_params}, &${quant_params}, &${input_dims}, ${A}, &${filter_dims}, ${B}, &${bias_dims}, ${C}, &${output_dims}, ${data_out});
 """)

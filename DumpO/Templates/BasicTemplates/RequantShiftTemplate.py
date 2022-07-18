@@ -2,8 +2,8 @@
 #
 # File: RequantShiftTemplate.py
 #
-# Last edited: 14.12.2021        
-# 
+# Last edited: 14.12.2021
+#
 # Copyright (C) 2021, ETH Zurich and University of Bologna.
 #
 # Author: Moritz Scherer, ETH Zurich
@@ -47,5 +47,5 @@ class _RequantShiftTemplate(NodeTemplate):
 referenceTemplate = _RequantShiftTemplate("""
 // RQS
 
-RequantShift_s${data_in_type._value_}(${data_in}, ${size}, ${mul}, ${add}, ${data_out}, ${log2D}, ${channels}, ${input_offset}, ${output_offset});
+RequantShift_s${data_in_type._value_}(${data_in}, ${size}, ${mul}, ${add}, ${data_out}, ${log2D}, ${channels}, ${input_offset}, ${output_offset}, 0);
 """)

@@ -115,7 +115,7 @@ class CMSISDWConv2DParser(Conv2DParser):
                 self.parserDict['bias_shift'] = int(0)
                 self.parserDict['out_shift'] = int(0)
 
-                if hasattr(node, 'n_levels'):
+                if 'n_levels' in node.attrs:
                     self.parserDict['n_levels'] = int(node.attrs['n_levels'].values)
                 else:
                     self.parserDict['n_levels'] = int(node.attrs['n_levels_out'].values)
@@ -207,7 +207,7 @@ class CMSISConv2DParser(Conv2DParser):
                 self.parserDict['bias_shift'] = int(0)
                 self.parserDict['out_shift'] = int(0)
 
-                if hasattr(node, 'n_levels'):
+                if 'n_levels' in node.attrs:
                     self.parserDict['n_levels'] = int(node.attrs['n_levels'].values)
                 else:
                     self.parserDict['n_levels'] = int(node.attrs['n_levels_out'].values)
@@ -275,14 +275,14 @@ class CMSISDWConv1DParser(Conv1DParser):
             ])
 
             if ret:
-                self.parserDict['dim_kernel_x'] = int(self.parserDict['kernel_shape'][0])
-                self.parserDict['dilation_x'] = int(self.parserDict['dilations'][0])
-                self.parserDict['padding_x'] = int(self.parserDict['pads'][0])
-                self.parserDict['stride_x'] = int(self.parserDict['strides'][0])
+                self.parserDict['dim_kernel_y'] = int(self.parserDict['kernel_shape'][0])
+                self.parserDict['dilation_y'] = int(self.parserDict['dilations'][0])
+                self.parserDict['padding_y'] = int(self.parserDict['pads'][0])
+                self.parserDict['stride_y'] = int(self.parserDict['strides'][0])
                 self.parserDict['bias_shift'] = int(0)
                 self.parserDict['out_shift'] = int(0)
 
-                if hasattr(node, 'n_levels'):
+                if 'n_levels' in node.attrs:
                     self.parserDict['n_levels'] = int(node.attrs['n_levels'].values)
                 else:
                     self.parserDict['n_levels'] = int(node.attrs['n_levels_out'].values)
@@ -316,16 +316,20 @@ class CMSISDWConv1DParser(Conv1DParser):
             newCtxt.globalObjects[self.parserDict['weight']].values = np.transpose(weight.values, list(range(len(weight.shape)))[1:] + [0])
 
             self.parserDict['batch'] = data_in.shape[0]
+            self.parserDict['dim_im_in_x'] = 1
+            self.parserDict['dim_im_out_x'] = 1
+
+
             if channels_first:
                 self.parserDict['ch_im_in'] = data_in.shape[1]
-                self.parserDict['dim_im_in_x'] = data_in.shape[2]
+                self.parserDict['dim_im_in_y'] = data_in.shape[2]
                 self.parserDict['ch_im_out'] = data_out.shape[1]
-                self.parserDict['dim_im_out_x'] = data_out.shape[2]
+                self.parserDict['dim_im_out_y'] = data_out.shape[2]
             else:
                 self.parserDict['ch_im_in'] = data_in.shape[2]
-                self.parserDict['dim_im_in_x'] = data_in.shape[1]
+                self.parserDict['dim_im_in_y'] = data_in.shape[1]
                 self.parserDict['ch_im_out'] = data_out.shape[2]
-                self.parserDict['dim_im_out_x'] = data_out.shape[1]
+                self.parserDict['dim_im_out_y'] = data_out.shape[1]
 
             return newCtxt, True
 
@@ -357,14 +361,14 @@ class CMSISConv1DParser(Conv1DParser):
             ])
 
             if ret:
-                self.parserDict['dim_kernel_x'] = int(self.parserDict['kernel_shape'][0])
-                self.parserDict['dilation_x'] = int(self.parserDict['dilations'][0])
-                self.parserDict['padding_x'] = int(self.parserDict['pads'][0])
-                self.parserDict['stride_x'] = int(self.parserDict['strides'][0])
+                self.parserDict['dim_kernel_y'] = int(self.parserDict['kernel_shape'][0])
+                self.parserDict['dilation_y'] = int(self.parserDict['dilations'][0])
+                self.parserDict['padding_y'] = int(self.parserDict['pads'][0])
+                self.parserDict['stride_y'] = int(self.parserDict['strides'][0])
                 self.parserDict['bias_shift'] = int(0)
                 self.parserDict['out_shift'] = int(0)
 
-                if hasattr(node, 'n_levels'):
+                if 'n_levels' in node.attrs:
                     self.parserDict['n_levels'] = int(node.attrs['n_levels'].values)
                 else:
                     self.parserDict['n_levels'] = int(node.attrs['n_levels_out'].values)
@@ -388,16 +392,19 @@ class CMSISConv1DParser(Conv1DParser):
             data_out = newCtxt.lookup(self.parserDict['data_out'])
             weight = newCtxt.lookup(self.parserDict['weight'])
 
+            self.parserDict['dim_im_in_x'] = 1
+            self.parserDict['dim_im_out_x'] = 1
+
             if channels_first:
                 self.parserDict['ch_im_in'] = data_in.shape[1]
-                self.parserDict['dim_im_in_x'] = data_in.shape[2]
+                self.parserDict['dim_im_in_y'] = data_in.shape[2]
                 self.parserDict['ch_im_out'] = data_out.shape[1]
-                self.parserDict['dim_im_out_x'] = data_out.shape[2]
+                self.parserDict['dim_im_out_y'] = data_out.shape[2]
             else:
                 self.parserDict['ch_im_in'] = data_in.shape[2]
-                self.parserDict['dim_im_in_x'] = data_in.shape[1]
+                self.parserDict['dim_im_in_y'] = data_in.shape[1]
                 self.parserDict['ch_im_out'] = data_out.shape[2]
-                self.parserDict['dim_im_out_x'] = data_out.shape[1]
+                self.parserDict['dim_im_out_y'] = data_out.shape[1]
 
             return newCtxt, True
 
@@ -495,7 +502,7 @@ class CMSISGEMMParser(CMSISLinearParser):
         ])
 
             if ret:
-                if hasattr(node, 'n_levels'):
+                if 'n_levels' in node.attrs:
                     self.parserDict['n_levels'] = int(node.attrs['n_levels'].values)
                 else:
                     self.parserDict['n_levels'] = int(node.attrs['n_levels_out'].values)

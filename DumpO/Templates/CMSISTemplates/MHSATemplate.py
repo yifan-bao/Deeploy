@@ -2,8 +2,8 @@
 #
 # File: MHSATemplate.py
 #
-# Last edited: 01.01.2022        
-# 
+# Last edited: 01.01.2022
+#
 # Copyright (C) 2022, ETH Zurich and University of Bologna.
 #
 # Author: Moritz Scherer, ETH Zurich
@@ -37,7 +37,7 @@ class _MHSATemplate(NodeTemplate):
 
     def alignToContext(self, ctxt: NetworkContext, nodeRep: Dict) -> (NetworkContext, Dict):
         inputs = ['q', 'k', 'v', 'wq_weight', 'wq_bias','wk_weight', 'wk_bias', 'wv_weight', 'wv_bias', 'wo_weight', 'wo_bias']
-        
+
         s = ctxt.lookup(nodeRep['q']).shape[1]
 
         data_in = ctxt.lookup(nodeRep['q'])
@@ -73,7 +73,7 @@ class _MHSATemplate(NodeTemplate):
         data_in._signed = True
         # K
         weight = np.ones((s,nodeRep['dim_head']))
-        
+
         ctxt, nodeRep = bindFCParams(ctxt, nodeRep['data_out']+"_preattn", nodeRep['preattn_requant_mul'], nodeRep['preattn_requant_shift'], data_in, weight, nodeRep, "preattn_", bias=False)
         #*nodeRep['heads']
         new_shape = (s,s)
@@ -81,11 +81,11 @@ class _MHSATemplate(NodeTemplate):
         data_in._signed = False
         # K
         weight = np.ones((nodeRep['dim_head'],s))
-        
+
         ctxt, nodeRep = bindFCParams(ctxt, nodeRep['data_out']+"_postattn", nodeRep['postattn_requant_mul'], nodeRep['postattn_requant_shift'], data_in, weight, nodeRep, "postattn_", bias=False)
 
         return ctxt, nodeRep
-        
+
 
 referenceTemplate = _MHSATemplate("""
 do{
@@ -93,8 +93,8 @@ do{
     sequenceLength = q_shape[1]
 %>
 // W_Q * q -> Q
-int32_t* _null = malloc(${dim}*${heads});
-memset(_null, 0, ${dim}*${heads});
+int32_t* _null = malloc(${max(dim, sequenceLength)}*${heads});
+memset(_null, 0, ${max(dim, sequenceLength)}*${heads});
 
 int8_t* wq_buffer = malloc(${wq_output_dims}.n * ${wq_output_dims}.c);
 arm_fully_connected_s8(&${wq_ctxt}, &${wq_fc_params}, &${wq_quant_params}, &${wq_input_dims}, ${q}, &${wq_filter_dims}, ${wq_weight}, &${wq_bias_dims}, ${wq_bias}, &${wq_output_dims}, wq_buffer);
@@ -154,7 +154,7 @@ dim2 = heads
 dim3 = dim_head
 %>
 // NSHD-> NHDS
-// 
+//
 int8_t* wv_buffer_transposed = malloc(${wv_output_dims}.n * ${wv_output_dims}.c);
 for(int k=0;k<${dim2};k++){
 for(int j=0;j<${dim3};j++){
@@ -168,11 +168,11 @@ free(wv_buffer);
 int8_t* out_buffer = malloc(${heads} * ${sequenceLength} * ${dim_head});
 
 for(int i=0; i<${heads}; i++){
-arm_fully_connected_s8(&${postattn_ctxt}, &${postattn_fc_params}, &${postattn_quant_params}, 
-&${postattn_input_dims}, &postattn_buffer[i*${postattn_input_dims}.n*${postattn_input_dims}.c], 
-&${postattn_filter_dims}, &wv_buffer_transposed[i*${postattn_filter_dims}.n * ${postattn_filter_dims}.c], 
-&${postattn_bias_dims}, _null, 
-&${postattn_output_dims}, &out_buffer[i*${postattn_output_dims}.n*${postattn_output_dims}.c]);  
+arm_fully_connected_s8(&${postattn_ctxt}, &${postattn_fc_params}, &${postattn_quant_params},
+&${postattn_input_dims}, &postattn_buffer[i*${postattn_input_dims}.n*${postattn_input_dims}.c],
+&${postattn_filter_dims}, &wv_buffer_transposed[i*${postattn_filter_dims}.n * ${postattn_filter_dims}.c],
+&${postattn_bias_dims}, _null,
+&${postattn_output_dims}, &out_buffer[i*${postattn_output_dims}.n*${postattn_output_dims}.c]);
 }
 free(postattn_buffer);
 free(wv_buffer_transposed);
@@ -200,7 +200,3 @@ free(out_buffer_transposed);
 
 }while(0);
 """)
-
-
-
-

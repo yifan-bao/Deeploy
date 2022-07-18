@@ -95,6 +95,31 @@ class TransposeConstOptPass(ReplaceSequentialPatternPass):
         name = "_CONST_OPT_TRANSPOSES_PASS"
         super().__init__(graph, const_opt_transposes_fun, name)
 
+def one_dim_opt_transposes_fun(ctxt: NetworkContext, graph: gs.Graph, match: Match, name: str):
+    matched_nodes = [m for k, m in match.nodes_map.items()]
+    t1 = matched_nodes[0]
+
+    import IPython; IPython.embed()
+
+    if isinstance(t1.inputs[0], gs.Constant):
+        t1.inputs[0].values = np.transpose(t1.inputs[0].values, t1.attrs['perm'])
+        graph.deleteNode(t1)
+
+    return ctxt, graph
+
+class TransposeOneDimOptPass(ReplaceSequentialPatternPass):
+    def __init__(self):
+        passes = []
+        graph = gs.Graph()
+        _input = gs.Variable(name='input_1')
+        output = graph.layer(inputs=[_input], outputs=['t1_out'], op='Transpose', name='t1')
+        graph.outputs.append(output)
+        graph.inputs.append(_input)
+
+        name = "_CONST_OPT_TRANSPOSES_PASS"
+        super().__init__(graph, const_opt_transposes_fun, name)
+
+
 def merge_requant_fun(ctxt: NetworkContext, graph: gs.Graph, match: Match, name: str):
     matched_nodes = [m for k, m in match.nodes_map.items()]
     attrs = {}
