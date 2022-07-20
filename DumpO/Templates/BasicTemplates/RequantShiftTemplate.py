@@ -47,5 +47,5 @@ class _RequantShiftTemplate(NodeTemplate):
 referenceTemplate = _RequantShiftTemplate("""
 // RQS
 
-RequantShift_s${data_in_type._value_}(${data_in}, ${size}, ${mul}, ${add}, ${data_out}, ${log2D}, ${channels}, ${input_offset}, ${output_offset}, 0);
+RequantShift_s${data_in_type._value_}(${data_in}, ${size}, ${mul}, ${add}, ${data_out}, ${log2D}, ${channels}, ${input_offset}, ${output_offset}, 1);
 """)
