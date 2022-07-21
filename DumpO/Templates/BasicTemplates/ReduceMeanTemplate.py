@@ -44,5 +44,50 @@ class _ReduceMeanTemplate(NodeTemplate):
 
 referenceTemplate = _ReduceMeanTemplate("""
 // ReduceMean
-// SCHEREMO: TODO
+int32_t ${data_out}_accumulator = 0;
+<%
+reduceLength = 1
+for i in axes:
+    reduceLength = reduceLength * data_in_shape[i]
+%>
+<%
+    shapeStr = ''
+    accessStr = ''
+%>
+% for idx, i in enumerate(data_in_shape[:-1]):
+<%
+    shapeStr += '['+str(i)+']'
+%>
+% endfor
+% for j in range(len(data_in_shape)):
+<%
+    accessStr += '[i_'+str(j)+']'
+%>
+% endfor
+${data_in_type._name_}* dummy_${data_in} = ((${data_in_type._name_} (*)${shapeStr})${data_in});
+${data_out_type._name_}* dummy_${data_out} = ${data_out};
+
+<%
+restDims = set(list(range(len(data_in_shape)))).difference(set(axes))
+%>
+% for i in list(restDims):
+for(int i_${i} = 0; i_${i}<${data_in_shape[i]}; i_${i}++){
+% endfor
+${data_out}_accumulator = 0;
+% for i in list(axes):
+for(int i_${i} = 0; i_${i}<${data_in_shape[i]}; i_${i}++){
+% endfor
+${data_out}_accumulator += dummy_${data_in}${accessStr};
+
+% for i in range(len(axes)):
+}
+% endfor
+% if keepdims:
+*$dummy_${data_out}++ = ${data_out}_accumulator / ${reduceLength};
+% else:
+*$dummy_${data_out}++ = ${data_out}_accumulator / ${reduceLength};
+% endif
+% for i in range(len(restDims)):
+}
+% endfor
 """)
