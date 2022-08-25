@@ -4,3 +4,19 @@ requires = [
     "wheel",
 ]
 build-backend = "setuptools.build_meta"
+[project]
+name = "DumpO"
+description = "DumpO - Bring your networks to your platforms"
+version = '0.0.1'
+readme = "README.md"
+dependencies = [
+    'protobuf',
+    'numpy',
+    'onnx',
+    'mako',
+    'IPython',
+    'argparse',
+    "onnx-graphsurgeon @ https://developer.download.nvidia.com/compute/redist/onnx-graphsurgeon/onnx_graphsurgeon-0.3.20-py2.py3-none-any.whl"
+]
+[tool.setuptools]
+packages = ['DumpO']
