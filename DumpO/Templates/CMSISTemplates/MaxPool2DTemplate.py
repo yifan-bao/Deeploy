@@ -2,8 +2,8 @@
 #
 # File: MaxPool2DTemplate.py
 #
-# Last edited: 27.12.2021        
-# 
+# Last edited: 27.12.2021
+#
 # Copyright (C) 2021, ETH Zurich and University of Bologna.
 #
 # Author: Moritz Scherer, ETH Zurich
@@ -31,7 +31,7 @@ from .CMSISUtils import bindFCParams
 
 class _MaxPool2DTemplate(NodeTemplate):
     def __init__(self, templateStr):
-        self.template = Template(templateStr)
+        super().__init__(templateStr)
 
     def alignToContext(self, ctxt: NetworkContext, nodeRep: Dict) -> (NetworkContext, Dict):
         ctxt = ctxt.copy()
@@ -39,7 +39,7 @@ class _MaxPool2DTemplate(NodeTemplate):
         data_out_name = nodeRep['data_out']
 
         ctxtDict = {
-            'buf': 0, #f'{node.name}_ctxt_buffer',  
+            'buf': 0, #f'{node.name}_ctxt_buffer',
             'size': 0
         }
 
@@ -78,7 +78,7 @@ class _MaxPool2DTemplate(NodeTemplate):
             'h': nodeRep['dim_im_in_x'],
             'w': nodeRep['dim_im_in_y'],
             'c': nodeRep['ch_im_in']
-        }            
+        }
         ctxt.hoistStruct(inputDimsDict, f'{data_out_name}_input_dims', 'cmsis_nn_dims')
         nodeRep['input_dims'] = ctxt.lookup(f'{data_out_name}_input_dims').name
 

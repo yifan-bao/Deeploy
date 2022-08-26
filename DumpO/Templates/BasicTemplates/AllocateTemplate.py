@@ -2,8 +2,8 @@
 #
 # File: AllocateTemplate.py
 #
-# Last edited: 15.12.2021        
-# 
+# Last edited: 15.12.2021
+#
 # Copyright (C) 2021, ETH Zurich and University of Bologna.
 #
 # Author: Moritz Scherer, ETH Zurich
@@ -36,6 +36,6 @@ referenceStructInitTemplate = NodeTemplate("""static ${type} ${name};
 """)
 #static const ${type}* ${name} = &${name}_UL;
 
-referenceStructAllocateTemplate = NodeTemplate(""" % for key, value in structDict.items(): 
+referenceStructAllocateTemplate = NodeTemplate(""" % for key, value in structDict.items():
     ${name}.${key} = ${value};
 % endfor """)

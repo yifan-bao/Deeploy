@@ -25,6 +25,7 @@
 
 import numpy as np
 import math
+import onnx_graphsurgeon as gs
 
 from DumpO.DumpOTypes import *
 from DumpO.Parsers.BasicParsers import *
@@ -184,7 +185,7 @@ class CMSISConv2DParser(Conv2DParser):
                 self.parserDict['pads'][0] == self.parserDict['pads'][2],
                 self.parserDict['pads'][1] == self.parserDict['pads'][3],
                 self.parserDict['pads'][0] == self.parserDict['pads'][1],
-                self.parserDict['pads'][0] == 0,
+                #self.parserDict['pads'][0] == 0,
                 # Don't support dilations
                 #all([coeff == 1 for coeff in self.parserDict['dilations']]),
                 len(node.inputs) == 5,
@@ -262,7 +263,7 @@ class CMSISDWConv1DParser(Conv1DParser):
                 # Make sure padding is square
                 node.op == 'RequantizedConv',
                 self.parserDict['pads'][0] == self.parserDict['pads'][1],
-                self.parserDict['pads'][0] == 0,
+                #self.parserDict['pads'][0] == 0,
                 # Don't support dilations
                 #all([coeff == 1 for coeff in self.parserDict['dilations']]),
                 len(node.inputs) == 5,
@@ -298,27 +299,26 @@ class CMSISDWConv1DParser(Conv1DParser):
 
         if ret:
 
-            if not self.parserDict['group'] == newCtxt.lookup(self.parserDict['weight']).shape[0]:
-                return ctxt, False
-
             inputs = ['data_in', 'weight', 'mul', 'add', 'shift']
             for idx, inputNode in enumerate(node.inputs):
                 self.parserDict[inputs[idx]] = newCtxt.lookup(inputNode.name).name
+
+            if not self.parserDict['group'] == newCtxt.lookup(self.parserDict['weight']).shape[-1]:
+                return ctxt, False
 
             data_in = newCtxt.lookup(self.parserDict['data_in'])
             data_out = newCtxt.lookup(self.parserDict['data_out'])
             weight = newCtxt.lookup(self.parserDict['weight'])
 
-            if not newCtxt.is_global(self.parserDict['weight']):
-                return ctxt, False
+            # if not newCtxt.is_global(self.parserDict['weight']):
+            #     return ctxt, False
 
             # SCHEREMO: Transpose weights to be num filters last
-            newCtxt.globalObjects[self.parserDict['weight']].values = np.transpose(weight.values, list(range(len(weight.shape)))[1:] + [0])
+            # newCtxt.globalObjects[self.parserDict['weight']].values = np.transpose(weight.values, list(range(len(weight.shape)))[1:] + [0])
 
             self.parserDict['batch'] = data_in.shape[0]
             self.parserDict['dim_im_in_x'] = 1
             self.parserDict['dim_im_out_x'] = 1
-
 
             if channels_first:
                 self.parserDict['ch_im_in'] = data_in.shape[1]
@@ -349,7 +349,7 @@ class CMSISConv1DParser(Conv1DParser):
                 node.op == 'RequantizedConv',
                 self.parserDict['group'] == 1,
                 self.parserDict['pads'][0] == self.parserDict['pads'][1],
-                self.parserDict['pads'][0] == 0,
+                #self.parserDict['pads'][0] == 0,
                 # Don't support dilations
                 #all([coeff == 1 for coeff in self.parserDict['dilations']]),
                 len(node.inputs) == 5,
@@ -496,9 +496,8 @@ class CMSISGEMMParser(CMSISLinearParser):
                     'n_levels_out' in node.attrs
                      ]),
                 'signed' in node.attrs,
-                'mul' in node.attrs,
                 'shift' in node.attrs,
-                len(node.inputs) == 3,
+                len(node.inputs) == 4,
         ])
 
             if ret:
@@ -508,7 +507,6 @@ class CMSISGEMMParser(CMSISLinearParser):
                     self.parserDict['n_levels'] = int(node.attrs['n_levels_out'].values)
                 self.parserDict['signed'] = int(node.attrs['signed'].values)
                 self.parserDict['log2D'] = int(math.log2(node.attrs['div'].values))
-                self.parserDict['mul'] = int(node.attrs['mul'].values)
                 self.parserDict['shift'] = int(node.attrs['shift'].values)
 
             return ret
@@ -521,6 +519,10 @@ class CMSISGEMMParser(CMSISLinearParser):
         newCtxt, ret = super().parseNodeCtxt(ctxt, node)
 
         if ret:
+            inputs = ['A', 'B', 'C', 'mul', 'add']
+            for idx, inputNode in enumerate(node.inputs):
+                self.parserDict[inputs[idx]] = newCtxt.lookup(inputNode.name).name
+
             return newCtxt, True
 
         else:
@@ -562,6 +564,53 @@ class CMSISLinearAttentionParser(LinearAttentionParser):
         newCtxt, ret = super().parseNodeCtxt(ctxt, node)
 
         if ret:
+            return newCtxt, ret
+        else:
+            return ctxt, False
+
+class CMSISCLCAParser(CLCAParser):
+    def __init__(self):
+        super().__init__()
+
+    def parseNode(self, node: gs.ir.node.Node) -> (bool):
+
+        wellFormed = super().parseNode(node)
+        return wellFormed
+
+    def parseNodeCtxt(self, ctxt: NetworkContext, node: gs.ir.node.Node, channels_first: bool = True) -> (NetworkContext, bool):
+
+        ctxt = ctxt.copy()
+        newCtxt, ret = super().parseNodeCtxt(ctxt, node)
+        if ret:
+        # Div to shift:
+            newCtxt.globalObjects[self.parserDict['wq_requant_div']].values = np.log2(newCtxt.globalObjects[self.parserDict['wq_requant_div']].values).astype('int')
+            newCtxt.globalObjects[self.parserDict['wk_requant_div']].values = np.log2(newCtxt.globalObjects[self.parserDict['wk_requant_div']].values).astype('int')
+            newCtxt.globalObjects[self.parserDict['wv_requant_div']].values = np.log2(newCtxt.globalObjects[self.parserDict['wv_requant_div']].values).astype('int')
+            newCtxt.globalObjects[self.parserDict['wo_requant_div']].values = np.log2(newCtxt.globalObjects[self.parserDict['wo_requant_div']].values).astype('int')
+            newCtxt.globalObjects[self.parserDict['kdiv_requant_div']].values = np.log2(newCtxt.globalObjects[self.parserDict['kdiv_requant_div']].values).astype('int')
+            newCtxt.globalObjects[self.parserDict['preattn_requant_div']].values = np.log2(newCtxt.globalObjects[self.parserDict['preattn_requant_div']].values).astype('int')
+            newCtxt.globalObjects[self.parserDict['postattn_requant_div']].values = np.log2(newCtxt.globalObjects[self.parserDict['postattn_requant_div']].values).astype('int')
+
+            # Fold additions:
+            newCtxt.globalObjects[self.parserDict['wo_bias']].values = newCtxt.globalObjects[self.parserDict['wo_bias']].values + (newCtxt.globalObjects[self.parserDict['wo_requant_add']].values / newCtxt.globalObjects[self.parserDict['wo_requant_mul']].values).astype('int')
+            newCtxt.globalObjects[self.parserDict['wo_requant_add']]._deploy = False
+            newCtxt.globalObjects[self.parserDict['wq_bias']].values = newCtxt.globalObjects[self.parserDict['wq_bias']].values + (newCtxt.globalObjects[self.parserDict['wq_requant_add']].values / newCtxt.globalObjects[self.parserDict['wq_requant_mul']].values).astype('int')
+            newCtxt.globalObjects[self.parserDict['wq_requant_add']]._deploy = False
+            newCtxt.globalObjects[self.parserDict['wk_bias']].values = newCtxt.globalObjects[self.parserDict['wk_bias']].values + (newCtxt.globalObjects[self.parserDict['wv_requant_add']].values / newCtxt.globalObjects[self.parserDict['wv_requant_mul']].values).astype('int')
+            newCtxt.globalObjects[self.parserDict['wv_requant_add']]._deploy = False
+
+            # Rescale requant adds:
+            newCtxt.globalObjects[self.parserDict['postattn_requant_add']].values = (newCtxt.globalObjects[self.parserDict['postattn_requant_add']].values / newCtxt.globalObjects[self.parserDict['postattn_requant_mul']].values).astype('int')
+            newCtxt.globalObjects[self.parserDict['preattn_requant_add']].values = (newCtxt.globalObjects[self.parserDict['preattn_requant_add']].values / newCtxt.globalObjects[self.parserDict['preattn_requant_mul']].values).astype('int')
+            newCtxt.globalObjects[self.parserDict['kdiv_requant_add']].values = (newCtxt.globalObjects[self.parserDict['kdiv_requant_add']].values / newCtxt.globalObjects[self.parserDict['kdiv_requant_mul']].values).astype('int')
+            newCtxt.globalObjects[self.parserDict['wk_requant_add']].values = (newCtxt.globalObjects[self.parserDict['wk_requant_add']].values / newCtxt.globalObjects[self.parserDict['wk_requant_mul']].values).astype('int')
+            newCtxt.globalObjects[self.parserDict['wo_requant_add']].values = (newCtxt.globalObjects[self.parserDict['wo_requant_add']].values / newCtxt.globalObjects[self.parserDict['wo_requant_mul']].values).astype('int')
+            newCtxt.globalObjects[self.parserDict['wq_requant_add']].values = (newCtxt.globalObjects[self.parserDict['wq_requant_add']].values / newCtxt.globalObjects[self.parserDict['wq_requant_mul']].values).astype('int')
+            newCtxt.globalObjects[self.parserDict['wv_requant_add']].values = (newCtxt.globalObjects[self.parserDict['wv_requant_add']].values / newCtxt.globalObjects[self.parserDict['wv_requant_mul']].values).astype('int')
+
+            # Delta into mul
+            newCtxt.globalObjects[self.parserDict['kdiv_requant_mul']].values = newCtxt.globalObjects[self.parserDict['kdiv_requant_mul']].values * self.parserDict['Delta']
+
             return newCtxt, ret
         else:
             return ctxt, False

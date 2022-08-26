@@ -1,8 +1,8 @@
 # ----------------------------------------------------------------------
 #
-# File: LinearAttentionTemplate.py
+# File: BasicDataTypes.py
 #
-# Last edited: 05.06.2022
+# Last edited: 31.08.2022
 #
 # Copyright (C) 2022, ETH Zurich and University of Bologna.
 #
@@ -23,23 +23,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from enum import Enum
 
-import mako
-from typing import Dict
-from mako.template import Template
-import numpy as np
-
-from DumpO.DumpOTypes import NodeTemplate, NetworkContext
-from .CMSISUtils import bindFCParams
-
-class _LinearAttentionTemplate(NodeTemplate):
-    def __init__(self, templateStr):
-        super().__init__(templateStr)
-
-    def alignToContext(self, ctxt: NetworkContext, nodeRep: Dict) -> (NetworkContext, Dict):
-        return ctxt, nodeRep
-
-
-referenceTemplate = _LinearAttentionTemplate("""
-// PLACEHOLDER LINEAR ATTENTION
-""")
+class DataTypes(Enum):
+    int8_t = 8
+    int16_t = 16
+    int32_t = 32
+    int64_t = 64

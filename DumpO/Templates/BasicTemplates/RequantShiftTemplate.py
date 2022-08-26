@@ -32,7 +32,7 @@ from DumpO.DumpOTypes import NodeTemplate, NetworkContext
 
 class _RequantShiftTemplate(NodeTemplate):
     def __init__(self, templateStr):
-        self.template = Template(templateStr)
+        super().__init__(templateStr)
 
     def alignToContext(self, ctxt: NetworkContext, nodeRep: Dict) -> (NetworkContext, Dict):
         ctxt = ctxt.copy()
@@ -47,5 +47,12 @@ class _RequantShiftTemplate(NodeTemplate):
 referenceTemplate = _RequantShiftTemplate("""
 // RQS
 
-RequantShift_s${data_in_type._value_}(${data_in}, ${size}, ${mul}, ${add}, ${data_out}, ${log2D}, ${channels}, ${input_offset}, ${output_offset}, 1);
+<%
+if isinstance(log2D, int):
+    log2Dstring = log2D
+else:
+    log2Dstring = "*"+log2D
+%>
+
+RequantShift_s${data_in_type._value_}(${data_in}, ${size}, ${mul}, ${add}, ${data_out}, ${log2Dstring}, ${channels}, ${input_offset}, ${output_offset}, 1);
 """)

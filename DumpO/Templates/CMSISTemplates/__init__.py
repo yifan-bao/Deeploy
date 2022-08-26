@@ -4,4 +4,8 @@ from .GEMMTemplate import *
 from .AddTemplate import *
 from .MHSATemplate import *
 from .LinearAttentionTemplate import *
+from .CLCATemplate import *
 from .MaxPool2DTemplate import *
+from .MatMulTemplate import *
+from .IntegerDivTemplate import *
+from .RQIntegerDivTemplate import *

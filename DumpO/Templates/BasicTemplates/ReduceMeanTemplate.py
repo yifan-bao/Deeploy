@@ -30,7 +30,7 @@ from DumpO.DumpOTypes import NodeTemplate, NetworkContext
 
 class _ReduceMeanTemplate(NodeTemplate):
     def __init__(self, templateStr):
-        self.template = Template(templateStr)
+        super().__init__(templateStr)
 
     def alignToContext(self, ctxt: NetworkContext, nodeRep: Dict) -> (NetworkContext, Dict):
         ctxt = ctxt.copy()
@@ -54,7 +54,7 @@ for i in axes:
     shapeStr = ''
     accessStr = ''
 %>
-% for idx, i in enumerate(data_in_shape[:-1]):
+% for idx, i in enumerate(data_in_shape[1:]):
 <%
     shapeStr += '['+str(i)+']'
 %>
@@ -64,7 +64,6 @@ for i in axes:
     accessStr += '[i_'+str(j)+']'
 %>
 % endfor
-${data_in_type._name_}* dummy_${data_in} = ((${data_in_type._name_} (*)${shapeStr})${data_in});
 ${data_out_type._name_}* dummy_${data_out} = ${data_out};
 
 <%
@@ -73,19 +72,32 @@ restDims = set(list(range(len(data_in_shape)))).difference(set(axes))
 % for i in list(restDims):
 for(int i_${i} = 0; i_${i}<${data_in_shape[i]}; i_${i}++){
 % endfor
-${data_out}_accumulator = 0;
+${data_out}_accumulator = ${input_offset}*${reduceLength};
 % for i in list(axes):
 for(int i_${i} = 0; i_${i}<${data_in_shape[i]}; i_${i}++){
 % endfor
-${data_out}_accumulator += dummy_${data_in}${accessStr};
+${data_out}_accumulator += ((${data_in_type._name_} (*)${shapeStr})${data_in})${accessStr};
 
 % for i in range(len(axes)):
 }
 % endfor
 % if keepdims:
-*$dummy_${data_out}++ = ${data_out}_accumulator / ${reduceLength};
+*dummy_${data_out}++ = (${data_out}_accumulator + ${data_out}_sgn*(${reduceLength}>>1)) / ${reduceLength} + ${output_offset};
 % else:
-*$dummy_${data_out}++ = ${data_out}_accumulator / ${reduceLength};
+<%
+
+import numpy as np
+
+if (np.log2(reduceLength) - int(np.log2(reduceLength))) == 0:
+    shift = int(np.log2(reduceLength))
+%>
+% if shift is not None:
+*dummy_${data_out}++ = ((${data_out}_accumulator + (1<<(${shift}-1))) >> ${shift}) + ${output_offset};
+% else:
+int8_t ${data_out}_sgn = 0;
+${data_out}_sgn = -(${data_out}_accumulator<0) + (${data_out}_accumulator >= 0);
+*dummy_${data_out}++ = (${data_out}_accumulator + ${data_out}_sgn*(${reduceLength}>>1)) / ${reduceLength} + ${output_offset};
+% endif
 % endif
 % for i in range(len(restDims)):
 }

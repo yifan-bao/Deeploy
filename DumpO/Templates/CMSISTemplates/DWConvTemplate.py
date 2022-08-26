@@ -31,7 +31,7 @@ from .CMSISUtils import bindFCParams
 
 class _Conv2DDW_8_Template(NodeTemplate):
     def __init__(self, templateStr):
-        self.template = Template(templateStr)
+        super().__init__(templateStr)
 
     def alignToContext(self, ctxt: NetworkContext, nodeRep: Dict) -> (NetworkContext, Dict):
         ctxt = ctxt.copy()
@@ -169,7 +169,7 @@ free(_DumpO__ctxtBuffer_${ctxt});
 
 class _Conv1DDW_16_Template(NodeTemplate):
     def __init__(self, templateStr):
-        self.template = Template(templateStr)
+        super().__init__(templateStr)
 
     def alignToContext(self, ctxt: NetworkContext, nodeRep: Dict) -> (NetworkContext, Dict):
         ctxt = ctxt.copy()
@@ -250,7 +250,7 @@ class _Conv1DDW_16_Template(NodeTemplate):
         nodeRep['quant_params'] = ctxt.lookup(f'{data_out_name}_quant_params').name
 
         inputDimsDict = {
-            'n': 1,
+            'n': data_in.shape[0],
             'h': 1,
             'w': nodeRep['dim_im_in_y'],
             'c': nodeRep['ch_im_in']
@@ -268,9 +268,9 @@ class _Conv1DDW_16_Template(NodeTemplate):
         nodeRep['filter_dims'] = ctxt.lookup(f'{data_out_name}_filter_dims').name
 
         outputDimsDict = {
-            'n': 1,
+            'n': data_in.shape[0],
             'h': 1,
-            'w': nodeRep['dim_im_out_x'],
+            'w': nodeRep['dim_im_out_y'],
             'c': nodeRep['ch_im_out']
         }
         ctxt.hoistStruct(outputDimsDict, f'{data_out_name}_output_dims', 'cmsis_nn_dims')
@@ -302,7 +302,16 @@ free(_DumpO__ctxtBuffer_${ctxt});
 """)
 
 conv1D_8_Template = _Conv1DDW_16_Template("""
-// PLACEHOLDER CONV1D 8 Bit
+<%
+batchSizeIn = ch_im_in * dim_im_in_x * dim_im_in_y
+batchSizeOut = ch_im_out * dim_im_out_x * dim_im_out_y
+%>
+void* _DumpO__ctxtBuffer_${ctxt} = malloc(sizeof(int8_t)*${ctxt}.size);
+${ctxt}.buf = _DumpO__ctxtBuffer_${ctxt};
+for(int b=0; b<${batch}; b++){
+arm_depthwise_conv_wrapper_s8(&${ctxt}, &${dw_conv_params}, &${quant_params}, &${input_dims}, (${data_in} + b*${batchSizeIn}), &${filter_dims}, ${weight}, &${bias_dims}, ${add}, &${output_dims}, (${data_out} + b*${batchSizeOut}));
+}
+free(_DumpO__ctxtBuffer_${ctxt});
 """)
 # int8_t* bias = int8_t* malloc(sizeof(int8_t) * ${ch_im_in}); \n\
 #                free(bias); \

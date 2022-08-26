@@ -65,6 +65,9 @@ class iGELULayer(ONNXLayer):
         compDiv = self.mapper.nodeRep['size']
         return compAbs + compAdd + compSqr + compMul + compAdd + compMul2 + compAdd2 + compDiv
 
+class RQSiGELULayer(iGELULayer):
+    def __init__(self, maps : List[NodeMapper]):
+        super().__init__(maps)
 
 class iSoftmaxLayer(ONNXLayer):
     def __init__(self, maps : List[NodeMapper]):
@@ -100,6 +103,24 @@ class AddLayer(ONNXLayer):
     def computeOps(self):
         return self.mapper.nodeRep['size']
 
+class MatMulLayer(ONNXLayer):
+    def __init__(self, maps : List[NodeMapper]):
+        super().__init__(maps)
+
+    def computeShapes(self, inputShapes: List[np.shape], outputShapes: List[np.shape], parserDict, channels_first) -> (List[np.shape], List[np.shape]):
+        return (inputShapes, outputShapes)
+
+    def computeOps(self):
+        return 2 * self.mapper.nodeRep['M'] * self.mapper.nodeRep['N'] * self.mapper.nodeRep['O'] * self.mapper.nodeRep['batch']
+
+
+class IntegerDivLayer(ONNXLayer):
+    def __init__(self, maps : List[NodeMapper]):
+        super().__init__(maps)
+
+    def computeShapes(self, inputShapes: List[np.shape], outputShapes: List[np.shape], parserDict, channels_first) -> (List[np.shape], List[np.shape]):
+        return (inputShapes, outputShapes)
+
 class GEMMLayer(ONNXLayer):
     def __init__(self, maps : List[NodeMapper]):
         super().__init__(maps)
@@ -118,6 +139,14 @@ class GEMMLayer(ONNXLayer):
         if len(inputShapes) == 3:
             inputShapes[2] = [M,N]
 
+        return (inputShapes, outputShapes)
+
+class MulLayer(ONNXLayer):
+    def __init__(self, maps : List[NodeMapper]):
+        super().__init__(maps)
+
+    def computeShapes(self, inputShapes: List[np.shape], outputShapes: List[np.shape], parserDict, channels_first) -> (List[np.shape], List[np.shape]):
+        inputShapes[1] = 1
         return (inputShapes, outputShapes)
 
 class ConvLayer(ONNXLayer):
@@ -191,6 +220,75 @@ class LinearAttentionLayer(ONNXLayer):
         # return totOps
 
         return 0
+
+class CLCALayer(ONNXLayer):
+    def __init__(self, maps : List[NodeMapper]):
+        super().__init__(maps)
+    def computeShapes(self, inputShapes: List[np.shape], outputShapes: List[np.shape], parserDict, channels_first) -> (List[np.shape], List[np.shape]):
+        inputShapes[3] = inputShapes[2][0]
+        inputShapes[5] = inputShapes[4][0]
+        inputShapes[7] = inputShapes[6][0]
+        # WQ Requant
+        inputShapes[8] = [parserDict['dim_head'] * parserDict['heads'], 1]
+        inputShapes[9] = [parserDict['dim_head'] * parserDict['heads'], 1]
+        inputShapes[10] = [parserDict['dim_head'] * parserDict['heads'], 1]
+        # WK Requant
+        inputShapes[11] = [1, 1]
+        inputShapes[12] = [1, 1]
+        inputShapes[13] = [1, 1]
+        # WV Requant
+        inputShapes[14] = [parserDict['dim_head'] * parserDict['heads'], 1]
+        inputShapes[15] = [parserDict['dim_head'] * parserDict['heads'], 1]
+        inputShapes[16] = [parserDict['dim_head'] * parserDict['heads'], 1]
+        # Kdiv Requanat
+        inputShapes[17] = [1, 1]
+        inputShapes[18] = [1, 1]
+        inputShapes[19] = [1, 1]
+        # Preattn Requant
+        inputShapes[20] = [1, 1]
+        inputShapes[21] = [1, 1]
+        inputShapes[22] = [1, 1]
+        # Postattn Requant
+        inputShapes[23] = [1, 1]
+        inputShapes[24] = [1, 1]
+        inputShapes[25] = [1, 1]
+        # WO Requant
+        inputShapes[26] = [parserDict['out_dim'], 1]
+        inputShapes[27] = [parserDict['out_dim'], 1]
+        inputShapes[28] = [parserDict['out_dim'], 1]
+        return(inputShapes, outputShapes)
+
+    def computeOps(self):
+
+        qLen = self.mapper.nodeRep['q_shape'][-1]
+        kLen = self.mapper.nodeRep['kv_shape'][-1]
+        inDim = self.mapper.nodeRep['q_shape'][-2]
+        heads = self.mapper.nodeRep['heads']
+        dim_head = self.mapper.nodeRep['dim_head']
+        out_dim = self.mapper.nodeRep['out_dim']
+
+        # q -> Q
+        QOps = qLen * 1 * inDim * heads * dim_head * 2
+        # v -> V
+        VOps = kLen * 1 * inDim * heads * dim_head * 2
+        # V -> K
+        KOps = kLen * heads * dim_head * 2
+        # KOps = 0
+
+        EOps = heads * kLen * heads * dim_head
+
+        MMKTV = heads * dim_head * kLen * dim_head * 2
+        MMQA = heads * qLen * dim_head * dim_head * 2
+        MMQE = heads * qLen * dim_head * 1 * 2
+
+        # Divs, Adds(eps), muls(delta, eps)
+        DivOps = heads * qLen * dim_head + heads * qLen + 2 * heads * qLen * dim_head
+
+        OOps = (heads * dim_head) * qLen * out_dim * 1 * 2
+
+        return QOps + VOps + KOps + EOps + MMKTV + MMQA + MMQE + DivOps + OOps
+
+
 class MHSALayer(ONNXLayer):
     def __init__(self, maps : List[NodeMapper]):
         super().__init__(maps)

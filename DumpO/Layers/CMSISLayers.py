@@ -31,9 +31,14 @@ class RQSConvLayer(ConvLayer):
         super().__init__(maps)
 
     def computeShapes(self, inputShapes: List[np.shape], outputShapes: List[np.shape], parserDict, channels_first) -> (List[np.shape], List[np.shape]):
-        inputShapes[2] = inputShapes[1][0] # Channels out dimension of Kernel
-        inputShapes[3] = inputShapes[1][0] # Channels out dimension of Kernel
-        inputShapes[4] = inputShapes[1][0] # Channels out dimension of Kernel
+        if channels_first:
+            inputShapes[2] = outputShapes[0][1] # Channels out dimension of Kernel
+            inputShapes[3] = outputShapes[0][1] # Channels out dimension of Kernel
+            inputShapes[4] = outputShapes[0][1] # Channels out dimension of Kernel
+        else:
+            inputShapes[2] = outputShapes[0][-1] # Channels out dimension of Kernel
+            inputShapes[3] = outputShapes[0][-1] # Channels out dimension of Kernel
+            inputShapes[4] = outputShapes[0][-1] # Channels out dimension of Kernel
         return (inputShapes, outputShapes)
 
     def computeOps(self):
@@ -62,3 +67,10 @@ class RQSGEMMLayer(GEMMLayer):
     def computeOps(self):
         ops = self.mapper.nodeRep['in_N'] * self.mapper.nodeRep['in_C'] * self.mapper.nodeRep['weight_C'] * 2
         return ops
+
+class RQIntegerDivLayer(ONNXLayer):
+    def __init__(self, maps : List[NodeMapper]):
+        super().__init__(maps)
+
+    def computeShapes(self, inputShapes: List[np.shape], outputShapes: List[np.shape], parserDict, channels_first) -> (List[np.shape], List[np.shape]):
+        return (inputShapes, outputShapes)

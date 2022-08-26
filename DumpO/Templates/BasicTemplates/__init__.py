@@ -14,3 +14,5 @@ from .GatherTemplate import *
 from .PadTemplate import *
 from .TransposeTemplate import *
 from .DummyTemplate import *
+from .MulTemplate import *
+from .RQSiGELUTemplate import *

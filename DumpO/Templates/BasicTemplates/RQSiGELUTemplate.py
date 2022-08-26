@@ -1,10 +1,10 @@
 # ----------------------------------------------------------------------
 #
-# File: LinearAttentionTemplate.py
+# File: RQSiGELUTemplate.py
 #
-# Last edited: 05.06.2022
+# Last edited: 13.12.2021
 #
-# Copyright (C) 2022, ETH Zurich and University of Bologna.
+# Copyright (C) 2021, ETH Zurich and University of Bologna.
 #
 # Author: Moritz Scherer, ETH Zurich
 #
@@ -23,23 +23,23 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-
-import mako
 from typing import Dict
 from mako.template import Template
-import numpy as np
 
 from DumpO.DumpOTypes import NodeTemplate, NetworkContext
-from .CMSISUtils import bindFCParams
 
-class _LinearAttentionTemplate(NodeTemplate):
+class _RQSiGELUTemplate(NodeTemplate):
     def __init__(self, templateStr):
         super().__init__(templateStr)
 
     def alignToContext(self, ctxt: NetworkContext, nodeRep: Dict) -> (NetworkContext, Dict):
+        ctxt = ctxt.copy()
+
+        data_in = ctxt.lookup(nodeRep['data_in'])
+        data_out = ctxt.lookup(nodeRep['data_out'])
+        nodeRep['input_offset'] = (data_in._signed==0) * int(data_in.nLevels/2)
+        nodeRep['output_offset'] = -(data_out._signed==0) * int(data_out.nLevels/2)
+
         return ctxt, nodeRep
 
-
-referenceTemplate = _LinearAttentionTemplate("""
-// PLACEHOLDER LINEAR ATTENTION
-""")
+referenceTemplate = _RQSiGELUTemplate("RQSGELUKernel_s8(${data_in}, ${data_out}, ${size}, ${b}, ${one}, ${input_offset}, ${output_offset}, ${mul}, ${add}, ${shift});")

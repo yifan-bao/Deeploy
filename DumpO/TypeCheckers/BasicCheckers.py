@@ -102,6 +102,16 @@ class MHSAChecker(NodeTypeChecker):
     def inferSignedness(self, inputs: List[VariableBuffer], parserDict: Dict) -> List[bool]:
         return [True]
 
+class CLCAChecker(NodeTypeChecker):
+    def __init__(self, input_types: List[Enum], output_types: List[Enum]):
+        super().__init__(input_types, output_types)
+
+    def inferNumLevels(self, inputs: List[VariableBuffer], parserDict: Dict) -> List[int]:
+        return [2**(self.input_types[0]._value_)]
+
+    def inferSignedness(self, inputs: List[VariableBuffer], parserDict: Dict) -> List[bool]:
+        return [True]
+
 class LinearAttentionChecker(NodeTypeChecker):
     def __init__(self, input_types: List[Enum], output_types: List[Enum]):
         super().__init__(input_types, output_types)
@@ -131,6 +141,61 @@ class iLayerNormChecker(NodeTypeChecker):
 
     def inferSignedness(self, inputs: List[VariableBuffer], parserDict: Dict) -> List[bool]:
         return [True]
+
+class MulChecker(NodeTypeChecker):
+    def __init__(self, input_types: List[Enum], output_types: List[Enum]):
+        super().__init__(input_types, output_types)
+
+    def inferNumLevels(self, inputs: List[VariableBuffer], parserDict: Dict) -> List[int]:
+        return [2**(self.input_types[1]._value_)]
+
+    def inferSignedness(self, inputs: List[VariableBuffer], parserDict: Dict) -> List[bool]:
+        if inputs[0]._signed or inputs[1]._signed:
+            return [True]
+        else:
+            return [False]
+
+class IntegerDivChecker(NodeTypeChecker):
+    def __init__(self, input_types: List[Enum], output_types: List[Enum]):
+        super().__init__(input_types, output_types)
+
+    def inferNumLevels(self, inputs: List[VariableBuffer], parserDict: Dict) -> List[int]:
+        return [2**(self.output_types[0]._value_)]
+
+    def inferSignedness(self, inputs: List[VariableBuffer], parserDict: Dict) -> List[bool]:
+        if inputs[0]._signed or inputs[1]._signed:
+            return [True]
+        else:
+            return [False]
+
+
+class RQIntegerDivChecker(NodeTypeChecker):
+    def __init__(self, input_types: List[Enum], output_types: List[Enum]):
+        super().__init__(input_types, output_types)
+
+    def inferNumLevels(self, inputs: List[VariableBuffer], parserDict: Dict) -> List[int]:
+        return [2**(self.output_types[0]._value_)]
+
+    def inferSignedness(self, inputs: List[VariableBuffer], parserDict: Dict) -> List[bool]:
+        if inputs[0]._signed or inputs[1]._signed:
+            return [True]
+        else:
+            return [False]
+
+
+class MatMulChecker(NodeTypeChecker):
+    def __init__(self, input_types: List[Enum], output_types: List[Enum]):
+        super().__init__(input_types, output_types)
+
+    def inferNumLevels(self, inputs: List[VariableBuffer], parserDict: Dict) -> List[int]:
+        return [2**(self.input_types[0]._value_ + self.input_types[1]._value_)]
+
+    def inferSignedness(self, inputs: List[VariableBuffer], parserDict: Dict) -> List[bool]:
+        if inputs[0]._signed or inputs[1]._signed:
+            return [True]
+        else:
+            return [False]
+
 
 class ReduceMeanChecker(NodeTypeChecker):
     def __init__(self, input_types: List[Enum], output_types: List[Enum]):

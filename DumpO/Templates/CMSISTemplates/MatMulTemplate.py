@@ -1,8 +1,8 @@
 # ----------------------------------------------------------------------
 #
-# File: LinearAttentionTemplate.py
+# File: MatMulTemplate.py
 #
-# Last edited: 05.06.2022
+# Last edited: 02.09.2022
 #
 # Copyright (C) 2022, ETH Zurich and University of Bologna.
 #
@@ -23,23 +23,38 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-
-import mako
 from typing import Dict
 from mako.template import Template
-import numpy as np
 
 from DumpO.DumpOTypes import NodeTemplate, NetworkContext
-from .CMSISUtils import bindFCParams
 
-class _LinearAttentionTemplate(NodeTemplate):
+class _MatMulTemplate(NodeTemplate):
     def __init__(self, templateStr):
         super().__init__(templateStr)
 
     def alignToContext(self, ctxt: NetworkContext, nodeRep: Dict) -> (NetworkContext, Dict):
+        ctxt = ctxt.copy()
+
+        A = ctxt.lookup(nodeRep['A'])
+        B = ctxt.lookup(nodeRep['B'])
+        C = ctxt.lookup(nodeRep['data_out'])
+        nodeRep['A_offset'] = (A._signed==0) * int(A.nLevels/2)
+        nodeRep['B_offset'] = (B._signed==0) * int(B.nLevels/2)
+        nodeRep['C_offset'] = -(C._signed==0) * int(C.nLevels/2)
+
         return ctxt, nodeRep
 
+reference_8_8_32_Template = _MatMulTemplate("""
+// MatMul
+int8_t* ref_${data_out}_${A} = ${A};
+int8_t* ref_${data_out}_${B} = ${B};
+int32_t* ref_${data_out}_${data_out} = ${data_out};
 
-referenceTemplate = _LinearAttentionTemplate("""
-// PLACEHOLDER LINEAR ATTENTION
+for(int i=0;i<${batch};i++){
+MatMul_s8_s8_s32(ref_${data_out}_${A}, ref_${data_out}_${B}, ref_${data_out}_${data_out}, ${A_offset}, ${B_offset}, ${M}, ${N}, ${O});
+ref_${data_out}_${A} += ${M} * ${N};
+ref_${data_out}_${B} += ${N} * ${O};
+ref_${data_out}_${data_out} += ${M} * ${O};
+}
+
 """)

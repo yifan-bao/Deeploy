@@ -2,8 +2,8 @@
 #
 # File: TransposeTemplate.py
 #
-# Last edited: 28.12.2021        
-# 
+# Last edited: 28.12.2021
+#
 # Copyright (C) 2021, ETH Zurich and University of Bologna.
 #
 # Author: Moritz Scherer, ETH Zurich
@@ -26,9 +26,9 @@
 from DumpO.DumpOTypes import NodeTemplate
 
 referenceTemplate = NodeTemplate("""
-// Transpose
+// Transpose ${data_in_shape} -> ${data_out_shape}
 ${data_out_type._name_}* dummy_${data_out} = ${data_out};
-<% 
+<%
     dimStr = ''
     accessStr = ''
     shapeStr = ''
@@ -36,12 +36,12 @@ ${data_out_type._name_}* dummy_${data_out} = ${data_out};
         dimStr += '['+str(dim)+']'
 %>
 % for idx, i in enumerate(perm[:-1]):
-<% 
+<%
     shapeStr += '['+str(data_in_shape[idx+1])+']'
 %>
 % endfor
 % for idx, i in enumerate(perm):
-<% 
+<%
     shape = data_out_shape[idx]
     accessStr += '[i_'+str(idx)+']'
 %>

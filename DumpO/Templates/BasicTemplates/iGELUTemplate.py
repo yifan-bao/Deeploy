@@ -2,8 +2,8 @@
 #
 # File: iGELUTemplate.py
 #
-# Last edited: 13.12.2021        
-# 
+# Last edited: 13.12.2021
+#
 # Copyright (C) 2021, ETH Zurich and University of Bologna.
 #
 # Author: Moritz Scherer, ETH Zurich
@@ -30,11 +30,11 @@ from DumpO.DumpOTypes import NodeTemplate, NetworkContext
 
 class _iGELUTemplate(NodeTemplate):
     def __init__(self, templateStr):
-        self.template = Template(templateStr)
+        super().__init__(templateStr)
 
     def alignToContext(self, ctxt: NetworkContext, nodeRep: Dict) -> (NetworkContext, Dict):
         ctxt = ctxt.copy()
-        
+
         data_in = ctxt.lookup(nodeRep['data_in'])
         data_out = ctxt.lookup(nodeRep['data_out'])
         nodeRep['input_offset'] = (data_in._signed==0) * int(data_in.nLevels/2)
@@ -42,5 +42,4 @@ class _iGELUTemplate(NodeTemplate):
 
         return ctxt, nodeRep
 
-referenceTemplate = _iGELUTemplate("GELUKernel_s8(${data_in}, ${data_out}, ${size}, ${b}, ${log2D}, ${totScaler}, ${one}, ${input_offset});")
-
+referenceTemplate = _iGELUTemplate("GELUKernel_s8(${data_in}, ${data_out}, ${size}, ${b}, ${one}, ${input_offset});")

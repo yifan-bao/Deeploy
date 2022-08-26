@@ -40,24 +40,33 @@ from DumpO.OptimizationPasses.CMSISPasses import *
 from DumpO.OptimizationPasses.BasicPasses import *
 
 GELU_int8_Mapper = NodeMapper(iGELUParser(), [BasicGELUBinding])
+RQGELU_int8_Mapper = NodeMapper(RQSiGELUParser(), [RQSGELUBinding])
 Softmax_int8_Mapper = NodeMapper(iSoftmaxParser(), [BasicSoftmaxBinding])
 iLayerNorm_int8_Mapper = NodeMapper(iLayerNormParser(), [CMSISLayerNormBinding])
 MHSA_int8_Mapper = NodeMapper(CMSISMHSAParser(), [CMSISMHSABinding])
 LinearAttention_int16_Mapper = NodeMapper(CMSISLinearAttentionParser(), [CMSISLinearAttentionBinding])
 
+CLCA_int8_Mapper = NodeMapper(CMSISCLCAParser(), [CMSISCLCABinding])
+
 GatherMapper = NodeMapper(GatherParser(), BasicGatherBindings)
 ReshapeMapper = NodeMapper(ReshapeParser(), BasicReshapeBindings)
 FlattenMapper = NodeMapper(FlattenParser(), BasicReshapeBindings)
+UnsqueezeMapper = NodeMapper(UnsqueezeParser(), BasicReshapeBindings)
 RequantShiftMapper = NodeMapper(RequantShiftParser(), BasicRQSBindings)
 ReduceMeanMapper = NodeMapper(ReduceMeanParser(), BasicReduceMeanBindings)
 GEMMMapper = NodeMapper(CMSISGEMMParser(), CMSISGEMMBindings)
-Conv2D_int8_Mapper = NodeMapper(CMSISConv2DParser(), [CMSISConv2DBinding])
-DWConv2D_int8_Mapper = NodeMapper(CMSISDWConv2DParser(), [CMSISDW3x3Conv2DBinding])
 
+Conv2D_int8_Mapper = NodeMapper(CMSISConv2DParser(), [CMSISConv2DBinding])
+DWConv2D_int8_Mapper = NodeMapper(CMSISDWConv2DParser(), [CMSISDWConv2DBinding])
 Conv1D_Mapper = NodeMapper(CMSISConv1DParser(), CMSISConv1DBindings)
-DWConv1D_Mapper = NodeMapper(CMSISDWConv1DParser(), CMSISDW3x3Conv1DBindings)
+DWConv1D_Mapper = NodeMapper(CMSISDWConv1DParser(), CMSISDWConv1DBindings)
 
 AddMapper = NodeMapper(AddParser(), BasicAddBindings)
+MulMapper = NodeMapper(MulParser(), BasicMulBindings)
+MatMulMapper = NodeMapper(MatMulParser(), [MatMul_8_8_32_Binding])
+
+IntegerDivMapper = NodeMapper(IntegerDivParser(), [IntegerDivBinding])
+RQIntegerDivMapper = NodeMapper(RQIntegerDivParser(), [RQIntegerDivBinding])
 
 TransposeMapper = NodeMapper(TransposeParser(), BasicTransposeBindings)
 Pad2DMapper = NodeMapper(Pad2DParser(), BasicPad2DBindings)
@@ -67,21 +76,29 @@ MaxPool2DMapper = NodeMapper(CMSISMaxPool2DParser(), [CMSISMaxPool2DBinding])
 DummyMapper = NodeMapper(DummyParser(), [DummyBinding])
 
 CMSISMapping = {
-    'RequantizedConv' : RQSConvLayer([Conv2D_int8_Mapper, DWConv2D_int8_Mapper, Conv1D_Mapper, DWConv1D_Mapper]),
+    'RequantizedConv' : RQSConvLayer([Conv2D_int8_Mapper, DWConv2D_int8_Mapper, Conv1D_Mapper, DWConv1D_Mapper ]),
     'RequantizedGemm': RQSGEMMLayer([GEMMMapper]),
     'RequantShift': RequantShiftLayer([RequantShiftMapper]),
+    'IntegerMean': ReduceMeanLayer([ReduceMeanMapper]),
     'ReduceMean': ReduceMeanLayer([ReduceMeanMapper]),
     'MaxPool': MaxPoolLayer([MaxPool2DMapper]),
+    'IntegerDiv': IntegerDivLayer([IntegerDivMapper]),
+    'RQIntegerDiv': RQIntegerDivLayer([RQIntegerDivMapper]),
+    'Mul': MulLayer([MulMapper]),
+    'MatMul': MatMulLayer([MatMulMapper]),
     'iLayerNorm': iLayerNormLayer([iLayerNorm_int8_Mapper]),
     'MultiHeadSelfAttention': MHSALayer([MHSA_int8_Mapper]),
     'LinearAttention': LinearAttentionLayer([LinearAttention_int16_Mapper]),
+    'CLCA': CLCALayer([CLCA_int8_Mapper]),
     'iGELU' : iGELULayer([GELU_int8_Mapper]),
+    'RequantizediGELU' : RQSiGELULayer([RQGELU_int8_Mapper]),
     'iSoftmax' : iSoftmaxLayer([Softmax_int8_Mapper]),
     'Transpose': TransposeLayer([TransposeMapper]),
     'Gather': GatherLayer([GatherMapper]),
     'Pad': PadLayer([Pad1DMapper, Pad2DMapper]),
     'Add': AddLayer([AddMapper]),
     'Reshape': ReshapeLayer([ReshapeMapper]),
+    'Unsqueeze': ReshapeLayer([UnsqueezeMapper]),
     'Flatten': ReshapeLayer([FlattenMapper]),
 }
 
@@ -153,8 +170,8 @@ class SimpleStructBuffer(StructBuffer):
     def dealloc(self) -> str:
         return FreeTemplate.referenceLocalTemplate.generate(name=self.name)
 
-
-CMSISOptimizer = NetworkOptimizer([LinearAttentionAlignmentPass(), MHSAAlignmentPass(), MergeConstAddAndRequantPass(), ExtractPaddingFromPoolPass(), ExtractPaddingFromConvPass(), ConvRequantMergePass(), GEMMRequantMergePass(), MatMulRequantMergePass()])
+#ExtractPaddingFromConvPass(),ExtractPaddingFromPoolPass(),
+CMSISOptimizer = NetworkOptimizer([ IntegerDivRequantMergePass(),iGELURequantMergePass(),LinearAttentionAlignmentPass(), MHSAAlignmentPass(), MergeConstAddAndRequantPass(), ConvRequantMergePass(), GEMMRequantMergePass(), MatMulRequantMergePass()])
 
 includeList = ["arm_math.h", "arm_nnfunctions.h", "DumpOMath.h"]
 

@@ -26,14 +26,11 @@
 from DumpO.DumpOTypes import *
 from DumpO.TypeCheckers.BasicCheckers import *
 from DumpO.Templates.BasicTemplates import *
+from DumpO.DataTypes.BasicDataTypes import *
 
-class DataTypes(Enum):
-    int8_t = 8
-    int16_t = 16
-    int32_t = 32
-    int64_t = 64
+BasicGELUBinding = NodeBinding(GELUChecker([DataTypes.int8_t], [DataTypes.int32_t]), iGELUTemplate.referenceTemplate)
+RQSGELUBinding = NodeBinding(GELUChecker([DataTypes.int8_t,DataTypes.int32_t,DataTypes.int32_t,DataTypes.int32_t], [DataTypes.int8_t]), RQSiGELUTemplate.referenceTemplate)
 
-BasicGELUBinding = NodeBinding(GELUChecker([DataTypes.int8_t], [DataTypes.int8_t]), iGELUTemplate.referenceTemplate)
 BasicSoftmaxBinding = NodeBinding(SoftmaxChecker([DataTypes.int8_t], [DataTypes.int8_t]), iSoftmaxTemplate.referenceTemplate)
 
 BasicGEMMBinding = NodeBinding(GEMMChecker([DataTypes.int8_t, DataTypes.int8_t], [DataTypes.int32_t]), GEMMTemplate.referenceTemplate)
@@ -55,3 +52,5 @@ BasicPad2DBindings = [NodeBinding(PadChecker([type], [type]), PadTemplate.refere
 BasicPad1DBindings = [NodeBinding(PadChecker([type], [type]), PadTemplate.reference1DTemplate) for type in DataTypes]
 
 DummyBinding = NodeBinding(DummyChecker([DataTypes.int8_t],[DataTypes.int8_t]), DummyTemplate.referenceTemplate)
+
+BasicMulBindings = [NodeBinding(MulChecker([typeA, DataTypes.int32_t], [DataTypes.int32_t]), MulTemplate.referenceTemplate) for typeA in DataTypes]

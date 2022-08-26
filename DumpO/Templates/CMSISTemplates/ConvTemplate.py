@@ -31,7 +31,7 @@ from .CMSISUtils import bindFCParams
 
 class _Conv2D_8_Template(NodeTemplate):
     def __init__(self, templateStr):
-        self.template = Template(templateStr)
+        super().__init__(templateStr)
 
     def alignToContext(self, ctxt: NetworkContext, nodeRep: Dict) -> (NetworkContext, Dict):
         ctxt = ctxt.copy()
@@ -161,7 +161,7 @@ free(_DumpO__ctxtBuffer_${ctxt});\
 
 class _Conv1D_16_Template(NodeTemplate):
     def __init__(self, templateStr):
-        self.template = Template(templateStr)
+        super().__init__(templateStr)
 
     def alignToContext(self, ctxt: NetworkContext, nodeRep: Dict) -> (NetworkContext, Dict):
 

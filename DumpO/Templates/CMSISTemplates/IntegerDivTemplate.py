@@ -1,8 +1,8 @@
 # ----------------------------------------------------------------------
 #
-# File: LinearAttentionTemplate.py
+# File: IntegerDivTemplate.py
 #
-# Last edited: 05.06.2022
+# Last edited: 02.09.2022
 #
 # Copyright (C) 2022, ETH Zurich and University of Bologna.
 #
@@ -23,23 +23,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from DumpO.DumpOTypes import NodeTemplate
 
-import mako
-from typing import Dict
-from mako.template import Template
-import numpy as np
-
-from DumpO.DumpOTypes import NodeTemplate, NetworkContext
-from .CMSISUtils import bindFCParams
-
-class _LinearAttentionTemplate(NodeTemplate):
-    def __init__(self, templateStr):
-        super().__init__(templateStr)
-
-    def alignToContext(self, ctxt: NetworkContext, nodeRep: Dict) -> (NetworkContext, Dict):
-        return ctxt, nodeRep
-
-
-referenceTemplate = _LinearAttentionTemplate("""
-// PLACEHOLDER LINEAR ATTENTION
+IntegerDiv_s32_s32_Template = NodeTemplate("""
+DivKernel_s32(${A}, ${B}, ${sizeA}, ${sizeB}, ${nomStep}, ${denomStep}, ${C}, ${Delta}, ${eps}, ${eta});
 """)

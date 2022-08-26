@@ -33,7 +33,7 @@ from DumpO.DumpOTypes import NodeTemplate, NetworkContext
 
 class _Pad2DTemplate(NodeTemplate):
     def __init__(self, templateStr):
-        self.template = Template(templateStr)
+        super().__init__(templateStr)
 
     def alignToContext(self, ctxt: NetworkContext, nodeRep: Dict) -> (NetworkContext, Dict):
         ctxt = ctxt.copy()
@@ -78,7 +78,7 @@ offset_in_${data_in} += ${addoffsetIn};
 
 class _Pad1DTemplate(NodeTemplate):
     def __init__(self, templateStr):
-        self.template = Template(templateStr)
+        super().__init__(templateStr)
 
     def alignToContext(self, ctxt: NetworkContext, nodeRep: Dict) -> (NetworkContext, Dict):
         ctxt = ctxt.copy()

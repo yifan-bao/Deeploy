@@ -2,8 +2,8 @@
 #
 # File: ReshapeTemplate.py
 #
-# Last edited: 16.12.2021        
-# 
+# Last edited: 16.12.2021
+#
 # Copyright (C) 2021, ETH Zurich and University of Bologna.
 #
 # Author: Moritz Scherer, ETH Zurich
@@ -30,7 +30,7 @@ from DumpO.DumpOTypes import NodeTemplate, NetworkContext
 
 class _ReshapeTemplate(NodeTemplate):
     def __init__(self, templateStr):
-        self.template = Template(templateStr)
+        super().__init__(templateStr)
 
     def alignToContext(self, ctxt: NetworkContext, nodeRep: Dict) -> (NetworkContext, Dict):
         ctxt = ctxt.copy()
@@ -39,8 +39,7 @@ class _ReshapeTemplate(NodeTemplate):
         if 'indices' in nodeRep.keys():
             ctxt.globalObjects[nodeRep['indices']]._deploy = False
             ctxt.globalObjects[nodeRep['indices']]._live = False
-        
+
         return ctxt, nodeRep
 
 referenceTemplate = _ReshapeTemplate("${data_out} = ${data_in};")
-

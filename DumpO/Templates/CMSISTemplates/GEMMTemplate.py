@@ -31,7 +31,7 @@ from .CMSISUtils import bindFCParams
 
 class _GEMM_8_Template(NodeTemplate):
     def __init__(self, templateStr):
-        self.template = Template(templateStr)
+        super().__init__(templateStr)
 
     def alignToContext(self, ctxt: NetworkContext, nodeRep: Dict) -> (NetworkContext, Dict):
         inputs = ['A', 'B', 'add']
@@ -45,13 +45,22 @@ class _GEMM_8_Template(NodeTemplate):
 
         return ctxt, nodeRep
 
-Linear_8_Template = _GEMM_8_Template("\
-arm_fully_connected_s8(&${ctxt}, &${fc_params}, &${quant_params}, &${input_dims}, ${A}, &${filter_dims}, ${B}, &${bias_dims}, ${C}, &${output_dims}, ${data_out});\
-")
+Linear_8_Template = _GEMM_8_Template("""
+// GEMM
+int8_t* ref_${data_out}_${A} = ${A};
+int8_t* ref_${data_out}_${B} = ${B};
+int8_t* ref_${data_out}_${data_out} = ${data_out};
+for(int i=0;i<${batch};i++){
+    arm_fully_connected_s8(&${ctxt}, &${fc_params}, &${quant_params}, &${input_dims}, ref_${data_out}_${A}, &${filter_dims}, ref_${data_out}_${B}, &${bias_dims}, ${C}, &${output_dims}, ref_${data_out}_${data_out});
+    ref_${data_out}_${A} += ${M} * ${N};
+    ref_${data_out}_${B} += ${N} * ${O};
+    ref_${data_out}_${data_out} += ${M} * ${O};
+}
+""")
 
 class _GEMM_16_Template(NodeTemplate):
     def __init__(self, templateStr):
-        self.template = Template(templateStr)
+        super().__init__(templateStr)
 
     def alignToContext(self, ctxt: NetworkContext, nodeRep: Dict) -> (NetworkContext, Dict):
         inputs = ['A', 'B', 'add']
