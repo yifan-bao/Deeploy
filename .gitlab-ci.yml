@@ -21,6 +21,7 @@ run:   # This job runs in the test stage.
   dependencies: 
     - build
   script:
+    - git submodule update --init --recursive
     - bash
     - source ~/.bashrc
     - export PATH="~scheremo/gcc-arm/bin:$PATH"
