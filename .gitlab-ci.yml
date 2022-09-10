@@ -12,7 +12,7 @@ build:       # This job runs in the build stage, which runs first.
     - bash
     - source ~/.bashrc
     - conda activate dumpoci
-    - pip install -e .
+    - pip install --ignore-install -e .
     - rm -f dumpotest/out.txt
 
 run:   # This job runs in the test stage.
