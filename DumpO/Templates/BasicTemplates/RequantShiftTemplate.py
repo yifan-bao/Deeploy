@@ -25,7 +25,7 @@
 
 from DumpO.DumpOTypes import NodeTemplate
 
-from typing import Dict
+from typing import Dict, Tuple
 from mako.template import Template
 
 from DumpO.DumpOTypes import NodeTemplate, NetworkContext
@@ -34,13 +34,16 @@ class _RequantShiftTemplate(NodeTemplate):
     def __init__(self, templateStr):
         super().__init__(templateStr)
 
-    def alignToContext(self, ctxt: NetworkContext, nodeRep: Dict) -> (NetworkContext, Dict):
+    def alignToContext(self, ctxt: NetworkContext, nodeRep: Dict) -> Tuple[NetworkContext, Dict]:
         ctxt = ctxt.copy()
 
         data_in = ctxt.lookup(nodeRep['data_in'])
         data_out = ctxt.lookup(nodeRep['data_out'])
         nodeRep['input_offset'] = (data_in._signed==0) * int(data_in.nLevels/2)
-        nodeRep['output_offset'] = -(data_out._signed==0) * int(data_in.nLevels/2)
+        nodeRep['output_offset'] = -(data_out._signed == 0) * nodeRep['n_levels']//2
+
+        nodeRep['output_min'] = -(nodeRep['n_levels']//2)
+        nodeRep['output_max'] = (nodeRep['n_levels']//2) - 1
 
         return ctxt, nodeRep
 

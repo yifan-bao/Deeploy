@@ -66,8 +66,8 @@ def replaceInsertNode(self, inputs, outputs, node):
     return ret
 
 class Match(NamedTuple):
-    anchor: gs.ir.node.Node
-    nodes_map: Dict[str, gs.ir.node.Node]
+    anchor:  gs.Node
+    nodes_map: Dict[str,  gs.Node]
 
 class GSPass(NetworkOptimizationPass):
 
@@ -169,7 +169,7 @@ class SequentialMatcher:
         # a dictionary of the modules contained in the searched GraphModule
         return dict(self.searched_graph.nodes)
 
-    def matches_subgraph_from_anchor(self, ctxt: NetworkContext, anchor : gs.ir.node.Node):
+    def matches_subgraph_from_anchor(self, ctxt: NetworkContext, anchor :  gs.Node):
         # similar to the fx method, except the nodes_map is not a member of the
         # class
         #TODO: is this really a nice way to return the results? (None if no
@@ -182,7 +182,7 @@ class SequentialMatcher:
             mm = None
         return mm
 
-    def _match_nodes(self, ctxt: NetworkContext, pn : gs.ir.node.Node, gn : gs.ir.node.Node, remaining_pattern_length : int, nodes_map : dict = None):
+    def _match_nodes(self, ctxt: NetworkContext, pn :  gs.Node, gn :  gs.Node, remaining_pattern_length : int, nodes_map : dict = None):
         nodes_map = {} if nodes_map is None else nodes_map
         last_active_node = remaining_pattern_length==1
         # as we do sequential traversal, the first step (checking if nodes
@@ -191,7 +191,7 @@ class SequentialMatcher:
 
         # the following submethod is a modified version of the one from the
         # original SubgraphMatcher
-        def attributes_are_equal(pn: gs.ir.node.Node, gn: gs.ir.node.Node) -> bool:
+        def attributes_are_equal(pn:  gs.Node, gn:  gs.Node) -> bool:
             return pn.op == gn.op
 
 
@@ -243,7 +243,7 @@ class SequentialMatcher:
 class ReplaceMatchWithModulePass(GSPass):
     #Matches are specific to graph instances, so don't use this type of pass on its
     #own if you want to reuse it!
-    def __init__(self, match : Match, module : gs.ir.node.Node):
+    def __init__(self, match : Match, module :  gs.Node):
         # this class needs a name field because the inserted submodules will be named
         super(ReplaceMatchWithModulePass, self).__init__()
         self.match = match

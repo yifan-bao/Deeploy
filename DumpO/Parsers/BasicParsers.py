@@ -33,7 +33,7 @@ class TransposeParser(NodeParser):
     def __init__(self):
         super().__init__()
 
-    def parseNode(self, node: gs.ir.node.Node) -> bool:
+    def parseNode(self, node:  gs.Node) -> bool:
 
         ret = all([
             'perm' in node.attrs,
@@ -45,7 +45,7 @@ class TransposeParser(NodeParser):
             self.parserDict['perm'] = node.attrs['perm']
         return ret
 
-    def parseNodeCtxt(self, ctxt: NetworkContext, node: gs.ir.node.Node, channels_first: bool = True) -> (NetworkContext, bool):
+    def parseNodeCtxt(self, ctxt: NetworkContext, node:  gs.Node, channels_first: bool = True) -> Tuple[NetworkContext, bool]:
 
         ctxt = ctxt.copy()
 
@@ -64,7 +64,7 @@ class MaxPoolParser(NodeParser):
     def __init__(self):
         super().__init__()
 
-    def parseNode(self, node: gs.ir.node.Node) -> bool:
+    def parseNode(self, node:  gs.Node) -> bool:
 
         ret = all([
             'ceil_mode' in node.attrs,
@@ -83,7 +83,7 @@ class MaxPoolParser(NodeParser):
 
         return ret
 
-    def parseNodeCtxt(self, ctxt: NetworkContext, node: gs.ir.node.Node, channels_first: bool = True) -> (NetworkContext, bool):
+    def parseNodeCtxt(self, ctxt: NetworkContext, node:  gs.Node, channels_first: bool = True) -> Tuple[NetworkContext, bool]:
 
         ctxt = ctxt.copy()
 
@@ -100,18 +100,19 @@ class MaxPool2DParser(MaxPoolParser):
     def __init__(self):
         super().__init__()
 
-    def parseNode(self, node: gs.ir.node.Node) -> bool:
+    def parseNode(self, node:  gs.Node) -> bool:
 
         ret = super().parseNode(node)
         wellFormed = False
         if ret:
             pads = self.parserDict['pads']
             kernel_shape = self.parserDict['kernel_shape']
-            if len(pads) == 4 and len(kernel_shape) == 2:
+            strides = self.parserDict['strides']
+            if len(pads) == 4 and len(kernel_shape) == 2 and len(strides) == 2:
                 wellFormed = True
         return wellFormed
 
-    def parseNodeCtxt(self, ctxt: NetworkContext, node: gs.ir.node.Node, channels_first: bool = True) -> (NetworkContext, bool):
+    def parseNodeCtxt(self, ctxt: NetworkContext, node:  gs.Node, channels_first: bool = True) -> Tuple[NetworkContext, bool]:
 
         ctxt, ret = super().parseNodeCtxt(ctxt, node)
         wellFormed = False
@@ -128,7 +129,7 @@ class PadParser(NodeParser):
     def __init__(self):
         super().__init__()
 
-    def parseNode(self, node: gs.ir.node.Node) -> bool:
+    def parseNode(self, node:  gs.Node) -> bool:
 
         ret = all([
             'mode' in node.attrs,
@@ -145,7 +146,7 @@ class PadParser(NodeParser):
 
         return ret
 
-    def parseNodeCtxt(self, ctxt: NetworkContext, node: gs.ir.node.Node, channels_first: bool = True) -> (NetworkContext, bool):
+    def parseNodeCtxt(self, ctxt: NetworkContext, node:  gs.Node, channels_first: bool = True) -> Tuple[NetworkContext, bool]:
         ctxt = ctxt.copy()
 
         data_in = ctxt.lookup(node.inputs[0].name)
@@ -161,7 +162,7 @@ class Pad2DParser(PadParser):
     def __init__(self):
         super().__init__()
 
-    def parseNode(self, node: gs.ir.node.Node) -> bool:
+    def parseNode(self, node:  gs.Node) -> bool:
 
         ret = super().parseNode(node)
         wellFormed = False
@@ -170,12 +171,12 @@ class Pad2DParser(PadParser):
             if len(pads) == 8 and pads[0] == 0 and pads[4] == 0 \
             and pads[1] == 0 and pads[5] == 0:
                 wellFormed = True
-                self.parserDict['pad_x'] = pads[3]
-                self.parserDict['pad_y'] = pads[2]
+                self.parserDict['pad_x'] = int(pads[3])
+                self.parserDict['pad_y'] = int(pads[2])
 
         return wellFormed
 
-    def parseNodeCtxt(self, ctxt: NetworkContext, node: gs.ir.node.Node, channels_first: bool = True) -> (NetworkContext, bool):
+    def parseNodeCtxt(self, ctxt: NetworkContext, node:  gs.Node, channels_first: bool = True) -> Tuple[NetworkContext, bool]:
 
         ctxt, ret = super().parseNodeCtxt(ctxt, node)
         wellFormed = False
@@ -205,7 +206,7 @@ class Pad1DParser(PadParser):
     def __init__(self):
         super().__init__()
 
-    def parseNode(self, node: gs.ir.node.Node) -> bool:
+    def parseNode(self, node:  gs.Node) -> bool:
 
         ret = super().parseNode(node)
         wellFormed = False
@@ -219,7 +220,7 @@ class Pad1DParser(PadParser):
 
         return wellFormed
 
-    def parseNodeCtxt(self, ctxt: NetworkContext, node: gs.ir.node.Node, channels_first: bool = True) -> (NetworkContext, bool):
+    def parseNodeCtxt(self, ctxt: NetworkContext, node:  gs.Node, channels_first: bool = True) -> Tuple[NetworkContext, bool]:
 
         ctxt, ret = super().parseNodeCtxt(ctxt, node)
         wellFormed = False
@@ -248,7 +249,7 @@ class AddParser(NodeParser):
     def __init__(self):
         super().__init__()
 
-    def parseNode(self, node: gs.ir.node.Node) -> bool:
+    def parseNode(self, node:  gs.Node) -> bool:
 
         ret = all([
             len(node.inputs) == 2,
@@ -257,7 +258,7 @@ class AddParser(NodeParser):
 
         return ret
 
-    def parseNodeCtxt(self, ctxt: NetworkContext, node: gs.ir.node.Node, channels_first: bool = True) -> (NetworkContext, bool):
+    def parseNodeCtxt(self, ctxt: NetworkContext, node:  gs.Node, channels_first: bool = True) -> Tuple[NetworkContext, bool]:
 
         ctxt = ctxt.copy()
 
@@ -275,7 +276,7 @@ class ReduceMeanParser(NodeParser):
     def __init__(self):
         super().__init__()
 
-    def parseNode(self, node: gs.ir.node.Node) -> bool:
+    def parseNode(self, node:  gs.Node) -> bool:
 
         ret = all([
             'axes' in node.attrs,
@@ -293,7 +294,7 @@ class ReduceMeanParser(NodeParser):
 
         return ret
 
-    def parseNodeCtxt(self, ctxt: NetworkContext, node: gs.ir.node.Node, channels_first: bool = True) -> (NetworkContext, bool):
+    def parseNodeCtxt(self, ctxt: NetworkContext, node:  gs.Node, channels_first: bool = True) -> Tuple[NetworkContext, bool]:
 
         ctxt = ctxt.copy()
 
@@ -312,7 +313,7 @@ class iSoftmaxParser(NodeParser):
     def __init__(self):
         super().__init__()
 
-    def parseNode(self, node: gs.ir.node.Node) -> bool:
+    def parseNode(self, node:  gs.Node) -> bool:
 
         ret = all([
             'coeffA' in node.attrs,
@@ -331,7 +332,7 @@ class iSoftmaxParser(NodeParser):
 
         return ret
 
-    def parseNodeCtxt(self, ctxt: NetworkContext, node: gs.ir.node.Node, channels_first: bool = True) -> (NetworkContext, bool):
+    def parseNodeCtxt(self, ctxt: NetworkContext, node:  gs.Node, channels_first: bool = True) -> Tuple[NetworkContext, bool]:
 
         ctxt = ctxt.copy()
 
@@ -348,7 +349,7 @@ class iGELUParser(NodeParser):
     def __init__(self):
         super().__init__()
 
-    def parseNode(self, node: gs.ir.node.Node) -> bool:
+    def parseNode(self, node:  gs.Node) -> bool:
 
         ret = all([
             'b' in node.attrs,
@@ -363,7 +364,7 @@ class iGELUParser(NodeParser):
 
         return ret
 
-    def parseNodeCtxt(self, ctxt: NetworkContext, node: gs.ir.node.Node, channels_first: bool = True) -> (NetworkContext, bool):
+    def parseNodeCtxt(self, ctxt: NetworkContext, node:  gs.Node, channels_first: bool = True) -> Tuple[NetworkContext, bool]:
 
         ctxt = ctxt.copy()
 
@@ -379,7 +380,7 @@ class RQSiGELUParser(iGELUParser):
     def __init__(self):
         super().__init__()
 
-    def parseNode(self, node: gs.ir.node.Node) -> bool:
+    def parseNode(self, node:  gs.Node) -> bool:
 
         wellFormed = all([
             len(node.inputs) == 4,
@@ -388,7 +389,7 @@ class RQSiGELUParser(iGELUParser):
 
         return (ret and wellFormed)
 
-    def parseNodeCtxt(self, ctxt: NetworkContext, node: gs.ir.node.Node, channels_first: bool = True) -> (NetworkContext, bool):
+    def parseNodeCtxt(self, ctxt: NetworkContext, node:  gs.Node, channels_first: bool = True) -> Tuple[NetworkContext, bool]:
 
         ctxt = ctxt.copy()
         newCtxt, ret = super().parseNodeCtxt(ctxt, node, channels_first)
@@ -411,7 +412,7 @@ class GatherParser(NodeParser):
     def __init__(self):
         super().__init__()
 
-    def parseNode(self, node: gs.ir.node.Node) -> (bool):
+    def parseNode(self, node:  gs.Node) -> (bool):
 
         ret = all([
             'axis' in node.attrs,
@@ -425,7 +426,7 @@ class GatherParser(NodeParser):
 
         return ret
 
-    def parseNodeCtxt(self, ctxt: NetworkContext, node: gs.ir.node.Node, channels_first: bool = True) -> (NetworkContext, bool):
+    def parseNodeCtxt(self, ctxt: NetworkContext, node:  gs.Node, channels_first: bool = True) -> Tuple[NetworkContext, bool]:
 
         ctxt = ctxt.copy()
 
@@ -449,7 +450,7 @@ class FlattenParser(NodeParser):
     def __init__(self):
         super().__init__()
 
-    def parseNode(self, node: gs.ir.node.Node) -> (bool):
+    def parseNode(self, node:  gs.Node) -> (bool):
 
         ret = all([
             'axis' in node.attrs,
@@ -462,7 +463,7 @@ class FlattenParser(NodeParser):
 
         return ret
 
-    def parseNodeCtxt(self, ctxt: NetworkContext, node: gs.ir.node.Node, channels_first: bool = True) -> (NetworkContext, bool):
+    def parseNodeCtxt(self, ctxt: NetworkContext, node:  gs.Node, channels_first: bool = True) -> Tuple[NetworkContext, bool]:
 
         ctxt = ctxt.copy()
 
@@ -481,7 +482,7 @@ class UnsqueezeParser(NodeParser):
     def __init__(self):
         super().__init__()
 
-    def parseNode(self, node: gs.ir.node.Node) -> (bool):
+    def parseNode(self, node:  gs.Node) -> (bool):
 
         ret = all([
             'axes' in node.attrs,
@@ -494,7 +495,7 @@ class UnsqueezeParser(NodeParser):
 
         return ret
 
-    def parseNodeCtxt(self, ctxt: NetworkContext, node: gs.ir.node.Node, channels_first: bool = True) -> (NetworkContext, bool):
+    def parseNodeCtxt(self, ctxt: NetworkContext, node:  gs.Node, channels_first: bool = True) -> Tuple[NetworkContext, bool]:
 
         ctxt = ctxt.copy()
 
@@ -514,7 +515,7 @@ class ReshapeParser(NodeParser):
     def __init__(self):
         super().__init__()
 
-    def parseNode(self, node: gs.ir.node.Node) -> (bool):
+    def parseNode(self, node:  gs.Node) -> (bool):
 
         ret = all([
             len(node.inputs) == 2,
@@ -523,7 +524,7 @@ class ReshapeParser(NodeParser):
 
         return ret
 
-    def parseNodeCtxt(self, ctxt: NetworkContext, node: gs.ir.node.Node, channels_first: bool = True) -> (NetworkContext, bool):
+    def parseNodeCtxt(self, ctxt: NetworkContext, node:  gs.Node, channels_first: bool = True) -> Tuple[NetworkContext, bool]:
 
         ctxt = ctxt.copy()
 
@@ -544,7 +545,7 @@ class RequantShiftParser(NodeParser):
     def __init__(self):
         super().__init__()
 
-    def parseNode(self, node: gs.ir.node.Node) -> (bool):
+    def parseNode(self, node:  gs.Node) -> (bool):
 
         ret = all([
             'div' in node.attrs,
@@ -566,7 +567,7 @@ class RequantShiftParser(NodeParser):
 
         return ret
 
-    def parseNodeCtxt(self, ctxt: NetworkContext, node: gs.ir.node.Node, channels_first: bool = True) -> (NetworkContext, bool):
+    def parseNodeCtxt(self, ctxt: NetworkContext, node:  gs.Node, channels_first: bool = True) -> Tuple[NetworkContext, bool]:
 
         ctxt = ctxt.copy()
 
@@ -587,7 +588,7 @@ class MulParser(NodeParser):
     def __init__(self):
         super().__init__()
 
-    def parseNode(self, node: gs.ir.node.Node) -> (bool):
+    def parseNode(self, node:  gs.Node) -> (bool):
 
         wellFormed = all([
             len(node.inputs) == 2,
@@ -596,7 +597,7 @@ class MulParser(NodeParser):
 
         return wellFormed
 
-    def parseNodeCtxt(self, ctxt: NetworkContext, node: gs.ir.node.Node, channels_first: bool = True) -> (NetworkContext, bool):
+    def parseNodeCtxt(self, ctxt: NetworkContext, node:  gs.Node, channels_first: bool = True) -> Tuple[NetworkContext, bool]:
 
         ctxt = ctxt.copy()
 
@@ -618,7 +619,7 @@ class ConvParser(NodeParser):
         super().__init__()
         self.noBiasHoisting = noBiasHoisting
 
-    def parseNode(self, node: gs.ir.node.Node) -> (bool):
+    def parseNode(self, node:  gs.Node) -> (bool):
 
         wellFormed = all([
             'dilations' in node.attrs,
@@ -640,7 +641,7 @@ class ConvParser(NodeParser):
 
         return wellFormed
 
-    def parseNodeCtxt(self, ctxt: NetworkContext, node: gs.ir.node.Node, channels_first: bool = True) -> (NetworkContext, bool):
+    def parseNodeCtxt(self, ctxt: NetworkContext, node:  gs.Node, channels_first: bool = True) -> Tuple[NetworkContext, bool]:
 
         ctxt = ctxt.copy()
 
@@ -671,7 +672,7 @@ class Conv2DParser(ConvParser):
     def __init__(self, noBiasHoisting = True):
         super().__init__(noBiasHoisting)
 
-    def parseNode(self, node: gs.ir.node.Node) -> (bool):
+    def parseNode(self, node:  gs.Node) -> (bool):
 
         wellFormed = super().parseNode(node)
         ret = False
@@ -688,7 +689,7 @@ class Conv2DParser(ConvParser):
 
         return ret
 
-    def parseNodeCtxt(self, ctxt: NetworkContext, node: gs.ir.node.Node, channels_first: bool = True) -> (NetworkContext, bool):
+    def parseNodeCtxt(self, ctxt: NetworkContext, node:  gs.Node, channels_first: bool = True) -> Tuple[NetworkContext, bool]:
 
         ctxt = ctxt.copy()
 
@@ -706,7 +707,7 @@ class Conv1DParser(ConvParser):
     def __init__(self, noBiasHoisting = True):
         super().__init__(noBiasHoisting)
 
-    def parseNode(self, node: gs.ir.node.Node) -> (bool):
+    def parseNode(self, node:  gs.Node) -> (bool):
 
         wellFormed = super().parseNode(node)
         ret = False
@@ -723,7 +724,7 @@ class Conv1DParser(ConvParser):
 
         return ret
 
-    def parseNodeCtxt(self, ctxt: NetworkContext, node: gs.ir.node.Node, channels_first: bool = True) -> (NetworkContext, bool):
+    def parseNodeCtxt(self, ctxt: NetworkContext, node:  gs.Node, channels_first: bool = True) -> Tuple[NetworkContext, bool]:
 
         ctxt = ctxt.copy()
 
@@ -742,7 +743,7 @@ class MHSAParser(NodeParser):
     def __init__(self):
         super().__init__()
 
-    def parseNode(self, node: gs.ir.node.Node) -> (bool):
+    def parseNode(self, node:  gs.Node) -> (bool):
 
         ret = all([
             'preattn_requant_mul' in node.attrs,
@@ -800,7 +801,7 @@ class MHSAParser(NodeParser):
 
         return ret
 
-    def parseNodeCtxt(self, ctxt: NetworkContext, node: gs.ir.node.Node, channels_first: bool = True) -> (NetworkContext, bool):
+    def parseNodeCtxt(self, ctxt: NetworkContext, node:  gs.Node, channels_first: bool = True) -> Tuple[NetworkContext, bool]:
 
         ctxt = ctxt.copy()
 
@@ -821,7 +822,7 @@ class LinearAttentionParser(NodeParser):
     def __init__(self):
         super().__init__()
 
-    def parseNode(self, node: gs.ir.node.Node) -> (bool):
+    def parseNode(self, node:  gs.Node) -> (bool):
 
         ret = all([
             'preattn_requant_mul' in node.attrs,
@@ -882,7 +883,7 @@ class LinearAttentionParser(NodeParser):
 
         return ret
 
-    def parseNodeCtxt(self, ctxt: NetworkContext, node: gs.ir.node.Node, channels_first: bool = True) -> (NetworkContext, bool):
+    def parseNodeCtxt(self, ctxt: NetworkContext, node:  gs.Node, channels_first: bool = True) -> Tuple[NetworkContext, bool]:
 
         ctxt = ctxt.copy()
 
@@ -903,7 +904,7 @@ class CLCAParser(NodeParser):
     def __init__(self):
         super().__init__()
 
-    def parseNode(self, node: gs.ir.node.Node) -> (bool):
+    def parseNode(self, node:  gs.Node) -> (bool):
 
         ret = all([
             'Delta' in node.attrs,
@@ -933,7 +934,7 @@ class CLCAParser(NodeParser):
 
         return ret
 
-    def parseNodeCtxt(self, ctxt: NetworkContext, node: gs.ir.node.Node, channels_first: bool = True) -> (NetworkContext, bool):
+    def parseNodeCtxt(self, ctxt: NetworkContext, node:  gs.Node, channels_first: bool = True) -> Tuple[NetworkContext, bool]:
 
         ctxt = ctxt.copy()
 
@@ -964,7 +965,7 @@ class iLayerNormParser(NodeParser):
     def __init__(self):
         super().__init__()
 
-    def parseNode(self, node: gs.ir.node.Node) -> (bool):
+    def parseNode(self, node:  gs.Node) -> (bool):
 
         ret = all([
             'D' in node.attrs,
@@ -980,7 +981,7 @@ class iLayerNormParser(NodeParser):
 
         return ret
 
-    def parseNodeCtxt(self, ctxt: NetworkContext, node: gs.ir.node.Node, channels_first: bool = True) -> (NetworkContext, bool):
+    def parseNodeCtxt(self, ctxt: NetworkContext, node:  gs.Node, channels_first: bool = True) -> Tuple[NetworkContext, bool]:
 
         ctxt = ctxt.copy()
 
@@ -1001,7 +1002,7 @@ class MatMulParser(NodeParser):
     def __init__(self, noBiasHoisting = True):
         super().__init__()
         self.noBiasHoisting = noBiasHoisting
-    def parseNode(self, node: gs.ir.node.Node) -> (bool):
+    def parseNode(self, node:  gs.Node) -> (bool):
 
         ret = all([
             len(node.inputs) >= 2,
@@ -1017,7 +1018,7 @@ class MatMulParser(NodeParser):
 
         return ret
 
-    def parseNodeCtxt(self, ctxt: NetworkContext, node: gs.ir.node.Node, channels_first: bool = True) -> (NetworkContext, bool):
+    def parseNodeCtxt(self, ctxt: NetworkContext, node:  gs.Node, channels_first: bool = True) -> Tuple[NetworkContext, bool]:
 
         ctxt = ctxt.copy()
         ret = True
@@ -1062,7 +1063,7 @@ class GEMMParser(MatMulParser):
         self.noBiasHoisting = noBiasHoisting
         super().__init__()
 
-    def parseNode(self, node: gs.ir.node.Node) -> (bool):
+    def parseNode(self, node:  gs.Node) -> (bool):
 
         ret = all([
             len(node.inputs) >= 2,
@@ -1092,7 +1093,7 @@ class GEMMParser(MatMulParser):
             return False
 
 
-    def parseNodeCtxt(self, ctxt: NetworkContext, node: gs.ir.node.Node, channels_first: bool = True) -> (NetworkContext, bool):
+    def parseNodeCtxt(self, ctxt: NetworkContext, node:  gs.Node, channels_first: bool = True) -> Tuple[NetworkContext, bool]:
 
         ctxt, wellFormed = super().parseNodeCtxt(ctxt, node, channels_first)
 
@@ -1127,10 +1128,10 @@ class DummyParser(NodeParser):
     def __init__(self):
         super().__init__()
 
-    def parseNode(self, node: gs.ir.node.Node) -> bool:
-        return ret
+    def parseNode(self, node: gs.Node) -> bool:
+        return True
 
-    def parseNodeCtxt(self, ctxt: NetworkContext, node: gs.ir.node.Node, channels_first: bool = True) -> (NetworkContext, bool):
+    def parseNodeCtxt(self, ctxt: NetworkContext, node:  gs.Node, channels_first: bool = True) -> Tuple[NetworkContext, bool]:
 
         inputs = []
         outputs = []
@@ -1149,7 +1150,7 @@ class IntegerDivParser(NodeParser):
     def __init__(self):
         super().__init__()
 
-    def parseNode(self, node: gs.ir.node.Node) -> bool:
+    def parseNode(self, node:  gs.Node) -> bool:
 
         ret = all([
             len(node.inputs) >= 2,
@@ -1166,7 +1167,7 @@ class IntegerDivParser(NodeParser):
 
         return ret
 
-    def parseNodeCtxt(self, ctxt: NetworkContext, node: gs.ir.node.Node, channels_first: bool = True) -> (NetworkContext, bool):
+    def parseNodeCtxt(self, ctxt: NetworkContext, node:  gs.Node, channels_first: bool = True) -> Tuple[NetworkContext, bool]:
 
         inputs = ["A", "B"]
         outputs = ["C"]
@@ -1191,7 +1192,7 @@ class RQIntegerDivParser(IntegerDivParser):
     def __init__(self):
         super().__init__()
 
-    def parseNode(self, node: gs.ir.node.Node) -> bool:
+    def parseNode(self, node:  gs.Node) -> bool:
         ret = super().parseNode(node)
 
         wellFormed = all([
@@ -1203,7 +1204,7 @@ class RQIntegerDivParser(IntegerDivParser):
 
         return ret
 
-    def parseNodeCtxt(self, ctxt: NetworkContext, node: gs.ir.node.Node, channels_first: bool = True) -> (NetworkContext, bool):
+    def parseNodeCtxt(self, ctxt: NetworkContext, node:  gs.Node, channels_first: bool = True) -> Tuple[NetworkContext, bool]:
         ctxt, ret = super().parseNodeCtxt(ctxt, node, channels_first)
 
         inputs = ["A", "B", "requant_mul", "requant_add", "requant_div"]

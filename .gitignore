@@ -2,6 +2,8 @@
 __pycache__
 build
 dist
-DumpO/DumpO.egg*
+**/DumpO.egg*
+*.vscode
 .DS_Store
 *.html
+.ipynb_checkpoints/

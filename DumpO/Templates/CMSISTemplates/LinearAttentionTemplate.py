@@ -25,7 +25,7 @@
 
 
 import mako
-from typing import Dict
+from typing import Dict, Tuple
 from mako.template import Template
 import numpy as np
 
@@ -36,7 +36,7 @@ class _LinearAttentionTemplate(NodeTemplate):
     def __init__(self, templateStr):
         super().__init__(templateStr)
 
-    def alignToContext(self, ctxt: NetworkContext, nodeRep: Dict) -> (NetworkContext, Dict):
+    def alignToContext(self, ctxt: NetworkContext, nodeRep: Dict) -> Tuple[NetworkContext, Dict]:
         return ctxt, nodeRep
 
 
