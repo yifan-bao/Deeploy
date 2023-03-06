@@ -24,7 +24,7 @@
 # limitations under the License.
 
 import mako
-from typing import Dict
+from typing import Dict, Tuple
 from mako.template import Template
 import numpy as np
 import copy
@@ -63,7 +63,7 @@ class _CLCATemplate(NodeTemplate):
 
         self.subTemplates["MMA"] = (RQSMMTemplate, self.MMAGenerator)
 
-    def MMAGenerator(self, ctxt: NetworkContext, nodeRep: Dict) -> (NetworkContext, Dict):
+    def MMAGenerator(self, ctxt: NetworkContext, nodeRep: Dict) -> Tuple[NetworkContext, Dict]:
 
         ctxt, nodeRep = copy.deepcopy(ctxt), copy.deepcopy(nodeRep)
 
@@ -89,7 +89,7 @@ class _CLCATemplate(NodeTemplate):
         return ctxt, nodeRep
 
 
-    def transQGenerator(self, ctxt: NetworkContext, nodeRep: Dict) -> (NetworkContext, Dict):
+    def transQGenerator(self, ctxt: NetworkContext, nodeRep: Dict) -> Tuple[NetworkContext, Dict]:
         Q = ctxt.lookup(f"Q", _id=nodeRep['id'])
         QT = ctxt.lookup(f"QT", _id=nodeRep['id'])
 
@@ -103,7 +103,7 @@ class _CLCATemplate(NodeTemplate):
 
         return ctxt, nodeRep
 
-    def transOGenerator(self, ctxt: NetworkContext, nodeRep: Dict) -> (NetworkContext, Dict):
+    def transOGenerator(self, ctxt: NetworkContext, nodeRep: Dict) -> Tuple[NetworkContext, Dict]:
         O = ctxt.lookup(f"O", _id=nodeRep['id'])
         OT = ctxt.lookup(f"OT", _id=nodeRep['id'])
 
@@ -117,7 +117,7 @@ class _CLCATemplate(NodeTemplate):
 
         return ctxt, nodeRep
 
-    def rqsDeltaGenerator(self, ctxt: NetworkContext, nodeRep: Dict) -> (NetworkContext, Dict):
+    def rqsDeltaGenerator(self, ctxt: NetworkContext, nodeRep: Dict) -> Tuple[NetworkContext, Dict]:
 
         K = ctxt.lookup(f"K", _id=nodeRep['id'])
         RK = ctxt.lookup(f"RK", _id=nodeRep['id'])
@@ -134,7 +134,7 @@ class _CLCATemplate(NodeTemplate):
         return ctxt, nodeRep
 
 
-    def rqsKGenerator(self, ctxt: NetworkContext, nodeRep: Dict) -> (NetworkContext, Dict):
+    def rqsKGenerator(self, ctxt: NetworkContext, nodeRep: Dict) -> Tuple[NetworkContext, Dict]:
 
         V = ctxt.lookup(f"V", _id=nodeRep['id'])
         K = ctxt.lookup(f"K", _id=nodeRep['id'])
@@ -150,7 +150,7 @@ class _CLCATemplate(NodeTemplate):
 
         return ctxt, nodeRep
 
-    def convOGenerator(self, ctxt: NetworkContext, nodeRep: Dict) -> (NetworkContext, Dict):
+    def convOGenerator(self, ctxt: NetworkContext, nodeRep: Dict) -> Tuple[NetworkContext, Dict]:
         convCtxt, convRep = self.convGenerator(ctxt, nodeRep)
 
         OT = ctxt.lookup(f"OT", _id=nodeRep['id'])
@@ -167,7 +167,7 @@ class _CLCATemplate(NodeTemplate):
 
         return convCtxt, convRep
 
-    def convVGenerator(self, ctxt: NetworkContext, nodeRep: Dict) -> (NetworkContext, Dict):
+    def convVGenerator(self, ctxt: NetworkContext, nodeRep: Dict) -> Tuple[NetworkContext, Dict]:
         convCtxt, convRep = self.convGenerator(ctxt, nodeRep)
 
         V = ctxt.lookup(f"V", _id=nodeRep['id'])
@@ -185,7 +185,7 @@ class _CLCATemplate(NodeTemplate):
 
         return convCtxt, convRep
 
-    def convQGenerator(self, ctxt: NetworkContext, nodeRep: Dict) -> (NetworkContext, Dict):
+    def convQGenerator(self, ctxt: NetworkContext, nodeRep: Dict) -> Tuple[NetworkContext, Dict]:
         convCtxt, convRep = self.convGenerator(ctxt, nodeRep)
 
         Q = ctxt.lookup(f"Q", _id=nodeRep['id'])
@@ -203,7 +203,7 @@ class _CLCATemplate(NodeTemplate):
 
         return convCtxt, convRep
 
-    def convGenerator(self, ctxt: NetworkContext, nodeRep: Dict) -> (NetworkContext, Dict):
+    def convGenerator(self, ctxt: NetworkContext, nodeRep: Dict) -> Tuple[NetworkContext, Dict]:
 
         convRep = copy.deepcopy(nodeRep)
         convCtxt = copy.deepcopy(ctxt)
@@ -222,7 +222,7 @@ class _CLCATemplate(NodeTemplate):
 
         return convCtxt, convRep
 
-    def reduceMeanGenerator(self, ctxt: NetworkContext, nodeRep: Dict) -> (NetworkContext, Dict):
+    def reduceMeanGenerator(self, ctxt: NetworkContext, nodeRep: Dict) -> Tuple[NetworkContext, Dict]:
         K = ctxt.lookup(f"K", _id=nodeRep['id'])
         E = ctxt.lookup(f"E", _id=nodeRep['id'])
 
@@ -239,7 +239,7 @@ class _CLCATemplate(NodeTemplate):
 
         return ctxt, nodeRep
 
-    def alignToContext(self, ctxt: NetworkContext, nodeRep: Dict) -> (NetworkContext, Dict):
+    def alignToContext(self, ctxt: NetworkContext, nodeRep: Dict) -> Tuple[NetworkContext, Dict]:
 
         Q = VariableBuffer(f"Q", [nodeRep['heads'], nodeRep['dim_head'], nodeRep['q_shape'][-1]], 256)
         Q._type = DataTypes.int8_t

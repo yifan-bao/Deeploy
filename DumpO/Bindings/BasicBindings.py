@@ -2,11 +2,13 @@
 #
 # File: BasicBindings.py
 #
-# Last edited: 21.12.2021
+# Last edited: 17.12.2022
 #
-# Copyright (C) 2021, ETH Zurich and University of Bologna.
+# Copyright (C) 2022, ETH Zurich and University of Bologna.
 #
-# Author: Moritz Scherer, ETH Zurich
+# Author:
+# - Moritz Scherer, ETH Zurich
+# - Philip Wiese, ETH Zurich
 #
 # ----------------------------------------------------------------------
 # SPDX-License-Identifier: Apache-2.0
@@ -24,33 +26,34 @@
 # limitations under the License.
 
 from DumpO.DumpOTypes import *
+
+from DumpO.DataTypes.BasicDataTypes import DataTypes
 from DumpO.TypeCheckers.BasicCheckers import *
 from DumpO.Templates.BasicTemplates import *
-from DumpO.DataTypes.BasicDataTypes import *
+
+BasicAddBindings = [NodeBinding(AddChecker([type, type], [DataTypes.int32_t]), AddTemplate.referenceTemplate) for type in DataTypes]
+
+BasicGatherBindings = [NodeBinding(GatherChecker([type, DataTypes.int32_t], [type]), GatherTemplate.referenceTemplate) for type in DataTypes]
 
 BasicGELUBinding = NodeBinding(GELUChecker([DataTypes.int8_t], [DataTypes.int32_t]), iGELUTemplate.referenceTemplate)
-RQSGELUBinding = NodeBinding(GELUChecker([DataTypes.int8_t,DataTypes.int32_t,DataTypes.int32_t,DataTypes.int32_t], [DataTypes.int8_t]), RQSiGELUTemplate.referenceTemplate)
-
-BasicSoftmaxBinding = NodeBinding(SoftmaxChecker([DataTypes.int8_t], [DataTypes.int8_t]), iSoftmaxTemplate.referenceTemplate)
 
 BasicGEMMBinding = NodeBinding(GEMMChecker([DataTypes.int8_t, DataTypes.int8_t], [DataTypes.int32_t]), GEMMTemplate.referenceTemplate)
-BasicConv2DBinding = NodeBinding(ConvChecker([DataTypes.int8_t, DataTypes.int8_t], [DataTypes.int32_t]), DummyTemplate.referenceTemplate)
+
+BasicMulBindings = [NodeBinding(MulChecker([typeA, DataTypes.int32_t], [DataTypes.int32_t]), MulTemplate.referenceTemplate) for typeA in DataTypes]
+
+BasicPad1DBindings = [NodeBinding(PadChecker([type], [type]), PadTemplate.reference1DTemplate) for type in DataTypes]
+BasicPad2DBindings = [NodeBinding(PadChecker([type], [type]), PadTemplate.reference2DTemplate) for type in DataTypes]
 
 BasicReduceMeanBindings = [NodeBinding(ReduceMeanChecker([type], [type]), ReduceMeanTemplate.referenceTemplate) for type in DataTypes]
 
-BasicGatherBindings = [NodeBinding(GatherChecker([type, DataTypes.int32_t],[type]), GatherTemplate.referenceTemplate) for type in DataTypes]
-BasicReshapeBindings = [NodeBinding(ReshapeChecker([type, DataTypes.int32_t],[type]), ReshapeTemplate.referenceTemplate) for type in DataTypes]
+BasicReshapeBindings = [NodeBinding(ReshapeChecker([type, DataTypes.int32_t], [type]), ReshapeTemplate.referenceTemplate) for type in DataTypes ]
 
-BasicTransposeBindings = [NodeBinding(TransposeChecker([type],[type]), TransposeTemplate.referenceTemplate) for type in DataTypes]
-BasicRQSBindings = [NodeBinding(RequantShiftChecker([type,DataTypes.int32_t,DataTypes.int32_t], [DataTypes.int8_t]), RequantShiftTemplate.referenceTemplate) for type in DataTypes]
+BasicRQSBindings = [NodeBinding(RequantShiftChecker([type, DataTypes.int32_t, DataTypes.int32_t], [DataTypes.int8_t]), RequantShiftTemplate.referenceTemplate) for type in DataTypes]
 
-BasicAddBindings = [NodeBinding(AddChecker([DataTypes.int8_t, DataTypes.int8_t], [DataTypes.int16_t]), AddTemplate.referenceTemplate)]
-BasicAddBindings += [NodeBinding(AddChecker([DataTypes.int16_t, DataTypes.int16_t], [DataTypes.int32_t]), AddTemplate.referenceTemplate) for type in DataTypes]
+BasicRQSGELUBinding = NodeBinding(GELUChecker([DataTypes.int8_t, DataTypes.int32_t, DataTypes.int32_t, DataTypes.int32_t], [DataTypes.int8_t]), RQSiGELUTemplate.referenceTemplate)
 
-BasicPad2DBindings = [NodeBinding(PadChecker([type], [type]), PadTemplate.reference2DTemplate) for type in DataTypes]
+BasicSoftmaxBinding = NodeBinding(SoftmaxChecker([DataTypes.int8_t], [DataTypes.int8_t]), iSoftmaxTemplate.referenceTemplate)
 
-BasicPad1DBindings = [NodeBinding(PadChecker([type], [type]), PadTemplate.reference1DTemplate) for type in DataTypes]
+BasicTransposeBindings = [NodeBinding(TransposeChecker([type], [type]), TransposeTemplate.referenceTemplate) for type in DataTypes]
 
-DummyBinding = NodeBinding(DummyChecker([DataTypes.int8_t],[DataTypes.int8_t]), DummyTemplate.referenceTemplate)
-
-BasicMulBindings = [NodeBinding(MulChecker([typeA, DataTypes.int32_t], [DataTypes.int32_t]), MulTemplate.referenceTemplate) for typeA in DataTypes]
+DummyBinding = NodeBinding(DummyChecker([DataTypes.int8_t], [DataTypes.int8_t]), DummyTemplate.referenceTemplate)

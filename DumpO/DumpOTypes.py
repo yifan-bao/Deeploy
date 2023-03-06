@@ -28,13 +28,15 @@ import copy
 import mako
 from mako.template import Template
 import numpy as np
-from typing import List, Callable, Iterable, Union, Tuple, Dict, Callable
+from typing import List, Callable, TypeVar, Tuple, Dict, Callable, Type, Any, Sequence
 import onnx
 import onnx_graphsurgeon as gs
 import math
 from enum import Enum
 from onnx.external_data_helper import convert_model_to_external_data
 from collections import OrderedDict
+
+Shape = TypeVar("Shape", bound=Any)
 
 class VariableBuffer():
     def __init__(self, name: str = '', shape = [1], nLevels: int = 1):
@@ -46,10 +48,10 @@ class VariableBuffer():
         self._users = []
 
         # Do not override - Should be written in the typechecking passes
-        self._type = None
+        self._type: Enum = None
 
         # Do not override - Should be written in the typechecking passes
-        self._signed = None
+        self._signed: bool = None
 
         # Do not override - Should be written in the deployment passes
         self._live = False
@@ -76,7 +78,7 @@ class VariableBuffer():
         return f'VariableBuffer: name: {self.name}, type: {self._type}, levels: {self.nLevels}'
 
     @classmethod
-    def fromNode(cls, node: gs.ir.node.Node, nLevels:int):
+    def fromNode(cls, node:  gs.Node, nLevels:int):
         return(
             cls(
                 name = node.name,
@@ -129,7 +131,7 @@ class StructBuffer(VariableBuffer):
         return f'StructBuffer: name: {self.name}, type: {self._type}'
 
 class NetworkContext():
-    def __init__(self, variableBuffer: VariableBuffer, constantBuffer: ConstantBuffer, structBuffer: StructBuffer, globalObjects = {}, localObjects = {}, name: str = 'DumpONetwork'):
+    def __init__(self, variableBuffer: Type[VariableBuffer], constantBuffer: Type[ConstantBuffer], structBuffer: Type[StructBuffer], globalObjects = {}, localObjects = {}, name: str = 'DumpONetwork'):
         self.globalObjects = {}
         self.localObjects = {}
         self.internalObjects = {}
@@ -205,7 +207,7 @@ class NetworkContext():
         structBuffer._type = _type
         self.add(structBuffer, 'global')
 
-    def hoistConstant(self, node: gs.ir.node.Node, name = '', type = None):
+    def hoistConstant(self, node:  gs.Node, name = '', type = None):
 
         assert len(node.outputs) <= 1, "Constant has more than one output"
 
@@ -303,12 +305,12 @@ class NodeParser():
         return True
 
     # Change this
-    def parseNodeCtxt(self, ctxt: NetworkContext, node: gs.ir.node.Node, channels_first: bool = True) -> (NetworkContext, bool):
+    def parseNodeCtxt(self, ctxt: NetworkContext, node:  gs.Node, channels_first: bool = True) -> Tuple[NetworkContext, bool]:
         return ctxt, True
 
     # Don't override this, it checks for consistency (all inputs are available, no outputs are defined)
     # Also hoists inputs that are parameters
-    def parseInputs(self, ctxt: NetworkContext, node: gs.ir.node.Node) -> (NetworkContext, bool):
+    def parseInputs(self, ctxt: NetworkContext, node:  gs.Node) -> Tuple[NetworkContext, bool]:
         ctxt = ctxt.copy()
 
         data_in_buffers = []
@@ -326,7 +328,7 @@ class NodeParser():
         return ctxt, True
 
     # Don't touch this
-    def parseOutputs(self, ctxt: NetworkContext, node: gs.ir.node.Node) -> (NetworkContext, bool):
+    def parseOutputs(self, ctxt: NetworkContext, node:  gs.Node) -> Tuple[NetworkContext, bool]:
         newCtxt = ctxt.copy()
         outputNodes = node.outputs
         outputNames = [node.name for node in outputNodes]
@@ -345,7 +347,7 @@ class NodeParser():
         return newCtxt, True
 
     # Don't touch this
-    def parse(self, ctxt: NetworkContext, node: gs.ir.node.Node) -> (NetworkContext, bool):
+    def parse(self, ctxt: NetworkContext, node:  gs.Node) -> Tuple[NetworkContext, bool]:
         newCtxt = copy.deepcopy(ctxt)
         self.parserDict = {}
         ret1 = self.parseNode(node)
@@ -357,7 +359,7 @@ class NodeParser():
             return ctxt, False
 
 class NodeTypeChecker():
-    def __init__(self, input_types: List[Enum], output_types: List[Enum]):
+    def __init__(self, input_types: Sequence[Enum], output_types: Sequence[Enum]):
         self.input_types = input_types
         self.output_types = output_types
         self.typeDict = {}
@@ -371,7 +373,7 @@ class NodeTypeChecker():
         return [True for type in self.output_types]
 
     # Don't override this. This should check that the input n_levels are appropriate for the kernel
-    def typeCheckNodeInputs(self, ctxt: NetworkContext, node: gs.ir.node.Node) -> bool:
+    def typeCheckNodeInputs(self, ctxt: NetworkContext, node:  gs.Node) -> bool:
         inputName = [i.name for i in node.inputs]
         inputs = [ctxt.lookup(name) for name in inputName]
 
@@ -380,7 +382,7 @@ class NodeTypeChecker():
         )
 
     # Don't override this. This should check that the output n_levels are appropriate for the kernel
-    def typeCheckNodeOutputs(self, ctxt: NetworkContext, node: gs.ir.node.Node, parserDict) -> bool:
+    def typeCheckNodeOutputs(self, ctxt: NetworkContext, node:  gs.Node, parserDict) -> bool:
         newCtxt = ctxt.copy()
         inputName = [i.name for i in node.inputs]
         inputs = [ctxt.lookup(name) for name in inputName]
@@ -390,7 +392,7 @@ class NodeTypeChecker():
         )
 
     # Don't override this. This should annotate the output node with the correct data type
-    def typeInferOutput(self, ctxt: NetworkContext, node: gs.ir.node.Node, parserDict) -> NetworkContext:
+    def typeInferOutput(self, ctxt: NetworkContext, node:  gs.Node, parserDict) -> NetworkContext:
         newCtxt = ctxt.copy()
 
         outputTypeDict = {}
@@ -414,7 +416,7 @@ class NodeTypeChecker():
         return newCtxt
 
     # Don't override this. Automated annotation of global buffer
-    def typeInferGlobalCtxt(self, ctxt: NetworkContext, node: gs.ir.node.Node, typeInfer: Callable) -> NetworkContext:
+    def typeInferGlobalCtxt(self, ctxt: NetworkContext, node:  gs.Node, typeInfer: Callable) -> NetworkContext:
         ctxt = ctxt.copy()
 
         for inputNode, _type in zip(node.inputs, self.input_types):
@@ -435,7 +437,7 @@ class NodeTypeChecker():
         return ctxt
 
     # Don't override this.
-    def annotateDict(self, ctxt: NetworkContext, node: gs.ir.node.Node, parserDict: Dict):
+    def annotateDict(self, ctxt: NetworkContext, node:  gs.Node, parserDict: Dict):
         env = [node.name for node in node.inputs + node.outputs]
         for key, value in parserDict.items():
             # check if the referenced buffer is in the environment
@@ -444,7 +446,7 @@ class NodeTypeChecker():
                 self.typeDict[key + '_type'] = _buffer._type
 
     # Don't override this. Automated type checking
-    def typeCheck(self, ctxt: NetworkContext, node: gs.ir.node.Node, typeInfer: Callable, parserDict) -> (NetworkContext, bool):
+    def typeCheck(self, ctxt: NetworkContext, node:  gs.Node, typeInfer: Callable, parserDict) -> Tuple[NetworkContext, bool]:
         newCtxt = ctxt.copy()
         if self.typeCheckNodeInputs(newCtxt, node):
             newCtxt = self.typeInferGlobalCtxt(newCtxt, node, typeInfer)
@@ -472,11 +474,11 @@ class NodeTemplate():
         return 0
 
     # Override this. Used to hoist optional structs, constants and so on to the GLOBAL context for specialized kernels
-    def alignToContext(self, ctxt: NetworkContext, nodeRep: Dict) -> (NetworkContext, Dict):
+    def alignToContext(self, ctxt: NetworkContext, nodeRep: Dict) -> Tuple[NetworkContext, Dict]:
         return ctxt, nodeRep
 
     # Don't override this
-    def _alignToContext(self, ctxt: NetworkContext, nodeRep: Dict) -> (NetworkContext, Dict):
+    def _alignToContext(self, ctxt: NetworkContext, nodeRep: Dict) -> Tuple[NetworkContext, Dict]:
         ctxt, nodeRep = self.alignToContext(ctxt, nodeRep)
         for key, (template, repGenerator) in self.subTemplates.items():
             ctxt, subNodeRep = template.alignToContext(*(repGenerator(ctxt, copy.deepcopy(nodeRep))))
@@ -517,7 +519,7 @@ class NodeBinding():
         self.template = template
 
     # Don't override this. This should annotate the output node with the correct data type
-    def bind(self, ctxt: NetworkContext, node:gs.ir.node.Node, typeInfer: Callable, nodeRep: Dict) -> (NetworkContext, Dict, bool):
+    def bind(self, ctxt: NetworkContext, node: gs.Node, typeInfer: Callable, nodeRep: Dict) -> Tuple[NetworkContext, Dict, bool]:
         newCtxt = ctxt.copy()
         newCtxt, ret = self.typeChecker.typeCheck(newCtxt, node, typeInfer, nodeRep)
         if ret:
@@ -558,13 +560,13 @@ class NodeMapper():
         self.parser = parser
         self.bindings = bindings
 
-        self.binder = None
+        self.binder: NodeBinding = None
         self.bound = False
 
-        self.nodeRep = None
+        self.nodeRep: Dict = None
 
     # Don't override this. Parses the networks with the correct data type
-    def parse(self, ctxt: NetworkContext, node: gs.ir.node.Node, channels_first: bool) -> (NetworkContext, bool):
+    def parse(self, ctxt: NetworkContext, node:  gs.Node, channels_first: bool) -> Tuple[NetworkContext, bool]:
         hoistedCtxt, parseable = self.parser.parse(ctxt, node)
         if parseable:
             newCtxt, ret = self.parser.parseNodeCtxt(hoistedCtxt, node, channels_first)
@@ -575,7 +577,7 @@ class NodeMapper():
 
     # Don't override this. This should annotate the output node with the correct data type
     # SCHEREMO: Currently simply binds the first viable binding
-    def bind(self, ctxt: NetworkContext, node:gs.ir.node.Node, typeInfer: Callable) -> (NetworkContext, bool):
+    def bind(self, ctxt: NetworkContext, node: gs.Node, typeInfer: Callable) -> Tuple[NetworkContext, bool]:
         for binder in self.bindings:
             newCtxt = ctxt.copy()
             newCtxt, nodeRep, ret = binder.bind(newCtxt, node, typeInfer, self.nodeRep)
@@ -597,8 +599,8 @@ class ONNXLayer():
     def __init__(self, maps : List[NodeMapper]):
         self.maps = maps
 
-        self.mapper = None
-        self.node = None
+        self.mapper: NodeMapper = None
+        self.node: gs.Node = None
 
     def computeOps(self):
         assert self.mapper is not None, "To compute Ops, network must first be parsed!"
@@ -608,7 +610,7 @@ class ONNXLayer():
 
     # Override this for broadcasting support
     # Returns a tuple of new, broadcasted inputShapes and outputShapes
-    def computeShapes(self, inputShapes: List[np.shape], outputShapes: List[np.shape], parserDict: Dict, channels_first: bool) -> (List[np.shape], List[np.shape]):
+    def computeShapes(self, inputShapes: Shape, outputShapes: Shape, parserDict: Dict, channels_first: bool) -> Tuple[Shape, Shape]:
         return (inputShapes, outputShapes)
 
     def broadcast(self, ctxt: NetworkContext, channels_first: bool = True) -> (NetworkContext):
@@ -645,7 +647,7 @@ class ONNXLayer():
         return ctxt
 
     # Don't override - binds the layer to a node
-    def __call__(self, node: gs.ir.node.Node):
+    def __call__(self, node:  gs.Node):
         _copy = copy.deepcopy(self)
         _copy.node = node
         return _copy
@@ -663,7 +665,7 @@ class ONNXLayer():
         return _copy
 
     # Call this, DO NOT override! -> This should assert that all variables required are in the node!
-    def parse(self, ctxt: NetworkContext, channels_first: bool) -> (NetworkContext, bool):
+    def parse(self, ctxt: NetworkContext, channels_first: bool) -> Tuple[NetworkContext, bool]:
         retCtxt = None
         # iterate through all possible mappings and return the first that works
         for mapper in self.maps:
@@ -690,7 +692,7 @@ class ONNXLayer():
 
     # Do not override unless you know what you're doin - this generates code + buffer allocation / de-allocation
     # parseIO has to be called in advance!
-    def generate(self, ctxt: NetworkContext, verbose:bool=False) -> (NetworkContext, List[str]):
+    def generate(self, ctxt: NetworkContext, verbose:bool=False) -> Tuple[NetworkContext, List[str]]:
 
         outputs = [node for node in self.node.outputs]
         inputs = [node for node in self.node.inputs]
@@ -709,14 +711,14 @@ class NetworkOptimizationPass():
     def __init__(self):
         pass
 
-    def apply(self, ctxt: NetworkContext, graph: gs.Graph) -> (NetworkContext, gs.Graph) :
+    def apply(self, ctxt: NetworkContext, graph: gs.Graph) -> Tuple[NetworkContext, gs.Graph]:
         return ctxt, graph
 
 class NetworkOptimizer():
     def __init__(self, passes: List[NetworkOptimizationPass]):
         self.passes = passes
 
-    def optimize(self, ctxt: NetworkContext, graph: gs.Graph) -> (NetworkContext, gs.Graph):
+    def optimize(self, ctxt: NetworkContext, graph: gs.Graph) -> Tuple[NetworkContext, gs.Graph]:
         for _pass in self.passes:
             ctxt, graph = _pass.apply(ctxt, graph)
             graph.cleanup().toposort()
@@ -724,8 +726,8 @@ class NetworkOptimizer():
 
 class DeploymentPlatform():
     def __init__(self, Mapping: Dict[str, ONNXLayer], DataTypes: Enum, \
-                 TypeInfer: Callable, VariableBuffer: VariableBuffer, \
-                 ConstantBuffer: ConstantBuffer, StructBuffer: StructBuffer, \
+                 TypeInfer: Callable, VariableBuffer: Type[VariableBuffer], \
+                 ConstantBuffer: Type[ConstantBuffer], StructBuffer: Type[StructBuffer], \
                  includeList: List[str] = [""]):
 
         self.Mapping = Mapping
@@ -748,7 +750,7 @@ class NetworkContainer():
                  input_n_levels : Dict[str, int] = {'input_0': 256}, input_signed : Dict[str, bool] = {'input_0':False}):
         self.graph = graph
         self.scheduler = scheduler
-        self.ctxt = None
+        self.ctxt: NetworkContext = None
         self.layerBinding = OrderedDict()
         self.parsed = False
         self.Platform = platform
@@ -774,6 +776,7 @@ class NetworkContainer():
 
             # SCHEREMO: Figure out smallest assignable type here
             smallestTypeValue = 2**32
+            smallestType = 8
             for _type, value in zip(self.Platform.DataTypes, map(lambda x: x._value_, self.Platform.DataTypes)):
                 if (2**value >= data_type) and (2**value <= smallestTypeValue):
                     smallestType = _type
@@ -786,11 +789,8 @@ class NetworkContainer():
         for node in graph.outputs:
             data_name = node.name
             data_size = node.shape
-            # SCHEREMO: Should be parsed from graph
-            #data_type = 2**7
-            nb = ctxt.VariableBuffer(data_name, data_size, data_type)
-            #nb._type = self.Platform.DataTypes.int8_t
-            #nb._signed = False
+            # WIESEP: The shape and type will be parsed from the graph
+            nb = ctxt.VariableBuffer(data_name, data_size, 0)
             ctxt.add(nb, 'global')
 
         return ctxt
@@ -827,6 +827,8 @@ class NetworkContainer():
         else:
             self.bound = True
             self.ctxt = newCtxt
+
+        return True
 
     def _bindLayers(self):
         # Create schedule, binding, then parse resulting program for correctness
@@ -962,7 +964,7 @@ class NetworkContainer():
                     node.name = ctxt._mangle(node.name)
                     callStack += "extern " + node.init()
                     # SCHEREMO: Borderline hacky, but on the okay side of things, I think
-                    callStack += "const static uint32_t " + node.name + "_len" + " = " + str(np.prod(node.shape)) + ";\n"
+                    callStack += "static const uint32_t " + node.name + "_len" + " = " + str(np.prod(node.shape)) + ";\n"
                     node.name = name
 
         lines = callStack.split('\n')
@@ -1064,7 +1066,7 @@ class NetworkContainer():
         return size
 
     # Don't override this - Returns worst case layer and buffering size in bytes
-    def getTotalSize(self) -> (str, int):
+    def getTotalSize(self) -> int:
         if not self.parsed or not self.bound:
             raise ValueError('You need to parse and bind the network before getting RAM Size!')
 
@@ -1094,14 +1096,15 @@ class NetworkDeployer(NetworkContainer):
         self.input_signed = input_signed
 
     # Don't override this
-    def lower(self, ctxt: NetworkContext, graph: gs.Graph) -> (NetworkContext, gs.Graph):
+    def lower(self, ctxt: NetworkContext, graph: gs.Graph) -> Tuple[NetworkContext, gs.Graph]:
         return self.optimizer.optimize(ctxt, graph)
 
     # Don't override this
-    def baseParse(self) -> (NetworkContext, bool):
+    def baseParse(self) -> Tuple[NetworkContext, bool]:
         newCtxt = NetworkContext(VariableBuffer, ConstantBuffer, StructBuffer, {}, {})
         newCtxt = self._createIOBindings(newCtxt, self.graph)
 
+        ret = False
         for node in self.graph.nodes:
             newCtxt, ret = self.baseParser.parse(newCtxt, node)
 

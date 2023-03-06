@@ -24,14 +24,18 @@
 # limitations under the License.
 
 from DumpO.DumpOTypes import *
+
 from DumpO.Parsers.BasicParsers import *
+
 from DumpO.Layers.BasicLayers import *
 from DumpO.Layers.CMSISLayers import *
+
 from DumpO.OptimizationPasses.BasicPasses import *
+from DumpO.OptimizationPasses.CMSISPasses import *
 
 class CMSISDeployer(NetworkDeployer):
 
-    def __init__(self, graph: gs.Graph, deploymentPlatform: DeploymentPlatform, loweringOptimizer: NetworkOptimizer, scheduler: Callable = lambda x: x, name: str = 'DumpONetwork', input_n_levels : Dict[str, int] = {'input_0': 256}, input_signed : Dict[str, bool] = {'input_0':False}):
+    def __init__(self, graph: gs.Graph, deploymentPlatform: DeploymentPlatform, loweringOptimizer: NetworkOptimizer, scheduler: Callable = lambda x: x, name: str = 'DumpONetwork', input_n_levels : Dict[str, int] = {'input_0': 256}, input_signed : Dict[str, bool] = {'input_0':False}, channels_first=False):
         super().__init__(graph, deploymentPlatform, loweringOptimizer, scheduler, name, input_n_levels, input_signed)
 
     def postLoweringOptimization(self):
@@ -70,7 +74,7 @@ class CMSISDeployer(NetworkDeployer):
 
             layer = self.layerBinding[layerName]
 
-            if isinstance(layer, (RQSGEMMLayer)):
+            if isinstance(layer, (CMSISRQSGEMMLayer)):
                 # SCHEREMO: Enforce transA = 0, transB = 1
                 inputA = layer.node.inputs[0]
                 inputB = layer.node.inputs[1]

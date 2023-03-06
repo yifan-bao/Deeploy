@@ -2,9 +2,9 @@
 #
 # File: CMSISBindings.py
 #
-# Last edited: 21.12.2021
+# Last edited: 17.12.2022
 #
-# Copyright (C) 2021, ETH Zurich and University of Bologna.
+# Copyright (C) 2022, ETH Zurich and University of Bologna.
 #
 # Author: Moritz Scherer, ETH Zurich
 #
@@ -24,55 +24,47 @@
 # limitations under the License.
 
 from DumpO.DumpOTypes import *
+
+from DumpO.Bindings.BasicBindings import DataTypes
 from DumpO.TypeCheckers.BasicCheckers import *
 from DumpO.Templates.BasicTemplates import *
-from DumpO.Bindings.BasicBindings import DataTypes
 
 from DumpO.TypeCheckers.CMSISCheckers import *
 from DumpO.Templates.CMSISTemplates import *
 
+# Overwrite some templates with the basic version
 from DumpO.Templates.BasicTemplates import AddTemplate as AddTemplate
 
-CMSISConv2DBinding = NodeBinding(CMSISConvChecker([DataTypes.int8_t, DataTypes.int8_t, DataTypes.int32_t, DataTypes.int32_t,DataTypes.int32_t], [DataTypes.int8_t]), ConvTemplate.cmsis2D_8_Template)
+CMSISCLCABinding = NodeBinding(CLCAChecker([DataTypes.int8_t, DataTypes.int8_t] + [DataTypes.int8_t, DataTypes.int32_t] * 3 + [DataTypes.int32_t, DataTypes.int32_t, DataTypes.int32_t] * 7, [DataTypes.int8_t]), CLCATemplate.referenceTemplate)
 
-CMSISDWConv2DBinding = NodeBinding(CMSISConvChecker([DataTypes.int8_t, DataTypes.int8_t, DataTypes.int32_t, DataTypes.int32_t,DataTypes.int32_t], [DataTypes.int8_t]), DWConvTemplate.conv2D_8_Template)
+CMSISConv1DBinding_16 = NodeBinding(CMSISConvChecker([DataTypes.int16_t, DataTypes.int8_t, DataTypes.int32_t, DataTypes.int64_t, DataTypes.int32_t], [DataTypes.int16_t]), ConvTemplate.cmsis1D_16_Template)
+CMSISConv1DBinding_8 = NodeBinding(CMSISConvChecker([DataTypes.int8_t, DataTypes.int8_t, DataTypes.int32_t, DataTypes.int32_t, DataTypes.int32_t], [DataTypes.int8_t]), ConvTemplate.cmsis1D_8_Template)
+CMSISConv1DBindings = [CMSISConv1DBinding_8, CMSISConv1DBinding_16]
 
-CMSISConv1DBinding_16 = NodeBinding(CMSISConvChecker([DataTypes.int16_t, DataTypes.int8_t, DataTypes.int32_t, DataTypes.int64_t,DataTypes.int32_t], [DataTypes.int16_t]), ConvTemplate.cmsis1D_16_Template)
+CMSISConv2DBinding = NodeBinding(CMSISConvChecker([DataTypes.int8_t, DataTypes.int8_t, DataTypes.int32_t, DataTypes.int32_t, DataTypes.int32_t], [DataTypes.int8_t]), ConvTemplate.cmsis2D_8_Template)
 
-CMSISConv1DBinding_8 = NodeBinding(CMSISConvChecker([DataTypes.int8_t, DataTypes.int8_t, DataTypes.int32_t, DataTypes.int32_t,DataTypes.int32_t], [DataTypes.int8_t]), ConvTemplate.cmsis1D_8_Template)
+CMSISDWConv1DBinding_16 = NodeBinding(CMSISConvChecker([DataTypes.int16_t, DataTypes.int8_t, DataTypes.int32_t, DataTypes.int64_t, DataTypes.int32_t], [DataTypes.int16_t]), DWConvTemplate.conv1D_16_Template)
+CMSISDWConv1DBinding_8 = NodeBinding(CMSISConvChecker([DataTypes.int8_t, DataTypes.int8_t, DataTypes.int32_t, DataTypes.int32_t, DataTypes.int32_t], [DataTypes.int8_t]), DWConvTemplate.conv1D_8_Template)
+CMSISDWConv1DBindings = [CMSISDWConv1DBinding_8, CMSISDWConv1DBinding_16]
 
-CMSISConv1DBindings = [CMSISConv1DBinding_8,CMSISConv1DBinding_16]
-
-CMSISDWConv1DBinding_16 = NodeBinding(CMSISConvChecker([DataTypes.int16_t, DataTypes.int8_t, DataTypes.int32_t, DataTypes.int64_t,DataTypes.int32_t], [DataTypes.int16_t]), DWConvTemplate.conv1D_16_Template)
-
-CMSISDWConv1DBinding_8 = NodeBinding(CMSISConvChecker([DataTypes.int8_t, DataTypes.int8_t, DataTypes.int32_t, DataTypes.int32_t,DataTypes.int32_t], [DataTypes.int8_t]), DWConvTemplate.conv1D_8_Template)
-
-CMSISDWConv1DBindings = [CMSISDWConv1DBinding_8,CMSISDWConv1DBinding_16]
-
-MatMul_8_8_32_Binding = NodeBinding(MatMulChecker([DataTypes.int8_t, DataTypes.int8_t], [DataTypes.int32_t]), MatMulTemplate.reference_8_8_32_Template)
-
-CMSISGEMM_8_Binding = NodeBinding(CMSISLinearChecker([DataTypes.int8_t, DataTypes.int8_t, DataTypes.int32_t, DataTypes.int32_t], [DataTypes.int8_t]), GEMMTemplate.Linear_8_Template)
+CMSISDWConv2DBinding = NodeBinding(CMSISConvChecker([DataTypes.int8_t, DataTypes.int8_t, DataTypes.int32_t, DataTypes.int32_t, DataTypes.int32_t], [DataTypes.int8_t]), DWConvTemplate.conv2D_8_Template)
 
 CMSISGEMM_16_Binding = NodeBinding(CMSISLinearChecker([DataTypes.int16_t, DataTypes.int16_t, DataTypes.int64_t, DataTypes.int64_t], [DataTypes.int16_t]), GEMMTemplate.Linear_16_Template)
+CMSISGEMM_8_Binding = NodeBinding(CMSISLinearChecker([DataTypes.int8_t, DataTypes.int8_t, DataTypes.int32_t, DataTypes.int32_t], [DataTypes.int8_t]), GEMMTemplate.Linear_8_Template)
+CMSISGEMMBindings = [CMSISGEMM_8_Binding, CMSISGEMM_16_Binding]
 
-CMSISGEMMBindings = [CMSISGEMM_8_Binding,CMSISGEMM_16_Binding]
+CMSISIntegerDivBinding = NodeBinding(IntegerDivChecker([DataTypes.int32_t, DataTypes.int32_t], [DataTypes.int32_t]), IntegerDivTemplate.IntegerDiv_s32_s32_Template)
+
+CMSISLayerNormBinding = NodeBinding(iLayerNormChecker([DataTypes.int8_t, DataTypes.int32_t, DataTypes.int32_t], [DataTypes.int8_t]), iLayernormTemplate.referenceTemplate)
+
+CMSISLinearAttentionBinding = NodeBinding(LinearAttentionChecker([DataTypes.int16_t, DataTypes.int16_t, DataTypes.int16_t] + [DataTypes.int8_t, DataTypes.int64_t] * 4, [DataTypes.int16_t]), LinearAttentionTemplate.referenceTemplate)
+
+CMSISMatMul_8_8_32_Binding = NodeBinding(MatMulChecker([DataTypes.int8_t, DataTypes.int8_t], [DataTypes.int32_t]), MatMulTemplate.reference_8_8_32_Template)
 
 CMSISMaxPool2DBinding = NodeBinding(CMSISMaxPoolChecker([DataTypes.int8_t], [DataTypes.int8_t]), MaxPool2DTemplate.cmsisTemplate)
 
-CMSISLayerNormBinding = NodeBinding(iLayerNormChecker([DataTypes.int8_t,DataTypes.int32_t,DataTypes.int32_t], [DataTypes.int8_t]), iLayernormTemplate.referenceTemplate)
+CMSISMHSABinding = NodeBinding(MHSAChecker([DataTypes.int8_t, DataTypes.int8_t, DataTypes.int8_t] + [DataTypes.int8_t, DataTypes.int32_t] * 4, [DataTypes.int8_t]), MHSATemplate.referenceTemplate)
 
-CMSISMHSABinding = NodeBinding(MHSAChecker([DataTypes.int8_t,DataTypes.int8_t,DataTypes.int8_t]+[DataTypes.int8_t, DataTypes.int32_t]*4, [DataTypes.int8_t]), MHSATemplate.referenceTemplate)
+CMSISRQIntegerDivBinding = NodeBinding(RQIntegerDivChecker([DataTypes.int32_t, DataTypes.int32_t, DataTypes.int32_t, DataTypes.int32_t, DataTypes.int32_t], [DataTypes.int8_t]), RQIntegerDivTemplate.RQIntegerDiv_s32_s8_Template)
 
-#CMSISCLCABinding = NodeBinding(CLCAChecker([DataTypes.int8_t,DataTypes.int8_t]+[DataTypes.int8_t, DataTypes.int32_t]*4, [DataTypes.int8_t]), CLCATemplate.referenceTemplate)
-CMSISCLCABinding = NodeBinding(CLCAChecker([DataTypes.int8_t,DataTypes.int8_t]+[DataTypes.int8_t, DataTypes.int32_t]*3+[DataTypes.int32_t, DataTypes.int32_t, DataTypes.int32_t]*7, [DataTypes.int8_t]), CLCATemplate.referenceTemplate)
-
-CMSISLinearAttentionBinding = NodeBinding(LinearAttentionChecker([DataTypes.int16_t,DataTypes.int16_t,DataTypes.int16_t]+[DataTypes.int8_t, DataTypes.int64_t]*4, [DataTypes.int16_t]), LinearAttentionTemplate.referenceTemplate)
-
-CMSISSaturatingAddBindings = [NodeBinding(CMSISSaturatingAddChecker([DataTypes.int8_t, DataTypes.int8_t],[DataTypes.int8_t]), AddTemplate.referenceTemplate)]
-
-IntegerDivBinding = NodeBinding(IntegerDivChecker([DataTypes.int32_t, DataTypes.int32_t], [DataTypes.int32_t]), IntegerDivTemplate.IntegerDiv_s32_s32_Template)
-RQIntegerDivBinding = NodeBinding(RQIntegerDivChecker([DataTypes.int32_t, DataTypes.int32_t, DataTypes.int32_t, DataTypes.int32_t, DataTypes.int32_t], [DataTypes.int8_t]), RQIntegerDivTemplate.RQIntegerDiv_s32_s8_Template)
-
-# CMSISSaturatingAddBindings = [NodeBinding(CMSISSaturatingAddChecker([DataTypes.int8_t],[DataTypes.int8_t]), AddTemplate.AddInt8Template),
-#                               NodeBinding(CMSISSaturatingAddChecker([DataTypes.int16_t],[DataTypes.int16_t]), AddTemplate.AddInt16Template),
-#                               NodeBinding(CMSISSaturatingAddChecker([DataTypes.int32_t],[DataTypes.int32_t]), AddTemplate.AddInt32Template)]
+CMSISSaturatingAddBindings = [NodeBinding(CMSISSaturatingAddChecker([DataTypes.int8_t, DataTypes.int8_t], [DataTypes.int8_t]), AddTemplate.referenceTemplate)]

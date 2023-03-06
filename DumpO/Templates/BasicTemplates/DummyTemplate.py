@@ -25,6 +25,9 @@
 
 from DumpO.DumpOTypes import NodeTemplate
 
-referenceTemplate = NodeTemplate("void DummyOP(${data_in}, ${data_out}, ${size});")
+referenceTemplate = NodeTemplate("""
+// Dummy Node
+void DummyOP(${data_in}, ${data_out}, ${size});
+""")
 
 

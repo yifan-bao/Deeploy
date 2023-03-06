@@ -26,11 +26,11 @@
 from DumpO.DumpOTypes import *
 from DumpO.Layers.BasicLayers import *
 
-class RQSConvLayer(ConvLayer):
+class CMSISRQSConvLayer(ConvLayer):
     def __init__(self, maps : List[NodeMapper]):
         super().__init__(maps)
 
-    def computeShapes(self, inputShapes: List[np.shape], outputShapes: List[np.shape], parserDict, channels_first) -> (List[np.shape], List[np.shape]):
+    def computeShapes(self, inputShapes: Shape, outputShapes: Shape, parserDict, channels_first) -> Tuple[Shape, Shape]:
         if channels_first:
             inputShapes[2] = outputShapes[0][1] # Channels out dimension of Kernel
             inputShapes[3] = outputShapes[0][1] # Channels out dimension of Kernel
@@ -54,11 +54,11 @@ class RQSConvLayer(ConvLayer):
         return numPx * opsPerPx
 
 
-class RQSGEMMLayer(GEMMLayer):
+class CMSISRQSGEMMLayer(GEMMLayer):
     def __init__(self, maps : List[NodeMapper]):
         super().__init__(maps)
 
-    def computeShapes(self, inputShapes: List[np.shape], outputShapes: List[np.shape], parserDict, channels_first) -> (List[np.shape], List[np.shape]):
+    def computeShapes(self, inputShapes: Shape, outputShapes: Shape, parserDict, channels_first) -> Tuple[Shape, Shape]:
         inputShapes[2] = inputShapes[1][-2] # Channels out dimension of Kernel
         # inputShapes[3] = inputShapes[1][-1] # Channels out dimension of Kernel
         # inputShapes[4] = inputShapes[1][-1] # Channels out dimension of Kernel
@@ -72,5 +72,5 @@ class RQIntegerDivLayer(ONNXLayer):
     def __init__(self, maps : List[NodeMapper]):
         super().__init__(maps)
 
-    def computeShapes(self, inputShapes: List[np.shape], outputShapes: List[np.shape], parserDict, channels_first) -> (List[np.shape], List[np.shape]):
+    def computeShapes(self, inputShapes: Shape, outputShapes: Shape, parserDict, channels_first) -> Tuple[Shape, Shape]:
         return (inputShapes, outputShapes)

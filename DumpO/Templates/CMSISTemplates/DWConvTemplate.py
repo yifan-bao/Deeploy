@@ -23,7 +23,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import Dict
+from typing import Dict, Tuple
 from mako.template import Template
 
 from DumpO.DumpOTypes import NodeTemplate, NetworkContext
@@ -33,7 +33,7 @@ class _Conv2DDW_8_Template(NodeTemplate):
     def __init__(self, templateStr):
         super().__init__(templateStr)
 
-    def alignToContext(self, ctxt: NetworkContext, nodeRep: Dict) -> (NetworkContext, Dict):
+    def alignToContext(self, ctxt: NetworkContext, nodeRep: Dict) -> Tuple[NetworkContext, Dict]:
         ctxt = ctxt.copy()
 
         # Hoist the structs to the global ctxt
@@ -171,7 +171,7 @@ class _Conv1DDW_16_Template(NodeTemplate):
     def __init__(self, templateStr):
         super().__init__(templateStr)
 
-    def alignToContext(self, ctxt: NetworkContext, nodeRep: Dict) -> (NetworkContext, Dict):
+    def alignToContext(self, ctxt: NetworkContext, nodeRep: Dict) -> Tuple[NetworkContext, Dict]:
         ctxt = ctxt.copy()
         # Hoist the structs to the global ctxt
 

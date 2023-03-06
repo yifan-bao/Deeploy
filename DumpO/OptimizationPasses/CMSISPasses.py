@@ -2,12 +2,13 @@
 #
 # File: CMSISPasses.py
 #
-# Last edited: 20.12.2021
+# Last edited: 17.12.2022
 #
 # Copyright (C) 2021, ETH Zurich and University of Bologna.
 #
-# Author: Moritz Scherer, ETH Zurich
-# Author: Georg Rutishauser, ETH Zurich
+# Author: 
+# - Moritz Scherer, ETH Zurich
+# - Georg Rutishauser, ETH Zurich
 #
 # ----------------------------------------------------------------------
 # SPDX-License-Identifier: Apache-2.0

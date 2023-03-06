@@ -2,11 +2,13 @@
 #
 # File: BasicPlatform.py
 #
-# Last edited: 15.12.2021        
-# 
-# Copyright (C) 2021, ETH Zurich and University of Bologna.
+# Last edited: 17.12.2022
 #
-# Author: Moritz Scherer, ETH Zurich
+# Copyright (C) 2022, ETH Zurich and University of Bologna.
+#
+# Author:
+# - Moritz Scherer, ETH Zurich
+# - Philip Wiese, ETH Zurich
 #
 # ----------------------------------------------------------------------
 # SPDX-License-Identifier: Apache-2.0
@@ -23,108 +25,145 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from functools import partial
-from enum import Enum
-import mako
 import onnx_graphsurgeon as gs
 
-from DumpO.Layers.BasicLayers import *
 from DumpO.Parsers.BasicParsers import *
+
+from DumpO.Layers.BasicLayers import *
+
 from DumpO.Bindings.BasicBindings import *
 
-#GELU_int8_Mapper = NodeMapper(iGELUParser(), [BasicGELUBinding])
-#iLayerNorm_int8_Mapper = NodeMapper(iLayerNormParser(), [BasicLayerNormBinding])
-MatMul_int8_Mapper = NodeMapper(GEMMParser(), [BasicGEMMBinding])
-GEMM_int8_Mapper = NodeMapper(GEMMParser(), [BasicGEMMBinding])
-Conv_int8_Mapper = NodeMapper(Conv2DParser(), [BasicConv2DBinding])
-#Conv_int8_Mapper_testo = NodeMapper(Conv2DParser(), ConvChecker([CMSISDataTypes.int8_t, CMSISDataTypes.int8_t], [CMSISDataTypes.int16_t]), DummyTemplate.referenceTemplate)
-#MHSA_int8_Mapper = NodeMapper(MHSAParser(), [BasicMHSABinding])
-
-GatherMapper = NodeMapper(GatherParser(), BasicGatherBindings)
-ReshapeMapper = NodeMapper(ReshapeParser(), BasicReshapeBindings)
-FlattenMapper = NodeMapper(FlattenParser(), BasicReshapeBindings)
-RequantShiftMapper = NodeMapper(RequantShiftParser(), BasicRQSBindings)
+from DumpO.OptimizationPasses.BasicPasses import *
 
 AddMapper = NodeMapper(AddParser(), BasicAddBindings)
+FlattenMapper = NodeMapper(FlattenParser(), BasicReshapeBindings)
+GatherMapper = NodeMapper(GatherParser(), BasicGatherBindings)
+GEMM_int8_Mapper = NodeMapper(GEMMParser(), [BasicGEMMBinding])
+MatMul_int8_Mapper = NodeMapper(GEMMParser(), [BasicGEMMBinding])
+RequantShiftMapper = NodeMapper(RequantShiftParser(), BasicRQSBindings)
+ReshapeMapper = NodeMapper(ReshapeParser(), BasicReshapeBindings)
 
+# Dummy nodes are intended for development purposes only!
+# They should always generate compiler errors to not accidentally end up in production code
 DummyMapper = NodeMapper(DummyParser(), [DummyBinding])
 
 BasicMapping = {
-    'Conv' : ConvLayer([Conv_int8_Mapper]),
-    #'iLayerNorm': iLayerNormLayer([iLayerNorm_int8_Mapper]),
-    #'MultiHeadSelfAttention': MHSALayer([MHSA_int8_Mapper]),
-    #'iGELU' : iGELULayer([GELU_int8_Mapper]),
-    'MatMul': GEMMLayer([MatMul_int8_Mapper]),
-    'Gemm': GEMMLayer([GEMM_int8_Mapper]),
-    
-    'Gather': GatherLayer([GatherMapper]),
     'Add': AddLayer([AddMapper]),
-    'RequantShift' : RequantShiftLayer([RequantShiftMapper]),
+    'Flatten': ReshapeLayer([FlattenMapper]),
+    'Gather': GatherLayer([GatherMapper]),
+    'Gemm': GEMMLayer([GEMM_int8_Mapper]),
+    'MatMul': GEMMLayer([MatMul_int8_Mapper]),
+    'RequantShift': RequantShiftLayer([RequantShiftMapper]),
     'Reshape': ReshapeLayer([ReshapeMapper]),
-    'Flatten': ConvLayer([DummyMapper]),
-    'GlobalAveragePool': ConvLayer([DummyMapper]),
+
+    # # For example, you can use the DummpyMapper, in case you want to test
+    # # deployment or optimizations with GlobalAveragePool nodes but did not yet
+    # # implement the corresponding kernel
+    # 'GlobalAveragePool': ConvLayer([DummyMapper]),
 }
 
-def TypeInfer(node):
-    if type(node) == gs.ir.node.Node:
-        assert len(node.outputs) == 1, "Expected node for type inference to only have ONE output!"
-        outNode = node.attrs['value']
-    elif hasattr(node, 'values'):
+
+def BasicTypeInfer(node:  gs.Node):
+    if hasattr(node, 'values'):
+        assert len(node.outputs) <= 1, "Expected node for type inference to only have ONE output!"
         outNode = node
     else:
-        raise ValueError("TypeInfer was given a wring type of node!")
-    
+        import IPython
+        IPython.embed()
+        raise ValueError("TypeInfer was given a wrong type of node!")
+
+    if hasattr(outNode, 'signed') and outNode.attrs['signed']:
+        signed = True
+    else:
+        signed = False
+
     for _type in DataTypes:
-        if outNode.values.max() < 2**(_type._value_): #and outNode.values.min() >= -2**(_type._value_-1):
+        if signed and outNode.values.max() < 2**(_type._value_ - 1) and outNode.values.min() >= -2**(_type._value_ - 1):
+            return _type
+        # For nor we only have signed kernels
+        elif not signed and outNode.values.max() < 2**(_type._value_ - 1):
             return _type
 
-    #SCHEREMO: Remove this - this should raise and error
-    #return DataTypes.int32_t
     raise TypeError(f'Could not infer type of node {node.name}')
 
+
 class SimpleNetworkBuffer(VariableBuffer):
+
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
     def init(self):
-        return AllocTemplate.referenceGlobalInitTemplate(type=self._type._name_, name=self.name)
-        
+        return AllocateTemplate.referenceInitTemplate.generate(type = self._type._name_, name = self.name)
+
     def alloc(self):
-        return AllocTemplate.referenceLocalTemplate.generate(type = self._type._name_, name=self.name, size = np.prod(self.shape))
+        return AllocateTemplate.referenceAllocateTemplate.generate(type = self._type._name_,
+                                                                   name = self.name,
+                                                                   size = np.prod(self.shape))
 
     def dealloc(self):
         return FreeTemplate.referenceLocalTemplate.generate(name = self.name)
 
+
 class SimpleGlobalBuffer(ConstantBuffer):
+
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
     def init(self):
-        return AllocTemplate.referenceGlobalInitTemplate(type=self._type._name_, name=self.name)
-        
+        values = list(self.values.reshape(-1))
+        strValues = [str(value) for value in values]
+        valueString = ', '.join(strValues)
+        return AllocateTemplate.referenceGlobalInitTemplate.generate(type = self._type._name_,
+                                                                     name = self.name,
+                                                                     size = int(np.prod(self.shape)),
+                                                                     values = valueString)
+
     def alloc(self):
         values = list(self.values.reshape(-1))
         strValues = [str(value) for value in values]
         valueString = ', '.join(strValues)
-        return AllocTemplate.referenceGlobalTemplate.generate(type = self._type._name_, name=self.name, size = np.prod(self.shape), values = valueString)
+        return AllocateTemplate.referenceGlobalAllocateTemplate.generate(type = self._type._name_,
+                                                                         name = self.name,
+                                                                         size = int(np.prod(self.shape)),
+                                                                         values = valueString)
 
     def dealloc(self):
         return FreeTemplate.referenceGlobalTemplate.generate(name = self.name)
 
+
 class SimpleStructBuffer(StructBuffer):
+
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
     def init(self):
-        return AllocTemplate.referenceGlobalInitTemplate(type=self._type._name_, name=self.name)
-        
+        return AllocateTemplate.referenceStructInitTemplate.generate(type = self._type,
+                                                                     name = self.name,
+                                                                     structDict = self.structDict)
+
     def alloc(self) -> str:
-        return AllocateTemplate.referenceStructTemplate.generate(type=type, name=name, structDict=structDict)
+        return AllocateTemplate.referenceStructAllocateTemplate.generate(type = self._type,
+                                                                         name = self.name,
+                                                                         structDict = self.structDict)
 
     def dealloc(self) -> str:
-        return FreeTemplate.referenceLocalTemplate.generate(name=name)
+        return FreeTemplate.referenceLocalTemplate.generate(name = self.name)
 
 
-BasicOptimizer = NetworkOptimizer(passes=[])
+BasicOptimizer = NetworkOptimizer(passes = [])
 
-BasicPlatform = DeploymentPlatform(BasicMapping, DataTypes, TypeInfer, SimpleNetworkBuffer, SimpleGlobalBuffer, SimpleStructBuffer)
+includeList = ["DumpOMath.h"]
+
+
+class BasicPlatform(DeploymentPlatform):
+
+    def __init__(self,
+                 BasicMapping = BasicMapping,
+                 DataTypes = DataTypes,
+                 BasicTypeInfer = BasicTypeInfer,
+                 SimpleNetworkBuffer = SimpleNetworkBuffer,
+                 SimpleGlobalBuffer = SimpleGlobalBuffer,
+                 SimpleStructBuffer = SimpleStructBuffer,
+                 includeList: List[str] = includeList):
+        super().__init__(BasicMapping, DataTypes, BasicTypeInfer, SimpleNetworkBuffer, SimpleGlobalBuffer,
+                         SimpleStructBuffer, includeList)

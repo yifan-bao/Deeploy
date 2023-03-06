@@ -28,7 +28,7 @@ from enum import Enum
 from DumpO.DumpOTypes import *
 
 class TransposeChecker(NodeTypeChecker):
-    def __init__(self, input_types: List[Enum], output_types: List[Enum]):
+    def __init__(self, input_types: Sequence[Enum], output_types: Sequence[Enum]):
         super().__init__(input_types, output_types)
 
     def inferNumLevels(self, inputs: List[VariableBuffer], parserDict: Dict) -> List[int]:
@@ -41,7 +41,7 @@ class TransposeChecker(NodeTypeChecker):
             return [False]
 
 class PadChecker(NodeTypeChecker):
-    def __init__(self, input_types: List[Enum], output_types: List[Enum]):
+    def __init__(self, input_types: Sequence[Enum], output_types: Sequence[Enum]):
         super().__init__(input_types, output_types)
 
     def inferNumLevels(self, inputs: List[VariableBuffer], parserDict: Dict) -> List[int]:
@@ -54,7 +54,7 @@ class PadChecker(NodeTypeChecker):
             return [False]
 
 class AddChecker(NodeTypeChecker):
-    def __init__(self, input_types: List[Enum], output_types: List[Enum]):
+    def __init__(self, input_types: Sequence[Enum], output_types: Sequence[Enum]):
         super().__init__(input_types, output_types)
 
     def inferNumLevels(self, inputs: List[VariableBuffer], parserDict: Dict) -> List[int]:
@@ -67,7 +67,7 @@ class AddChecker(NodeTypeChecker):
             return [False]
 
 class GatherChecker(NodeTypeChecker):
-    def __init__(self, input_types: List[Enum], output_types: List[Enum]):
+    def __init__(self, input_types: Sequence[Enum], output_types: Sequence[Enum]):
         super().__init__(input_types, output_types)
 
     def inferNumLevels(self, inputs: List[VariableBuffer], parserDict: Dict) -> List[int]:
@@ -80,7 +80,7 @@ class GatherChecker(NodeTypeChecker):
             return [False]
 
 class ReshapeChecker(NodeTypeChecker):
-    def __init__(self, input_types: List[Enum], output_types: List[Enum]):
+    def __init__(self, input_types: Sequence[Enum], output_types: Sequence[Enum]):
         super().__init__(input_types, output_types)
 
     def inferNumLevels(self, inputs: List[VariableBuffer], parserDict: Dict) -> List[int]:
@@ -93,7 +93,7 @@ class ReshapeChecker(NodeTypeChecker):
             return [False]
 
 class MHSAChecker(NodeTypeChecker):
-    def __init__(self, input_types: List[Enum], output_types: List[Enum]):
+    def __init__(self, input_types: Sequence[Enum], output_types: Sequence[Enum]):
         super().__init__(input_types, output_types)
 
     def inferNumLevels(self, inputs: List[VariableBuffer], parserDict: Dict) -> List[int]:
@@ -103,7 +103,7 @@ class MHSAChecker(NodeTypeChecker):
         return [True]
 
 class CLCAChecker(NodeTypeChecker):
-    def __init__(self, input_types: List[Enum], output_types: List[Enum]):
+    def __init__(self, input_types: Sequence[Enum], output_types: Sequence[Enum]):
         super().__init__(input_types, output_types)
 
     def inferNumLevels(self, inputs: List[VariableBuffer], parserDict: Dict) -> List[int]:
@@ -113,7 +113,7 @@ class CLCAChecker(NodeTypeChecker):
         return [True]
 
 class LinearAttentionChecker(NodeTypeChecker):
-    def __init__(self, input_types: List[Enum], output_types: List[Enum]):
+    def __init__(self, input_types: Sequence[Enum], output_types: Sequence[Enum]):
         super().__init__(input_types, output_types)
 
     def inferNumLevels(self, inputs: List[VariableBuffer], parserDict: Dict) -> List[int]:
@@ -123,7 +123,7 @@ class LinearAttentionChecker(NodeTypeChecker):
         return [True]
 
 class GEMMChecker(NodeTypeChecker):
-    def __init__(self, input_types: List[Enum], output_types: List[Enum]):
+    def __init__(self, input_types: Sequence[Enum], output_types: Sequence[Enum]):
         super().__init__(input_types, output_types)
 
     def inferNumLevels(self, inputs: List[VariableBuffer], parserDict: Dict) -> List[int]:
@@ -133,7 +133,7 @@ class GEMMChecker(NodeTypeChecker):
         return [True]
 
 class iLayerNormChecker(NodeTypeChecker):
-    def __init__(self, input_types: List[Enum], output_types: List[Enum]):
+    def __init__(self, input_types: Sequence[Enum], output_types: Sequence[Enum]):
         super().__init__(input_types, output_types)
 
     def inferNumLevels(self, inputs: List[VariableBuffer], parserDict: Dict) -> List[int]:
@@ -143,7 +143,7 @@ class iLayerNormChecker(NodeTypeChecker):
         return [True]
 
 class MulChecker(NodeTypeChecker):
-    def __init__(self, input_types: List[Enum], output_types: List[Enum]):
+    def __init__(self, input_types: Sequence[Enum], output_types: Sequence[Enum]):
         super().__init__(input_types, output_types)
 
     def inferNumLevels(self, inputs: List[VariableBuffer], parserDict: Dict) -> List[int]:
@@ -156,7 +156,7 @@ class MulChecker(NodeTypeChecker):
             return [False]
 
 class IntegerDivChecker(NodeTypeChecker):
-    def __init__(self, input_types: List[Enum], output_types: List[Enum]):
+    def __init__(self, input_types: Sequence[Enum], output_types: Sequence[Enum]):
         super().__init__(input_types, output_types)
 
     def inferNumLevels(self, inputs: List[VariableBuffer], parserDict: Dict) -> List[int]:
@@ -170,7 +170,7 @@ class IntegerDivChecker(NodeTypeChecker):
 
 
 class RQIntegerDivChecker(NodeTypeChecker):
-    def __init__(self, input_types: List[Enum], output_types: List[Enum]):
+    def __init__(self, input_types: Sequence[Enum], output_types: Sequence[Enum]):
         super().__init__(input_types, output_types)
 
     def inferNumLevels(self, inputs: List[VariableBuffer], parserDict: Dict) -> List[int]:
@@ -184,11 +184,11 @@ class RQIntegerDivChecker(NodeTypeChecker):
 
 
 class MatMulChecker(NodeTypeChecker):
-    def __init__(self, input_types: List[Enum], output_types: List[Enum]):
+    def __init__(self, input_types: Sequence[Enum], output_types: Sequence[Enum]):
         super().__init__(input_types, output_types)
 
     def inferNumLevels(self, inputs: List[VariableBuffer], parserDict: Dict) -> List[int]:
-        return [2**(self.input_types[0]._value_ + self.input_types[1]._value_)]
+        return [np.max(inputs[0].shape)*np.max(inputs[1].shape)*2**(self.input_types[0]._value_)]
 
     def inferSignedness(self, inputs: List[VariableBuffer], parserDict: Dict) -> List[bool]:
         if inputs[0]._signed or inputs[1]._signed:
@@ -198,7 +198,7 @@ class MatMulChecker(NodeTypeChecker):
 
 
 class ReduceMeanChecker(NodeTypeChecker):
-    def __init__(self, input_types: List[Enum], output_types: List[Enum]):
+    def __init__(self, input_types: Sequence[Enum], output_types: Sequence[Enum]):
         super().__init__(input_types, output_types)
 
     def inferNumLevels(self, inputs: List[VariableBuffer], parserDict: Dict) -> List[int]:
@@ -211,7 +211,7 @@ class ReduceMeanChecker(NodeTypeChecker):
             return [False]
 
 class SoftmaxChecker(NodeTypeChecker):
-    def __init__(self, input_types: List[Enum], output_types: List[Enum]):
+    def __init__(self, input_types: Sequence[Enum], output_types: Sequence[Enum]):
         super().__init__(input_types, output_types)
 
     def inferNumLevels(self, inputs: List[VariableBuffer], parserDict: Dict) -> List[int]:
@@ -221,7 +221,7 @@ class SoftmaxChecker(NodeTypeChecker):
         return [False]
 
 class GELUChecker(NodeTypeChecker):
-    def __init__(self, input_types: List[Enum], output_types: List[Enum]):
+    def __init__(self, input_types: Sequence[Enum], output_types: Sequence[Enum]):
         super().__init__(input_types, output_types)
 
     def inferNumLevels(self, inputs: List[VariableBuffer], parserDict: Dict) -> List[int]:
@@ -234,27 +234,27 @@ class GELUChecker(NodeTypeChecker):
             return [False]
 
 class ConvChecker(NodeTypeChecker):
-    def __init__(self, input_types: List[Enum], output_types: List[Enum]):
+    def __init__(self, input_types: Sequence[Enum], output_types: Sequence[Enum]):
         super().__init__(input_types, output_types)
 
     def inferNumLevels(self, inputs: List[VariableBuffer], parserDict: Dict) -> List[int]:
         weight = inputs[1]
-        return [np.prod(parserDict['kernel_shape']) * weight.shape[1] * 2**(self.input_types[0]._value_)]
+        return [np.prod(parserDict['kernel_shape']) * weight.nLevels * weight.shape[1] * 2**(self.input_types[0]._value_)]
     def inferSignedness(self, inputs: List[VariableBuffer], parserDict: Dict) -> List[bool]:
         return [True]
 
 class RequantShiftChecker(NodeTypeChecker):
-    def __init__(self, input_types: List[Enum], output_types: List[Enum]):
+    def __init__(self, input_types: Sequence[Enum], output_types: Sequence[Enum]):
         super().__init__(input_types, output_types)
 
     def inferNumLevels(self, inputs: List[VariableBuffer], parserDict: Dict) -> List[int]:
-        return [2**8]
+        return [parserDict['n_levels']]
 
     def inferSignedness(self, inputs: List[VariableBuffer], parserDict: Dict) -> List[bool]:
         return [parserDict["signed"]]
 
 class DummyChecker(NodeTypeChecker):
-    def __init__(self, input_types: List[Enum], output_types: List[Enum]):
+    def __init__(self, input_types: Sequence[Enum], output_types: Sequence[Enum]):
         super().__init__(input_types, output_types)
 
     def inferNumLevels(self, inputs: List[VariableBuffer], parserDict: Dict) -> List[int]:

@@ -33,7 +33,7 @@ class ReshapeLayer(ONNXLayer):
     def __init__(self, maps : List[NodeMapper]):
         super().__init__(maps)
 
-    def generate(self, ctxt: NetworkContext, verbose: bool = False) -> (NetworkContext, List[str]):
+    def generate(self, ctxt: NetworkContext, verbose: bool = False) -> Tuple[NetworkContext, List[str]]:
         outputs = [node for node in self.node.outputs]
         inputs = [node for node in self.node.inputs]
 
@@ -77,7 +77,7 @@ class RequantShiftLayer(ONNXLayer):
     def __init__(self, maps : List[NodeMapper]):
         super().__init__(maps)
 
-    def computeShapes(self, inputShapes: List[np.shape], outputShapes: List[np.shape], parserDict, channels_first) -> (List[np.shape], List[np.shape]):
+    def computeShapes(self, inputShapes: List[Shape], outputShapes: Shape, parserDict, channels_first) -> Tuple[Shape, Shape]:
 
         channel_dim = inputShapes[0][1]
         inputShapes[2]  = [inputShapes[0][0], channel_dim] + list(inputShapes[1][1:])
@@ -92,7 +92,7 @@ class AddLayer(ONNXLayer):
     def __init__(self, maps : List[NodeMapper]):
         super().__init__(maps)
 
-    def computeShapes(self, inputShapes: List[np.shape], outputShapes: List[np.shape], parserDict, channels_first) -> (List[np.shape], List[np.shape]):
+    def computeShapes(self, inputShapes: Shape, outputShapes: Shape, parserDict, channels_first) -> Tuple[Shape, Shape]:
         if len(inputShapes[0]) > len(inputShapes[1]):
             inputShapes[1] = inputShapes[0]
         else:
@@ -107,7 +107,7 @@ class MatMulLayer(ONNXLayer):
     def __init__(self, maps : List[NodeMapper]):
         super().__init__(maps)
 
-    def computeShapes(self, inputShapes: List[np.shape], outputShapes: List[np.shape], parserDict, channels_first) -> (List[np.shape], List[np.shape]):
+    def computeShapes(self, inputShapes: Shape, outputShapes: Shape, parserDict, channels_first) -> Tuple[Shape, Shape]:
         return (inputShapes, outputShapes)
 
     def computeOps(self):
@@ -118,14 +118,14 @@ class IntegerDivLayer(ONNXLayer):
     def __init__(self, maps : List[NodeMapper]):
         super().__init__(maps)
 
-    def computeShapes(self, inputShapes: List[np.shape], outputShapes: List[np.shape], parserDict, channels_first) -> (List[np.shape], List[np.shape]):
+    def computeShapes(self, inputShapes: Shape, outputShapes: Shape, parserDict, channels_first) -> Tuple[Shape, Shape]:
         return (inputShapes, outputShapes)
 
 class GEMMLayer(ONNXLayer):
     def __init__(self, maps : List[NodeMapper]):
         super().__init__(maps)
 
-    def computeShapes(self, inputShapes: List[np.shape], outputShapes: List[np.shape], parserDict, channels_first) -> (List[np.shape], List[np.shape]):
+    def computeShapes(self, inputShapes: Shape, outputShapes: Shape, parserDict, channels_first) -> Tuple[Shape, Shape]:
         if parserDict['transA']:
             M = inputShapes[0][-1]
         else:
@@ -145,7 +145,7 @@ class MulLayer(ONNXLayer):
     def __init__(self, maps : List[NodeMapper]):
         super().__init__(maps)
 
-    def computeShapes(self, inputShapes: List[np.shape], outputShapes: List[np.shape], parserDict, channels_first) -> (List[np.shape], List[np.shape]):
+    def computeShapes(self, inputShapes: Shape, outputShapes: Shape, parserDict, channels_first) -> Tuple[Shape, Shape]:
         inputShapes[1] = 1
         return (inputShapes, outputShapes)
 
@@ -153,7 +153,7 @@ class ConvLayer(ONNXLayer):
     def __init__(self, maps : List[NodeMapper]):
         super().__init__(maps)
 
-    def computeShapes(self, inputShapes: List[np.shape], outputShapes: List[np.shape], parserDict, channels_first) -> (List[np.shape], List[np.shape]):
+    def computeShapes(self, inputShapes: Shape, outputShapes: Shape, parserDict, channels_first) -> Tuple[Shape, Shape]:
         if len(inputShapes) == 3:
             inputShapes[2] = inputShapes[1][-1]
         return (inputShapes, outputShapes)
@@ -191,7 +191,7 @@ class TransposeLayer(ONNXLayer):
 class LinearAttentionLayer(ONNXLayer):
     def __init__(self, maps : List[NodeMapper]):
         super().__init__(maps)
-    def computeShapes(self, inputShapes: List[np.shape], outputShapes: List[np.shape], parserDict, channels_first) -> (List[np.shape], List[np.shape]):
+    def computeShapes(self, inputShapes: Shape, outputShapes: Shape, parserDict, channels_first) -> Tuple[Shape, Shape]:
         inputShapes[4] = inputShapes[3][0]
         inputShapes[6] = inputShapes[5][0]
         inputShapes[8] = inputShapes[7][0]
@@ -224,7 +224,7 @@ class LinearAttentionLayer(ONNXLayer):
 class CLCALayer(ONNXLayer):
     def __init__(self, maps : List[NodeMapper]):
         super().__init__(maps)
-    def computeShapes(self, inputShapes: List[np.shape], outputShapes: List[np.shape], parserDict, channels_first) -> (List[np.shape], List[np.shape]):
+    def computeShapes(self, inputShapes: Shape, outputShapes: Shape, parserDict, channels_first) -> Tuple[Shape, Shape]:
         inputShapes[3] = inputShapes[2][0]
         inputShapes[5] = inputShapes[4][0]
         inputShapes[7] = inputShapes[6][0]
@@ -292,7 +292,7 @@ class CLCALayer(ONNXLayer):
 class MHSALayer(ONNXLayer):
     def __init__(self, maps : List[NodeMapper]):
         super().__init__(maps)
-    def computeShapes(self, inputShapes: List[np.shape], outputShapes: List[np.shape], parserDict, channels_first) -> (List[np.shape], List[np.shape]):
+    def computeShapes(self, inputShapes: Shape, outputShapes: Shape, parserDict, channels_first) -> Tuple[Shape, Shape]:
         inputShapes[4] = inputShapes[3][0]
         inputShapes[6] = inputShapes[5][0]
         inputShapes[8] = inputShapes[7][0]

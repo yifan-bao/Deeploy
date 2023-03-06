@@ -24,7 +24,7 @@
 # limitations under the License.
 
 
-from typing import Dict
+from typing import Dict, Tuple
 from mako.template import Template
 
 from DumpO.DumpOTypes import NodeTemplate, NetworkContext
@@ -35,7 +35,7 @@ class _Pad2DTemplate(NodeTemplate):
     def __init__(self, templateStr):
         super().__init__(templateStr)
 
-    def alignToContext(self, ctxt: NetworkContext, nodeRep: Dict) -> (NetworkContext, Dict):
+    def alignToContext(self, ctxt: NetworkContext, nodeRep: Dict) -> Tuple[NetworkContext, Dict]:
         ctxt = ctxt.copy()
 
         # Align padding value to input signedness
@@ -48,7 +48,7 @@ class _Pad2DTemplate(NodeTemplate):
         return ctxt, nodeRep
 
 reference2DTemplate = _Pad2DTemplate("""
-// Pad
+// 2D Pad
 memset(${data_out}, ${value}, ${data_out_size}*sizeof(${data_out_type._name_}));
 <%
     y_offset_out = dim_im_out_ch*(pad_y*dim_im_out_y)
@@ -80,7 +80,7 @@ class _Pad1DTemplate(NodeTemplate):
     def __init__(self, templateStr):
         super().__init__(templateStr)
 
-    def alignToContext(self, ctxt: NetworkContext, nodeRep: Dict) -> (NetworkContext, Dict):
+    def alignToContext(self, ctxt: NetworkContext, nodeRep: Dict) -> Tuple[NetworkContext, Dict]:
         ctxt = ctxt.copy()
 
         # Align padding value to input signedness
@@ -93,7 +93,7 @@ class _Pad1DTemplate(NodeTemplate):
         return ctxt, nodeRep
 
 reference1DTemplate = _Pad1DTemplate("""
-// Pad
+// 1D Pad
 memset(${data_out}, ${value}, ${data_out_size}*sizeof(${data_out_type._name_}));
 <%
     x_offset_out = dim_im_out_ch*(pad_y)

@@ -28,7 +28,7 @@ from enum import Enum
 from DumpO.DumpOTypes import *
 
 class CMSISSaturatingAddChecker(NodeTypeChecker):
-    def __init__(self, input_types: List[Enum], output_types: List[Enum]):
+    def __init__(self, input_types: Sequence[Enum], output_types: Sequence[Enum]):
         super().__init__(input_types, output_types)
 
     def inferNumLevels(self, inputs: List[VariableBuffer], parserDict: Dict) -> List[int]:
@@ -41,7 +41,7 @@ class CMSISSaturatingAddChecker(NodeTypeChecker):
             return [False]
 
 class CMSISLinearChecker(NodeTypeChecker):
-    def __init__(self, input_types: List[Enum], output_types: List[Enum]):
+    def __init__(self, input_types: Sequence[Enum], output_types: Sequence[Enum]):
         super().__init__(input_types, output_types)
 
     def inferNumLevels(self, inputs: List[VariableBuffer], parserDict: Dict) -> List[int]:
@@ -51,7 +51,7 @@ class CMSISLinearChecker(NodeTypeChecker):
         return [bool(parserDict["signed"])]
 
 class CMSISConvChecker(NodeTypeChecker):
-    def __init__(self, input_types: List[Enum], output_types: List[Enum]):
+    def __init__(self, input_types: Sequence[Enum], output_types: Sequence[Enum]):
         super().__init__(input_types, output_types)
 
     def inferNumLevels(self, inputs: List[VariableBuffer], parserDict: Dict) -> List[int]:
@@ -61,7 +61,7 @@ class CMSISConvChecker(NodeTypeChecker):
         return [bool(parserDict["signed"])]
 
 class CMSISMaxPoolChecker(NodeTypeChecker):
-    def __init__(self, input_types: List[Enum], output_types: List[Enum]):
+    def __init__(self, input_types: Sequence[Enum], output_types: Sequence[Enum]):
         super().__init__(input_types, output_types)
 
     def inferNumLevels(self, inputs: List[VariableBuffer], parserDict: Dict) -> List[int]:

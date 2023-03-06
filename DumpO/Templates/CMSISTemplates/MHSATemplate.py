@@ -24,7 +24,7 @@
 # limitations under the License.
 
 import mako
-from typing import Dict
+from typing import Dict, Tuple
 from mako.template import Template
 import numpy as np
 
@@ -35,7 +35,7 @@ class _MHSATemplate(NodeTemplate):
     def __init__(self, templateStr):
         super().__init__(templateStr)
 
-    def alignToContext(self, ctxt: NetworkContext, nodeRep: Dict) -> (NetworkContext, Dict):
+    def alignToContext(self, ctxt: NetworkContext, nodeRep: Dict) -> Tuple[NetworkContext, Dict]:
         inputs = ['q', 'k', 'v', 'wq_weight', 'wq_bias','wk_weight', 'wk_bias', 'wv_weight', 'wv_bias', 'wo_weight', 'wo_bias']
 
         s = ctxt.lookup(nodeRep['q']).shape[1]
