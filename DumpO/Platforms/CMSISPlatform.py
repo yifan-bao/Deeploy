@@ -49,12 +49,11 @@ FlattenMapper = NodeMapper(FlattenParser(), BasicReshapeBindings)
 GatherMapper = NodeMapper(GatherParser(), BasicGatherBindings)
 GELU_int8_Mapper = NodeMapper(iGELUParser(), [BasicGELUBinding])
 GEMMMapper = NodeMapper(CMSISGEMMParser(), CMSISGEMMBindings)
-iLayerNorm_int8_Mapper = NodeMapper(iLayerNormParser(), [CMSISLayerNormBinding])
-IntegerDivMapper = NodeMapper(IntegerDivParser(), [CMSISIntegerDivBinding])
+iLayerNorm_int8_Mapper = NodeMapper(iLayerNormParser(), [BasicLayerNormBinding])
+IntegerDivMapper = NodeMapper(IntegerDivParser(), [BasicIntegerDivBinding])
 LinearAttention_int16_Mapper = NodeMapper(CMSISLinearAttentionParser(), [CMSISLinearAttentionBinding])
-MatMulMapper = NodeMapper(MatMulParser(), [CMSISMatMul_8_8_32_Binding])
+MatMulMapper = NodeMapper(MatMulParser(), [BasicMatMulBinding])
 MaxPool2DMapper = NodeMapper(CMSISMaxPool2DParser(), [CMSISMaxPool2DBinding])
-MHSA_int8_Mapper = NodeMapper(CMSISMHSAParser(), [CMSISMHSABinding])
 MulMapper = NodeMapper(MulParser(), BasicMulBindings)
 Pad1DMapper = NodeMapper(Pad1DParser(), BasicPad1DBindings)
 Pad2DMapper = NodeMapper(Pad2DParser(), BasicPad2DBindings)
@@ -62,7 +61,7 @@ ReduceMeanMapper = NodeMapper(ReduceMeanParser(), BasicReduceMeanBindings)
 RequantShiftMapper = NodeMapper(RequantShiftParser(), BasicRQSBindings)
 ReshapeMapper = NodeMapper(ReshapeParser(), BasicReshapeBindings)
 RQGELU_int8_Mapper = NodeMapper(RQSiGELUParser(), [BasicRQSGELUBinding])
-RQIntegerDivMapper = NodeMapper(RQIntegerDivParser(), [CMSISRQIntegerDivBinding])
+RQIntegerDivMapper = NodeMapper(RQIntegerDivParser(), [BasicRQIntegerDivBinding])
 Softmax_int8_Mapper = NodeMapper(iSoftmaxParser(), [BasicSoftmaxBinding])
 TransposeMapper = NodeMapper(TransposeParser(), BasicTransposeBindings)
 UnsqueezeMapper = NodeMapper(UnsqueezeParser(), BasicReshapeBindings)
@@ -85,7 +84,6 @@ CMSISMapping = {
     'MatMul': MatMulLayer([MatMulMapper]),
     'MaxPool': MaxPoolLayer([MaxPool2DMapper]),
     'Mul': MulLayer([MulMapper]),
-    'MultiHeadSelfAttention': MHSALayer([MHSA_int8_Mapper]),
     'Pad': PadLayer([Pad1DMapper, Pad2DMapper]),
     'ReduceMean': ReduceMeanLayer([ReduceMeanMapper]),
     'RequantizedConv': CMSISRQSConvLayer([Conv2D_int8_Mapper, DWConv2D_int8_Mapper, Conv1D_Mapper, DWConv1D_Mapper]),

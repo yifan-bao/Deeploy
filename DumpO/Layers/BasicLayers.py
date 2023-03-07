@@ -319,3 +319,10 @@ class MHSALayer(ONNXLayer):
         # WO * O
         totOps = QOps + KOps + VOps + QKOps + AVOps + OutOps
         return totOps
+        
+class RQIntegerDivLayer(ONNXLayer):
+    def __init__(self, maps : List[NodeMapper]):
+        super().__init__(maps)
+
+    def computeShapes(self, inputShapes: Shape, outputShapes: Shape, parserDict, channels_first) -> Tuple[Shape, Shape]:
+        return (inputShapes, outputShapes)

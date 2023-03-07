@@ -153,7 +153,7 @@ class _Conv2D_8_Template(NodeTemplate):
 
 
 cmsis2D_8_Template = _Conv2D_8_Template("\
-void* _DumpO__ctxtBuffer_${ctxt} = malloc(sizeof(int8_t)*${ctxt}.size);\n\
+void* _DumpO__ctxtBuffer_${ctxt} = dumpo_malloc(sizeof(int8_t)*${ctxt}.size);\n\
 ${ctxt}.buf = _DumpO__ctxtBuffer_${ctxt};\n\
 arm_convolve_wrapper_s8(&${ctxt}, &${conv_params}, &${quant_params}, &${input_dims}, ${data_in}, &${filter_dims}, ${weight}, &${bias_dims}, ${add}, &${output_dims}, ${data_out}); \n\
 free(_DumpO__ctxtBuffer_${ctxt});\
@@ -282,14 +282,14 @@ class _Conv1D_16_Template(NodeTemplate):
 
 
 cmsis1D_16_Template = _Conv1D_16_Template("""
-void* _DumpO__ctxtBuffer_${ctxt} = malloc(sizeof(int8_t)*${ctxt}.size);\n\
+void* _DumpO__ctxtBuffer_${ctxt} = dumpo_malloc(sizeof(int8_t)*${ctxt}.size);\n\
 ${ctxt}.buf = _DumpO__ctxtBuffer_${ctxt};\n\
 arm_convolve_wrapper_s16(&${ctxt}, &${conv_params}, &${quant_params}, &${input_dims}, ${data_in}, &${filter_dims}, ${weight}, &${bias_dims}, ${add}, &${output_dims}, ${data_out}); \n\
 free(_DumpO__ctxtBuffer_${ctxt});\
 """)
 
 cmsis1D_8_Template = _Conv1D_16_Template("""
-void* _DumpO__ctxtBuffer_${ctxt} = malloc(sizeof(int8_t)*${ctxt}.size);\n\
+void* _DumpO__ctxtBuffer_${ctxt} = dumpo_malloc(sizeof(int8_t)*${ctxt}.size);\n\
 ${ctxt}.buf = _DumpO__ctxtBuffer_${ctxt};\n\
 arm_convolve_wrapper_s8(&${ctxt}, &${conv_params}, &${quant_params}, &${input_dims}, ${data_in}, &${filter_dims}, ${weight}, &${bias_dims}, ${add}, &${output_dims}, ${data_out}); \n\
 free(_DumpO__ctxtBuffer_${ctxt});\

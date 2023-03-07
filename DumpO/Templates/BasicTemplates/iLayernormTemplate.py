@@ -26,4 +26,4 @@
 
 from DumpO.DumpOTypes import NodeTemplate
 
-referenceTemplate = NodeTemplate("LayernormKernel_s8(${data_in}, ${data_out}, ${weight}, ${bias}, ${size}, ${lastDimLength}, ${log2D});")
+referenceTemplate = NodeTemplate("Layernorm_s8_s8(${data_in}, ${data_out}, ${weight}, ${bias}, ${size}, ${lastDimLength}, ${log2D});")

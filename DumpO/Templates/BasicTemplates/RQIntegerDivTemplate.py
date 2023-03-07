@@ -1,6 +1,6 @@
 # ----------------------------------------------------------------------
 #
-# File: IntegerDivTemplate.py
+# File: RQIntegerDivTemplate.py
 #
 # Last edited: 02.09.2022
 #
@@ -25,6 +25,6 @@
 
 from DumpO.DumpOTypes import NodeTemplate
 
-IntegerDiv_s32_s32_Template = NodeTemplate("""
-DivKernel_s32(${A}, ${B}, ${sizeA}, ${sizeB}, ${nomStep}, ${denomStep}, ${C}, ${Delta}, ${eps}, ${eta});
+RQIntegerDiv_s32_s8_Template = NodeTemplate("""
+RQDiv_s32_s8(${A}, ${B}, ${sizeA}, ${sizeB}, ${nomStep}, ${denomStep}, ${C}, ${Delta}, ${eps}, ${eta}, *${requant_mul}, *${requant_add}, *${requant_div});
 """)

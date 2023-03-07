@@ -53,18 +53,6 @@ CMSISGEMM_16_Binding = NodeBinding(CMSISLinearChecker([DataTypes.int16_t, DataTy
 CMSISGEMM_8_Binding = NodeBinding(CMSISLinearChecker([DataTypes.int8_t, DataTypes.int8_t, DataTypes.int32_t, DataTypes.int32_t], [DataTypes.int8_t]), GEMMTemplate.Linear_8_Template)
 CMSISGEMMBindings = [CMSISGEMM_8_Binding, CMSISGEMM_16_Binding]
 
-CMSISIntegerDivBinding = NodeBinding(IntegerDivChecker([DataTypes.int32_t, DataTypes.int32_t], [DataTypes.int32_t]), IntegerDivTemplate.IntegerDiv_s32_s32_Template)
-
-CMSISLayerNormBinding = NodeBinding(iLayerNormChecker([DataTypes.int8_t, DataTypes.int32_t, DataTypes.int32_t], [DataTypes.int8_t]), iLayernormTemplate.referenceTemplate)
-
 CMSISLinearAttentionBinding = NodeBinding(LinearAttentionChecker([DataTypes.int16_t, DataTypes.int16_t, DataTypes.int16_t] + [DataTypes.int8_t, DataTypes.int64_t] * 4, [DataTypes.int16_t]), LinearAttentionTemplate.referenceTemplate)
 
-CMSISMatMul_8_8_32_Binding = NodeBinding(MatMulChecker([DataTypes.int8_t, DataTypes.int8_t], [DataTypes.int32_t]), MatMulTemplate.reference_8_8_32_Template)
-
 CMSISMaxPool2DBinding = NodeBinding(CMSISMaxPoolChecker([DataTypes.int8_t], [DataTypes.int8_t]), MaxPool2DTemplate.cmsisTemplate)
-
-CMSISMHSABinding = NodeBinding(MHSAChecker([DataTypes.int8_t, DataTypes.int8_t, DataTypes.int8_t] + [DataTypes.int8_t, DataTypes.int32_t] * 4, [DataTypes.int8_t]), MHSATemplate.referenceTemplate)
-
-CMSISRQIntegerDivBinding = NodeBinding(RQIntegerDivChecker([DataTypes.int32_t, DataTypes.int32_t, DataTypes.int32_t, DataTypes.int32_t, DataTypes.int32_t], [DataTypes.int8_t]), RQIntegerDivTemplate.RQIntegerDiv_s32_s8_Template)
-
-CMSISSaturatingAddBindings = [NodeBinding(CMSISSaturatingAddChecker([DataTypes.int8_t, DataTypes.int8_t], [DataTypes.int8_t]), AddTemplate.referenceTemplate)]

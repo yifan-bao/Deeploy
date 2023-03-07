@@ -37,7 +37,11 @@ BasicGatherBindings = [NodeBinding(GatherChecker([type, DataTypes.int32_t], [typ
 
 BasicGELUBinding = NodeBinding(GELUChecker([DataTypes.int8_t], [DataTypes.int32_t]), iGELUTemplate.referenceTemplate)
 
-BasicGEMMBinding = NodeBinding(GEMMChecker([DataTypes.int8_t, DataTypes.int8_t], [DataTypes.int32_t]), GEMMTemplate.referenceTemplate)
+BasicIntegerDivBinding = NodeBinding(IntegerDivChecker([DataTypes.int32_t, DataTypes.int32_t], [DataTypes.int32_t]), IntegerDivTemplate.IntegerDiv_s32_s32_Template)
+
+BasicLayerNormBinding = NodeBinding(iLayerNormChecker([DataTypes.int8_t, DataTypes.int32_t, DataTypes.int32_t], [DataTypes.int8_t]), iLayernormTemplate.referenceTemplate)
+
+BasicMatMulBinding = NodeBinding(MatMulChecker([DataTypes.int8_t, DataTypes.int8_t], [DataTypes.int32_t]), MatMulTemplate.reference_8_8_32_Template)
 
 BasicMulBindings = [NodeBinding(MulChecker([typeA, DataTypes.int32_t], [DataTypes.int32_t]), MulTemplate.referenceTemplate) for typeA in DataTypes]
 
@@ -51,6 +55,8 @@ BasicReshapeBindings = [NodeBinding(ReshapeChecker([type, DataTypes.int32_t], [t
 BasicRQSBindings = [NodeBinding(RequantShiftChecker([type, DataTypes.int32_t, DataTypes.int32_t], [DataTypes.int8_t]), RequantShiftTemplate.referenceTemplate) for type in DataTypes]
 
 BasicRQSGELUBinding = NodeBinding(GELUChecker([DataTypes.int8_t, DataTypes.int32_t, DataTypes.int32_t, DataTypes.int32_t], [DataTypes.int8_t]), RQSiGELUTemplate.referenceTemplate)
+
+BasicRQIntegerDivBinding = NodeBinding(RQIntegerDivChecker([DataTypes.int32_t, DataTypes.int32_t, DataTypes.int32_t, DataTypes.int32_t, DataTypes.int32_t], [DataTypes.int8_t]), RQIntegerDivTemplate.RQIntegerDiv_s32_s8_Template)
 
 BasicSoftmaxBinding = NodeBinding(SoftmaxChecker([DataTypes.int8_t], [DataTypes.int8_t]), iSoftmaxTemplate.referenceTemplate)
 

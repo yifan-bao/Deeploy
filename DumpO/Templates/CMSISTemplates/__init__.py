@@ -3,9 +3,6 @@ from .CLCATemplate import *
 from .ConvTemplate import *
 from .DWConvTemplate import *
 from .GEMMTemplate import *
-from .IntegerDivTemplate import *
 from .LinearAttentionTemplate import *
-from .MatMulTemplate import *
 from .MaxPool2DTemplate import *
 from .MHSATemplate import *
-from .RQIntegerDivTemplate import *

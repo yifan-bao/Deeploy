@@ -93,10 +93,10 @@ do{
     sequenceLength = q_shape[1]
 %>
 // W_Q * q -> Q
-int32_t* _null = malloc(${max(dim, sequenceLength)}*${heads});
+int32_t* _null = dumpo_malloc(${max(dim, sequenceLength)}*${heads});
 memset(_null, 0, ${max(dim, sequenceLength)}*${heads});
 
-int8_t* wq_buffer = malloc(${wq_output_dims}.n * ${wq_output_dims}.c);
+int8_t* wq_buffer = dumpo_malloc(${wq_output_dims}.n * ${wq_output_dims}.c);
 arm_fully_connected_s8(&${wq_ctxt}, &${wq_fc_params}, &${wq_quant_params}, &${wq_input_dims}, ${q}, &${wq_filter_dims}, ${wq_weight}, &${wq_bias_dims}, ${wq_bias}, &${wq_output_dims}, wq_buffer);
 <%
 dim1 = sequenceLength
@@ -104,7 +104,7 @@ dim2 = heads
 dim3 = dim_head
 %>
 // Q: NSHD-> NHSD
-int8_t* wq_buffer_transposed = malloc(${wq_output_dims}.n * ${wq_output_dims}.c);
+int8_t* wq_buffer_transposed = dumpo_malloc(${wq_output_dims}.n * ${wq_output_dims}.c);
 for(int k=0;k<${dim2};k++){
 for (int i=0;i<${dim1};i++){
 for(int j=0;j<${dim3};j++){
@@ -115,13 +115,13 @@ wq_buffer_transposed[k*${dim3}*${dim1} + i*${dim3} + j] = wq_buffer[i*${dim2}*${
 free(wq_buffer);
 
 // W_K * k -> K
-int8_t* wk_buffer = malloc(${wk_output_dims}.n * ${wk_output_dims}.c);
+int8_t* wk_buffer = dumpo_malloc(${wk_output_dims}.n * ${wk_output_dims}.c);
 arm_fully_connected_s8(&${wk_ctxt}, &${wk_fc_params}, &${wk_quant_params}, &${wk_input_dims}, ${k}, &${wk_filter_dims}, ${wk_weight}
 , &${wk_bias_dims}, ${wk_bias}, &${wk_output_dims}, wk_buffer);
 
 
 // K: NSHD-> NHSD
-int8_t* wk_buffer_transposed = malloc(${wk_output_dims}.n * ${wk_output_dims}.c);
+int8_t* wk_buffer_transposed = dumpo_malloc(${wk_output_dims}.n * ${wk_output_dims}.c);
 for(int k=0;k<${dim2};k++){
 for (int i=0;i<${dim1};i++){
 for(int j=0;j<${dim3};j++){
@@ -135,17 +135,17 @@ free(wk_buffer);
 // ATTN Matrix -> Q*KT
 
 // QKT -> NHSS
-int8_t* preattn_buffer = malloc(${heads} * ${sequenceLength} * ${sequenceLength});
+int8_t* preattn_buffer = dumpo_malloc(${heads} * ${sequenceLength} * ${sequenceLength});
 for(int i=0; i<${heads}; i++){
 arm_fully_connected_s8(&${preattn_ctxt}, &${preattn_fc_params}, &${preattn_quant_params}, &${preattn_input_dims}, &wq_buffer_transposed[i * ${preattn_input_dims}.n * ${preattn_input_dims}.c], &${preattn_filter_dims}, &wk_buffer_transposed[i * ${preattn_filter_dims}.n * ${preattn_filter_dims}.c], &${preattn_bias_dims}, _null, &${preattn_output_dims}, &preattn_buffer[i*${preattn_output_dims}.c*${preattn_output_dims}.n]);
 }
 free(wq_buffer_transposed);
 free(wk_buffer_transposed);
-int8_t* postattn_buffer = malloc(${heads} * ${sequenceLength} * ${sequenceLength});
+int8_t* postattn_buffer = dumpo_malloc(${heads} * ${sequenceLength} * ${sequenceLength});
 SoftmaxKernel_s8(preattn_buffer, postattn_buffer, ${heads} * ${sequenceLength} * ${sequenceLength}, ${sequenceLength}, ${isoftmaxA}, ${isoftmaxB}, ${isoftmaxC}, ${isoftmaxlog2}, ${n_levels});
 free(preattn_buffer);
 
-int8_t* wv_buffer = malloc(${wv_output_dims}.n * ${wv_output_dims}.c);
+int8_t* wv_buffer = dumpo_malloc(${wv_output_dims}.n * ${wv_output_dims}.c);
 arm_fully_connected_s8(&${wv_ctxt}, &${wv_fc_params}, &${wv_quant_params}, &${wv_input_dims}, ${v}, &${wv_filter_dims}, ${wv_weight}, &${wv_bias_dims}, ${wv_bias}, &${wv_output_dims}, wv_buffer);
 
 <%
@@ -155,7 +155,7 @@ dim3 = dim_head
 %>
 // NSHD-> NHDS
 //
-int8_t* wv_buffer_transposed = malloc(${wv_output_dims}.n * ${wv_output_dims}.c);
+int8_t* wv_buffer_transposed = dumpo_malloc(${wv_output_dims}.n * ${wv_output_dims}.c);
 for(int k=0;k<${dim2};k++){
 for(int j=0;j<${dim3};j++){
 for (int i=0;i<${dim1};i++){
@@ -165,7 +165,7 @@ wv_buffer_transposed[k*${dim3}*${dim1} + j*${dim1} + i] = wv_buffer[i*${dim2}*${
 }
 free(wv_buffer);
 
-int8_t* out_buffer = malloc(${heads} * ${sequenceLength} * ${dim_head});
+int8_t* out_buffer = dumpo_malloc(${heads} * ${sequenceLength} * ${dim_head});
 
 for(int i=0; i<${heads}; i++){
 arm_fully_connected_s8(&${postattn_ctxt}, &${postattn_fc_params}, &${postattn_quant_params},
@@ -183,7 +183,7 @@ dim3 = dim_head
 %>
 
 // NHSD-> NSHD
-int8_t* out_buffer_transposed = malloc(${heads} * ${sequenceLength} * ${dim_head});
+int8_t* out_buffer_transposed = dumpo_malloc(${heads} * ${sequenceLength} * ${dim_head});
 for(int k=0;k<${dim2};k++){
 for (int i=0;i<${dim1};i++){
 for(int j=0;j<${dim3};j++){

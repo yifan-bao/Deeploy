@@ -56,6 +56,5 @@ if isinstance(log2D, int):
 else:
     log2Dstring = "*"+log2D
 %>
-
-RequantShift_s${data_in_type._value_}(${data_in}, ${size}, ${mul}, ${add}, ${data_out}, ${log2Dstring}, ${channels}, ${input_offset}, ${output_offset}, 1);
+RequantShift_s${data_in_type._value_}_s8_NHWC(${data_in}, ${size}, ${mul}, ${add}, ${data_out}, ${log2Dstring}, ${channels}, ${input_offset}, ${output_offset}, ${output_min}, ${output_max}, 1);
 """)

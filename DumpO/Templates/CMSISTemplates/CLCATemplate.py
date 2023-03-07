@@ -336,7 +336,7 @@ referenceTemplate = _CLCATemplate("""
 sizeV = heads*dim_head*kv_shape[2]
 %>
 // alloc V
-int8_t* ${V} = malloc(${sizeV});
+int8_t* ${V} = dumpo_malloc(${sizeV});
 am_util_stdio_printf("Alloc V at 0x\%x\\n", ${V});
 // V <- k * WKV
 ${RENDER_convV}
@@ -345,7 +345,7 @@ ${RENDER_convV}
 <%
 sizeK = heads*dim_head*kv_shape[2]
 %>
-int8_t* ${K} = malloc(${sizeK});
+int8_t* ${K} = dumpo_malloc(${sizeK});
 //am_util_stdio_printf("Alloc K at 0x\%x\\n", ${K});
 // K <- RQ(V)
 ${RENDER_RQK}
@@ -354,10 +354,10 @@ ${RENDER_RQK}
 sizeA = heads*dim_head*dim_head
 %>
 // RK <- RQ(K)
-int8_t* ${RK} = malloc(${sizeK});
+int8_t* ${RK} = dumpo_malloc(${sizeK});
 //am_util_stdio_printf("Alloc RK at 0x\%x\\n", ${RK});
 ${RENDER_RQDelta}
-int8_t* ${A} = (int8_t*)malloc(sizeof(int8_t) * ${sizeA});
+int8_t* ${A} = (int8_t*)dumpo_malloc(sizeof(int8_t) * ${sizeA});
 //am_util_stdio_printf("Alloc A at 0x\%x\\n", ${A});
 // A <- RQS(KT x V)
 // Headwise MMA
@@ -380,7 +380,7 @@ free(${RK});
 <%
 sizeE = heads*dim_head
 %>
-int8_t* ${E} = malloc(${sizeE});
+int8_t* ${E} = dumpo_malloc(${sizeE});
 //am_util_stdio_printf("Alloc E at 0x\%x\\n", ${E});
 // E <- mean(K)
 ${RENDER_reduceMean}
@@ -395,12 +395,12 @@ free(${V});
 <%
 sizeQ = heads*dim_head*q_shape[2]
 %>
-int8_t* ${Q} = malloc(${sizeQ});
+int8_t* ${Q} = dumpo_malloc(${sizeQ});
 //am_util_stdio_printf("Alloc Q at 0x\%x\\n", ${Q});
 // Q <- q * WQ
 ${RENDER_convQ}
 // alloc QT
-int8_t* ${QT} = malloc(${sizeQ});
+int8_t* ${QT} = dumpo_malloc(${sizeQ});
 //am_util_stdio_printf("Alloc QT at 0x\%x\\n", ${QT});
 // transpose Q -> QT
 ${RENDER_TransposeQ}
@@ -411,7 +411,7 @@ free(${Q});
 <%
 sizeAA = heads*dim_head*dim_head
 %>
-int32_t* ${AA} = (int32_t*)malloc((sizeof(int32_t)) * ${sizeAA});
+int32_t* ${AA} = (int32_t*)dumpo_malloc((sizeof(int32_t)) * ${sizeAA});
 //am_util_stdio_printf("Alloc AA at 0x\%x\\n", ${AA});
 // AA <- Q x A
 int32_t* OG_${AA} = ${AA};
@@ -434,7 +434,7 @@ free(${A});
 <%
 sizeB = heads*dim_head
 %>
-int32_t* ${B} = (int32_t*)malloc((sizeof(int32_t)) * ${sizeB});
+int32_t* ${B} = (int32_t*)dumpo_malloc((sizeof(int32_t)) * ${sizeB});
 //am_util_stdio_printf("Alloc B at 0x\%x\\n", ${B});
   //am_util_delay_ms(5);
 // B <- Q x E
@@ -464,7 +464,7 @@ free(${E});
 <%
 sizeO = sizeQ
 %>
-int8_t* ${O} = malloc(${sizeO});
+int8_t* ${O} = dumpo_malloc(${sizeO});
 //am_util_stdio_printf("Alloc O at 0x\%x\\n", ${O});
 RQDivKernel_s32_s8(${AA}, ${B}, ${sizeAA}, ${sizeB}, ${O}, ${Delta}, ${eps}, ${eta}, *${postattn_requant_mul}, *${postattn_requant_add}, *${postattn_requant_div});
 //am_util_stdio_printf("Comp O\\n");
@@ -479,7 +479,7 @@ free(${B});
   //am_util_delay_ms(5);
 
 // alloc OT
-int8_t* ${OT} = malloc(${sizeQ});
+int8_t* ${OT} = dumpo_malloc(${sizeQ});
 //am_util_stdio_printf("Alloc OT at 0x\%x\\n", ${OT});
   //am_util_delay_ms(5);
 // transpose O -> OT

@@ -26,7 +26,7 @@
 from DumpO.DumpOTypes import NodeTemplate
 
 referenceInitTemplate = NodeTemplate("${type}* ${name};\n")
-referenceAllocateTemplate = NodeTemplate("${name} = (${type}*) malloc(sizeof(${type}) * ${size});\n")
+referenceAllocateTemplate = NodeTemplate("${name} = (${type}*) dumpo_malloc(sizeof(${type}) * ${size});\n")
 
 referenceGlobalInitTemplate = NodeTemplate("static ${type} ${name}[${size}] = {${values}};\n")
 #referenceGlobalInitTemplate = NodeTemplate("static const ${type} ${name}[${size}];\n")
