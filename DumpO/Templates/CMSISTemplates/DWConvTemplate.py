@@ -156,14 +156,14 @@ conv2D_8_Template = _Conv2DDW_8_Template("""
 batchSizeIn = ch_im_in * dim_im_in_x * dim_im_in_y
 batchSizeOut = ch_im_out * dim_im_out_x * dim_im_out_y
 %>
-void* _DumpO__ctxtBuffer_${ctxt} = malloc(sizeof(int8_t)*${ctxt}.size);
+void* _DumpO__ctxtBuffer_${ctxt} = dumpo_malloc(sizeof(int8_t)*${ctxt}.size);
 ${ctxt}.buf = _DumpO__ctxtBuffer_${ctxt};
 for(int b=0; b<${batch}; b++){
 arm_depthwise_conv_wrapper_s8(&${ctxt}, &${dw_conv_params}, &${quant_params}, &${input_dims}, (${data_in} + b*${batchSizeIn}), &${filter_dims}, ${weight}, &${bias_dims}, ${add}, &${output_dims}, (${data_out} + b*${batchSizeOut}));
 }
 free(_DumpO__ctxtBuffer_${ctxt});
 """)
-# int8_t* bias = int8_t* malloc(sizeof(int8_t) * ${ch_im_in}); \n\
+# int8_t* bias = int8_t* dumpo_malloc(sizeof(int8_t) * ${ch_im_in}); \n\
 #                free(bias); \
 
 
@@ -293,7 +293,7 @@ conv1D_16_Template = _Conv1DDW_16_Template("""
 batchSizeIn = ch_im_in * dim_im_in_y
 batchSizeOut = ch_im_out * dim_im_out_y
 %>
-void* _DumpO__ctxtBuffer_${ctxt} = malloc(sizeof(int16_t)*${ctxt}.size);
+void* _DumpO__ctxtBuffer_${ctxt} = dumpo_malloc(sizeof(int16_t)*${ctxt}.size);
 ${ctxt}.buf = _DumpO__ctxtBuffer_${ctxt};
 for(int b=0; b<${batch}; b++){
 arm_depthwise_conv_s16(&${ctxt}, &${dw_conv_params}, &${quant_params}, &${input_dims}, (${data_in} + b*${batchSizeIn}), &${filter_dims}, ${weight}, &${bias_dims}, ${add}, &${output_dims}, (${data_out} + b*${batchSizeOut}));
@@ -306,12 +306,12 @@ conv1D_8_Template = _Conv1DDW_16_Template("""
 batchSizeIn = ch_im_in * dim_im_in_x * dim_im_in_y
 batchSizeOut = ch_im_out * dim_im_out_x * dim_im_out_y
 %>
-void* _DumpO__ctxtBuffer_${ctxt} = malloc(sizeof(int8_t)*${ctxt}.size);
+void* _DumpO__ctxtBuffer_${ctxt} = dumpo_malloc(sizeof(int8_t)*${ctxt}.size);
 ${ctxt}.buf = _DumpO__ctxtBuffer_${ctxt};
 for(int b=0; b<${batch}; b++){
 arm_depthwise_conv_wrapper_s8(&${ctxt}, &${dw_conv_params}, &${quant_params}, &${input_dims}, (${data_in} + b*${batchSizeIn}), &${filter_dims}, ${weight}, &${bias_dims}, ${add}, &${output_dims}, (${data_out} + b*${batchSizeOut}));
 }
 free(_DumpO__ctxtBuffer_${ctxt});
 """)
-# int8_t* bias = int8_t* malloc(sizeof(int8_t) * ${ch_im_in}); \n\
+# int8_t* bias = int8_t* dumpo_malloc(sizeof(int8_t) * ${ch_im_in}); \n\
 #                free(bias); \

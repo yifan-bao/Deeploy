@@ -191,10 +191,12 @@ class MatMulChecker(NodeTypeChecker):
         return [np.max(inputs[0].shape)*np.max(inputs[1].shape)*2**(self.input_types[0]._value_)]
 
     def inferSignedness(self, inputs: List[VariableBuffer], parserDict: Dict) -> List[bool]:
-        if inputs[0]._signed or inputs[1]._signed:
-            return [True]
-        else:
-            return [False]
+        # WIESEP: Hack because previous kernel implementation assumed signed to always be true.
+        return [True]
+        # if inputs[0]._signed or inputs[1]._signed:
+        #   return [True]
+        # else:
+            # return [False]
 
 
 class ReduceMeanChecker(NodeTypeChecker):

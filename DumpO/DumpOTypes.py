@@ -499,7 +499,7 @@ class NodeTemplate():
         return """StopTimer();"""
 
     def generateGetCyclesTimer(self) -> str:
-        return """am_util_stdio_printf("%8u cycles\\r\\n", getCycles());"""
+        return """dumpo_log("%8lu cycles\\r\\n", getCycles());"""
 
     # Don't override this
     def generate(self, nodeRep = {}, **kwargs) -> str:
@@ -903,7 +903,7 @@ class NetworkContainer():
         for key, node in self.layerBinding.items():
             self.ctxt, code = node.generate(self.ctxt, verbose=verbose)
             if verbose:
-                code = [[f"""am_util_stdio_printf("Layer {node.node.name}\\r\\n%8u ops\\r\\n", {node.computeOps()});"""]] + code
+                code = [[f"""dumpo_log("Layer {node.node.name}: %8u ops\\r\\n", {node.computeOps()});"""]] + code
 
             currentBufferSize = 0
             for _buffer in self.ctxt.localObjects.values():

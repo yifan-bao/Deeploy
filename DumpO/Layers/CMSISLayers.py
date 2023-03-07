@@ -67,10 +67,3 @@ class CMSISRQSGEMMLayer(GEMMLayer):
     def computeOps(self):
         ops = self.mapper.nodeRep['in_N'] * self.mapper.nodeRep['in_C'] * self.mapper.nodeRep['weight_C'] * 2
         return ops
-
-class RQIntegerDivLayer(ONNXLayer):
-    def __init__(self, maps : List[NodeMapper]):
-        super().__init__(maps)
-
-    def computeShapes(self, inputShapes: Shape, outputShapes: Shape, parserDict, channels_first) -> Tuple[Shape, Shape]:
-        return (inputShapes, outputShapes)

@@ -38,8 +38,7 @@ from DumpO.OptimizationPasses.BasicPasses import *
 AddMapper = NodeMapper(AddParser(), BasicAddBindings)
 FlattenMapper = NodeMapper(FlattenParser(), BasicReshapeBindings)
 GatherMapper = NodeMapper(GatherParser(), BasicGatherBindings)
-GEMM_int8_Mapper = NodeMapper(GEMMParser(), [BasicGEMMBinding])
-MatMul_int8_Mapper = NodeMapper(GEMMParser(), [BasicGEMMBinding])
+MatMulMapper = NodeMapper(MatMulParser(), [BasicMatMulBinding])
 RequantShiftMapper = NodeMapper(RequantShiftParser(), BasicRQSBindings)
 ReshapeMapper = NodeMapper(ReshapeParser(), BasicReshapeBindings)
 
@@ -51,8 +50,7 @@ BasicMapping = {
     'Add': AddLayer([AddMapper]),
     'Flatten': ReshapeLayer([FlattenMapper]),
     'Gather': GatherLayer([GatherMapper]),
-    'Gemm': GEMMLayer([GEMM_int8_Mapper]),
-    'MatMul': GEMMLayer([MatMul_int8_Mapper]),
+    'MatMul': GEMMLayer([MatMulMapper]),
     'RequantShift': RequantShiftLayer([RequantShiftMapper]),
     'Reshape': ReshapeLayer([ReshapeMapper]),
 

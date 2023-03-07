@@ -40,13 +40,13 @@ def merge_conv_rq_fun(ctxt: NetworkContext, graph: gs.Graph, match: Match, name:
 
     totalShift = 31-np.log2(rqs.attrs['div'].values)
 
-    rqs.inputs[-1].values = np.round(rqs.inputs[-1].values / rqs.inputs[-2].values) # normalize add
+    rqs.inputs[-1].values = np.round(rqs.inputs[-1].values / (rqs.inputs[-2].values +  1e-3)) # normalize add
 
     # Reweight multiplicators:
     # Get maximum:
     maxMult = rqs.inputs[1].values.max()
     # Get maximum shift possible:
-    MultShift = min(totalShift, np.floor(np.log2(2**31 - rqs.inputs[1].values.max())))
+    MultShift = min(totalShift, np.floor(32-np.log2(maxMult)))
     # get remaining shift:
     remainingShift = totalShift - MultShift
 
@@ -82,71 +82,6 @@ class ConvRequantMergePass(ReplaceSequentialPatternPass):
         name = f"_MERGE_CONVRQ_PASS"
         super().__init__(graph, merge_conv_rq_fun, name)
 
-def merge_igelu_rq_fun(ctxt: NetworkContext, graph: gs.Graph, match: Match, name: str):
-    matched_nodes = [m for k, m in match.nodes_map.items()]
-    igelu = matched_nodes[0]
-    rqs = matched_nodes[1]
-    totalShift = np.round(np.log2(rqs.attrs['div'].values))
-
-    rqs.inputs[-1].values = np.round(rqs.inputs[-1].values / rqs.inputs[-2].values + 1e-3) # normalize add
-
-    shiftNode = gs.Constant(f'{igelu.name}_shift', np.array(totalShift))
-    _inputs = list(igelu.inputs) + list(rqs.inputs[1:]) + [shiftNode]
-    _outputs = rqs.outputs
-
-    #import IPython; IPython.embed()
-
-    rqsiGELU = gs.Node(op='RequantizediGELU', name=name, attrs={**igelu.attrs, **rqs.attrs})
-    graph.replaceInsertNode(_inputs, _outputs, rqsiGELU)
-
-    return ctxt, graph
-
-class iGELURequantMergePass(ReplaceSequentialPatternPass):
-    def __init__(self):
-        passes = []
-        graph = gs.Graph()
-        _input = gs.Variable(name='input_1')
-        output = graph.layer(inputs=[_input], outputs=['igelu_out'], op='iGELU', name='igelu')
-        output = graph.layer(inputs=output, outputs=['rqs'], op='RequantShift', name='rqs1')
-        graph.outputs.append(output)
-        graph.inputs.append(_input)
-
-        name = f"_MERGE_iGELURQ_PASS"
-        super().__init__(graph, merge_igelu_rq_fun, name)
-
-def merge_integerdiv_rq_fun(ctxt: NetworkContext, graph: gs.Graph, match: Match, name: str):
-    matched_nodes = [m for k, m in match.nodes_map.items()]
-    integerdiv = matched_nodes[0]
-    rqs = matched_nodes[1]
-    totalShift = np.round(np.log2(rqs.attrs['div'].values))
-
-    rqs.inputs[-1].values = np.round(rqs.inputs[-1].values / rqs.inputs[-2].values  + 1e-3) # normalize add
-
-    shiftNode = gs.Constant(f'{integerdiv.name}_shift', np.array(totalShift))
-    _inputs = list(integerdiv.inputs) + list(rqs.inputs[1:]) + [shiftNode]
-    _outputs = rqs.outputs
-
-    #import IPython; IPython.embed()
-
-    rqsIntegerDiv = gs.Node(op='RQIntegerDiv', name=name, attrs={**integerdiv.attrs, **rqs.attrs})
-    graph.replaceInsertNode(_inputs, _outputs, rqsIntegerDiv)
-
-    return ctxt, graph
-
-class IntegerDivRequantMergePass(ReplaceSequentialPatternPass):
-    def __init__(self):
-        passes = []
-        graph = gs.Graph()
-        _input = gs.Variable(name='input_1')
-        output = graph.layer(inputs=[_input], outputs=['integerdiv_out'], op='IntegerDiv', name='integerdiv')
-        output = graph.layer(inputs=output, outputs=['rqs'], op='RequantShift', name='rqs1')
-        graph.outputs.append(output)
-        graph.inputs.append(_input)
-
-        name = f"_MERGE_INTEGERDIV_PASS"
-        super().__init__(graph, merge_integerdiv_rq_fun, name)
-
-
 def merge_gemm_rq_fun(ctxt: NetworkContext, graph: gs.Graph, match: Match, name: str):
     matched_nodes = [m for k, m in match.nodes_map.items()]
     gemm = matched_nodes[0]
@@ -154,7 +89,7 @@ def merge_gemm_rq_fun(ctxt: NetworkContext, graph: gs.Graph, match: Match, name:
 
     totalShift = 31-np.log2(rqs.attrs['div'].values)
 
-    rqs.inputs[-1].values = np.round(rqs.inputs[-1].values / rqs.inputs[-2].values  + 1e-3) # normalize add
+    rqs.inputs[-1].values = np.round(rqs.inputs[-1].values / (rqs.inputs[-2].values  + 1e-3)) # normalize add
 
     # Reweight multiplicators:
     # Get maximum:
@@ -174,7 +109,7 @@ def merge_gemm_rq_fun(ctxt: NetworkContext, graph: gs.Graph, match: Match, name:
     # GEMM has add
     if len(list(gemm.inputs)) == 3:
 
-        gemm.inputs[2].values = gemm.inputs[2].values + np.round(rqs.inputs[2].values / rqs.inputs[1].values)
+        gemm.inputs[2].values = gemm.inputs[2].values + np.round(rqs.inputs[2].values / (rqs.inputs[1].values + 1e-3))
 
         # Keep input, weight from GEMM
         # Take mul from RQS

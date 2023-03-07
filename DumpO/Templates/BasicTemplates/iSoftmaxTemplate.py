@@ -42,4 +42,4 @@ class _iSoftmaxTemplate(NodeTemplate):
 
         return ctxt, nodeRep
 
-referenceTemplate = _iSoftmaxTemplate("SoftmaxKernel_s8(${data_in}, ${data_out}, ${size}, ${lastDimLength}, ${coeffA}, ${coeffB}, ${coeffC}, ${log2}, ${n_levels});")
+referenceTemplate = _iSoftmaxTemplate("Softmax_s8_s8(${data_in}, ${data_out}, ${size}, ${lastDimLength}, ${coeffA}, ${coeffB}, ${coeffC}, ${log2}, ${n_levels});")

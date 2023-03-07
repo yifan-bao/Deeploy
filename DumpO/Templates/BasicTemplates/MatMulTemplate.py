@@ -51,10 +51,18 @@ int8_t* ref_${data_out}_${B} = ${B};
 int32_t* ref_${data_out}_${data_out} = ${data_out};
 
 for(int i=0;i<${batch};i++){
-MatMul_s8_s8_s32(ref_${data_out}_${A}, ref_${data_out}_${B}, ref_${data_out}_${data_out}, ${A_offset}, ${B_offset}, ${M}, ${N}, ${O});
-ref_${data_out}_${A} += ${M} * ${N};
-ref_${data_out}_${B} += ${N} * ${O};
-ref_${data_out}_${data_out} += ${M} * ${O};
-}
+    MatMul_s8_s8_s32(
+        ref_${data_out}_${A}, 
+        ref_${data_out}_${B}, 
+        ref_${data_out}_${data_out}, 
+        ${M}, 
+        ${N}, 
+        ${O},
+        ${A_offset}, ${B_offset}, ${C_offset}
+    );
 
+    ref_${data_out}_${A} += ${M} * ${N};
+    ref_${data_out}_${B} += ${N} * ${O};
+    ref_${data_out}_${data_out} += ${M} * ${O};
+}
 """)

@@ -42,4 +42,4 @@ class _RQSiGELUTemplate(NodeTemplate):
 
         return ctxt, nodeRep
 
-referenceTemplate = _RQSiGELUTemplate("RQSGELUKernel_s8(${data_in}, ${data_out}, ${size}, ${b}, ${one}, ${input_offset}, ${output_offset}, ${mul}, ${add}, ${shift});")
+referenceTemplate = _RQSiGELUTemplate("RQGELU_s8_s8(${data_in}, ${data_out}, ${size}, ${b}, ${one}, ${input_offset}, ${output_offset}, ${mul}, ${add}, ${shift});")

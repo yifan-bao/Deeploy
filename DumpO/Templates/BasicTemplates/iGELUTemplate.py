@@ -42,4 +42,4 @@ class _iGELUTemplate(NodeTemplate):
 
         return ctxt, nodeRep
 
-referenceTemplate = _iGELUTemplate("GELUKernel_s8(${data_in}, ${data_out}, ${size}, ${b}, ${one}, ${input_offset});")
+referenceTemplate = _iGELUTemplate("GELU_s8_s32(${data_in}, ${data_out}, ${size}, ${b}, ${one}, ${input_offset});")

@@ -1,10 +1,10 @@
 # ----------------------------------------------------------------------
 #
-# File: SkipTemplate.py
+# File: IntegerDivTemplate.py
 #
-# Last edited: 18.12.2021        
-# 
-# Copyright (C) 2021, ETH Zurich and University of Bologna.
+# Last edited: 02.09.2022
+#
+# Copyright (C) 2022, ETH Zurich and University of Bologna.
 #
 # Author: Moritz Scherer, ETH Zurich
 #
@@ -25,4 +25,6 @@
 
 from DumpO.DumpOTypes import NodeTemplate
 
-
+IntegerDiv_s32_s32_Template = NodeTemplate("""
+Div_s32_s32(${A}, ${B}, ${sizeA}, ${sizeB}, ${nomStep}, ${denomStep}, ${C}, ${Delta}, ${eps}, ${eta});
+""")
