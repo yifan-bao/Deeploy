@@ -350,6 +350,12 @@ class NodeParser():
     def parse(self, ctxt: NetworkContext, node:  gs.Node) -> Tuple[NetworkContext, bool]:
         newCtxt = copy.deepcopy(ctxt)
         self.parserDict = {}
+
+        if "channels_first" in node.attrs:
+            self.parserDict['channels_first'] = node.attrs['channels_first']
+        else:
+            self.parserDict['channels_first'] = True
+
         ret1 = self.parseNode(node)
         if ret1:
             newCtxt, ret2 = self.parseInputs(newCtxt, node)
@@ -566,10 +572,13 @@ class NodeMapper():
         self.nodeRep: Dict = None
 
     # Don't override this. Parses the networks with the correct data type
-    def parse(self, ctxt: NetworkContext, node:  gs.Node, channels_first: bool) -> Tuple[NetworkContext, bool]:
+    def parse(self, ctxt: NetworkContext, node:  gs.Node) -> Tuple[NetworkContext, bool]:
         hoistedCtxt, parseable = self.parser.parse(ctxt, node)
         if parseable:
-            newCtxt, ret = self.parser.parseNodeCtxt(hoistedCtxt, node, channels_first)
+            # SCHEREMO: Watch out here...
+            if "channels_first" in node.attrs and self.parser.parserDict["channels_first"] == True:
+                print(node.op)
+            newCtxt, ret = self.parser.parseNodeCtxt(hoistedCtxt, node, False)
             self.nodeRep = self.parser.parserDict
             return (newCtxt, ret)
         else:
@@ -665,12 +674,12 @@ class ONNXLayer():
         return _copy
 
     # Call this, DO NOT override! -> This should assert that all variables required are in the node!
-    def parse(self, ctxt: NetworkContext, channels_first: bool) -> Tuple[NetworkContext, bool]:
+    def parse(self, ctxt: NetworkContext) -> Tuple[NetworkContext, bool]:
         retCtxt = None
         # iterate through all possible mappings and return the first that works
         for mapper in self.maps:
             newCtxt = ctxt.copy()
-            newCtxt, ret = mapper.parse(newCtxt, self.node, channels_first)
+            newCtxt, ret = mapper.parse(newCtxt, self.node)
             if ret:
                 self.mapper = mapper
                 return newCtxt, True
@@ -796,12 +805,12 @@ class NetworkContainer():
         return ctxt
 
     # Don't override this
-    def broadcast(self, channels_first: bool = True) -> bool:
+    def broadcast(self) -> bool:
 
         ctxt = self.ctxt.copy()
 
         for name, layer in self.layerBinding.items():
-            ctxt = layer.broadcast(ctxt, channels_first)
+            ctxt = layer.broadcast(ctxt, False)
 
         self.ctxt = ctxt
         return True
@@ -844,7 +853,7 @@ class NetworkContainer():
 
 
     # Don't override this
-    def parse(self, channels_first=True) -> bool:
+    def parse(self) -> bool:
         # Reset context
         self.ctxt = NetworkContext(self.Platform.VariableBuffer, self.Platform.ConstantBuffer, self.Platform.StructBuffer, {}, {})
         self.ctxt = self._createIOBindings(self.ctxt, self.graph)
@@ -853,7 +862,7 @@ class NetworkContainer():
 
         parseSuccess = True
         for key, node in self.layerBinding.items():
-            self.ctxt, parsePass = node.parse(self.ctxt, channels_first)
+            self.ctxt, parsePass = node.parse(self.ctxt)
             parseSuccess = parseSuccess and parsePass
 
         if parseSuccess:
@@ -1138,9 +1147,9 @@ class NetworkDeployer(NetworkContainer):
         onnx.save(model, f)
 
     # Don't override this unless you know what you are doin
-    def backEnd(self, channels_first=True):
-        self.parse(channels_first) # This reparses the lowered graph
-        self.broadcast(channels_first) # This broadcasts all tensors offline
+    def backEnd(self):
+        self.parse() # This reparses the lowered graph
+        self.broadcast() # This broadcasts all tensors offline
         self.bind() # This binds the graph to the node templates
         onnx.save_model(gs.export_onnx(self.graph), "final_implementation.onnx")
 
@@ -1150,7 +1159,7 @@ class NetworkDeployer(NetworkContainer):
         self.middleWare()
         onnx.save_model(gs.export_onnx(self.graph), "preParse_implementation.onnx")
         # BACK END - Inherited from NetworkContainer
-        self.backEnd(channels_first=False)
+        self.backEnd()
         # FINAL TRANSFORMS
         self.prepared = True
 

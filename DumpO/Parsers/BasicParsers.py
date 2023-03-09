@@ -1068,14 +1068,20 @@ class GEMMParser(MatMulParser):
         ret = all([
             len(node.inputs) >= 2,
             len(node.outputs) == 1,
-            'alpha' in node.attrs,
-            'beta' in node.attrs,
         ])
 
         # This is a GEMM node:
         if ret:
-            self.parserDict['alpha'] = node.attrs['alpha']
-            self.parserDict['beta'] = node.attrs['beta']
+
+            if 'alpha' in node.attrs:
+                self.parserDict['alpha'] = node.attrs['alpha']
+            else:
+                self.parserDict['alpha'] = 1
+
+            if 'beta' in node.attrs:
+                self.parserDict['beta'] = node.attrs['beta']
+            else:
+                self.parserDict['beta'] = 1
 
             if 'transA' in node.attrs:
                 self.parserDict['transA'] = node.attrs['transA']
