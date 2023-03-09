@@ -1,9 +1,9 @@
 [submodule "dumpotest"]
 	path = dumpotest
-	url = git@iis-git.ee.ethz.ch:scheremo/dumpotest.git
+	url = git@iis-git.ee.ethz.ch:dumpo/dumpotest.git
 [submodule "dumpobasiclibs"]
 	path = dumpobasiclibs
-	url = git@iis-git.ee.ethz.ch:wiesep/dumpobasiclibs.git
+	url = git@iis-git.ee.ethz.ch:dumpo/dumpobasiclibs.git
 [submodule "dumpocmsislibs"]
 	path = dumpocmsislibs
-	url = git@iis-git.ee.ethz.ch:scheremo/dumpocmsislibs.git
+	url = git@iis-git.ee.ethz.ch:dumpo/dumpocmsislibs.git
