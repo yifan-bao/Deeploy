@@ -1,9 +1,12 @@
-[submodule "dumpotest"]
-	path = dumpotest
-	url = git@iis-git.ee.ethz.ch:dumpo/dumpotest.git
-[submodule "dumpobasiclibs"]
-	path = dumpobasiclibs
-	url = git@iis-git.ee.ethz.ch:dumpo/dumpobasiclibs.git
-[submodule "dumpocmsislibs"]
-	path = dumpocmsislibs
-	url = git@iis-git.ee.ethz.ch:dumpo/dumpocmsislibs.git
+[submodule "deeploytest"]
+	path = deeploytest
+	url = git@iis-git.ee.ethz.ch:deeploy/deeploytest.git
+[submodule "deeploymempoollibs"]
+	path = deeploymempoollibs
+	url = git@iis-git.ee.ethz.ch:deeploy/deeploymempoollibs.git
+[submodule "deeploycmsislibs"]
+	path = deeploycmsislibs
+	url = git@iis-git.ee.ethz.ch:deeploy/deeploycmsislibs.git
+[submodule "deeploybasiclibs"]
+	path = deeploybasiclibs
+	url = git@iis-git.ee.ethz.ch:deeploy/deeploybasiclibs.git

@@ -1,37 +1,168 @@
-stages:          # List of stages for jobs, and their order of execution
+variables:
+  GIT_SUBMODULE_STRATEGY: recursive
+
+stages: # List of stages for jobs, and their order of execution
+  - lint
   - build
   - run
 
-build:       # This job runs in the build stage, which runs first.
+build_deeploy: # This job runs in the build stage, which runs first.
   stage: build
   artifacts:
     untracked: true
   script:
-    - git submodule update --init --recursive
-    - echo "Updating dependencies"
-    - bash
-    - source ~/.bashrc
+    - bash && source ~/.bashrc
     - conda activate dumpoci
     - pip install --ignore-install -e .
-    - rm -f dumpotest/out.txt
+    - rm -f deeploytest/out.txt
 
-run:   # This job runs in the test stage.
-  stage: run    # It only starts when the job in the build stage completes successfully.
-  dependencies: 
-    - build
+run_cmsis_test_models: # This job runs in the test stage.
+  stage: run # It only starts when the job in the build stage completes successfully.
+  tags:
+    - qemu-arm
+  dependencies:
+    - build_deeploy
   script:
-    - git submodule update --init --recursive
-    - bash
-    - source ~/.bashrc
-    - export PATH="~scheremo/gcc-arm/bin:$PATH"
-    - export LD_LIBRARY_PATH="~scheremo/.local/JLink_Linux_V770c_x86_64/:$LD_LIBRARY_PATH"
+    - bash && source ~/.bashrc
     - conda activate dumpoci
-    - unzip -o dumpotest/third_party/AmbiqSuite-4.zip -d dumpotest/third_party/
-    - cd dumpotest
-    - python testRunner.py --device=/dev/ttyACM0 -t ./Tests/simpleRegression
-    - python testRunner.py --device=/dev/ttyACM0 -t ./Tests/WaveFormer
-    
+    - pip install -e .
+    - cd deeploytest
+    - python testRunner_qemu.py -t ./Tests/simpleRegression
+    - python testRunner_qemu.py -t ./Tests/WaveFormer
   artifacts:
     name: "$CI_JOB_NAME-$CI_COMMIT_REF_NAME-$CI_COMMIT_SHORT_SHA"
     paths:
-      - ./dumpotest/out.txt
+      - ./deeploytest/out.txt
+
+run_cmsis_test_kernels: # This job runs in the test stage.
+  stage: run # It only starts when the job in the build stage completes successfully.
+  tags:
+    - qemu-arm
+  dependencies:
+    - build_deeploy
+  script:
+    - bash && source ~/.bashrc && source ~/.zshenv
+    - conda activate dumpoci
+    - pip install -e .
+    - cd deeploytest
+    - python testRunner_qemu.py -t ./Tests/Adder
+    - python testRunner_qemu.py -t ./Tests/MultIO
+    - python testRunner_qemu.py -t ./Tests/test1DPad
+    - python testRunner_qemu.py -t ./Tests/test2DPad
+    - python testRunner_qemu.py -t ./Tests/testMatMul
+    - python testRunner_qemu.py -t ./Tests/testMatMulAdd
+    - python testRunner_qemu.py -t ./Tests/testMaxPool
+    - python testRunner_qemu.py -t ./Tests/testRequantizedConv
+  artifacts:
+    name: "$CI_JOB_NAME-$CI_COMMIT_REF_NAME-$CI_COMMIT_SHORT_SHA"
+    paths:
+      - ./deeploytest/out.txt
+
+run_mempool_test_kernels: # This job runs in the test stage.
+  stage: run # It only starts when the job in the build stage completes successfully.
+  tags:
+    - banshee
+  dependencies:
+    - build_deeploy
+  script:
+    - bash && source ~/.bashrc && source ~/.zshenv
+    - conda activate dumpoci
+    - pip install -e .
+    - cd deeploytest
+    - python testRunner_mempool.py -t ./Tests/Adder -DGCC_INSTALL_DIR=$MEMPOOL_GCC_INSTALL_DIR
+    - python testRunner_mempool.py -t ./Tests/MultIO -DGCC_INSTALL_DIR=$MEMPOOL_GCC_INSTALL_DIR
+    - python testRunner_mempool.py -t ./Tests/test1DConvolution -DGCC_INSTALL_DIR=$MEMPOOL_GCC_INSTALL_DIR
+    - python testRunner_mempool.py -t ./Tests/test1DDWConvolution -DGCC_INSTALL_DIR=$MEMPOOL_GCC_INSTALL_DIR
+    - python testRunner_mempool.py -t ./Tests/test1DPad -DGCC_INSTALL_DIR=$MEMPOOL_GCC_INSTALL_DIR
+    - python testRunner_mempool.py -t ./Tests/test2DConvolution -DGCC_INSTALL_DIR=$MEMPOOL_GCC_INSTALL_DIR
+    - python testRunner_mempool.py -t ./Tests/test2DDWConvolution -DGCC_INSTALL_DIR=$MEMPOOL_GCC_INSTALL_DIR
+    - python testRunner_mempool.py -t ./Tests/test2DPad -DGCC_INSTALL_DIR=$MEMPOOL_GCC_INSTALL_DIR
+    - python testRunner_mempool.py -t ./Tests/testGEMM -DGCC_INSTALL_DIR=$MEMPOOL_GCC_INSTALL_DIR
+    - python testRunner_mempool.py -t ./Tests/testMatMul -DGCC_INSTALL_DIR=$MEMPOOL_GCC_INSTALL_DIR
+    - python testRunner_mempool.py -t ./Tests/testMatMulAdd -DGCC_INSTALL_DIR=$MEMPOOL_GCC_INSTALL_DIR
+    - python testRunner_mempool.py -t ./Tests/testMaxPool -DGCC_INSTALL_DIR=$MEMPOOL_GCC_INSTALL_DIR
+    - python testRunner_mempool.py -t ./Tests/testRequantizedConv -DGCC_INSTALL_DIR=$MEMPOOL_GCC_INSTALL_DIR
+  artifacts:
+    name: "$CI_JOB_NAME-$CI_COMMIT_REF_NAME-$CI_COMMIT_SHORT_SHA"
+    paths:
+      - ./deeploytest/out.txt
+
+run_mempool_test_models:   # This job runs in the test stage.
+  stage: run              # It only starts when the job in the build stage completes successfully.
+  tags:
+    - banshee
+  dependencies:
+    - build_deeploy
+  script:
+    - bash && source ~/.bashrc && source ~/.zshenv
+    - conda activate dumpoci
+    - pip install -e .
+    - cd deeploytest
+    - python testRunner_mempool.py -t ./Tests/simpleRegression -DGCC_INSTALL_DIR=$MEMPOOL_GCC_INSTALL_DIR
+    # - python testRunner_mempool.py -t ./Tests/WaveFormer -DGCC_INSTALL_DIR=$MEMPOOL_GCC_INSTALL_DIR # Boken with ITA (heap is too small)
+    - python testRunner_mempool.py -t ./Tests/simpleCNN -DGCC_INSTALL_DIR=$MEMPOOL_GCC_INSTALL_DIR
+  artifacts:
+    name: "$CI_JOB_NAME-$CI_COMMIT_REF_NAME-$CI_COMMIT_SHORT_SHA"
+    paths:
+      - ./deeploytest/out.txt
+
+run_generic_test_kernels: # This job runs in the test stage.
+  stage: run # It only starts when the job in the build stage completes successfully.
+  dependencies:
+    - build_deeploy
+  script:
+    - bash && source ~/.bashrc && source ~/.zshenv
+    - conda activate dumpoci
+    - pip install -e .
+    - cd deeploytest
+    - python testRunner_generic.py -t ./Tests/Adder
+    - python testRunner_generic.py -t ./Tests/MultIO
+    - python testRunner_generic.py -t ./Tests/test1DConvolution
+    - python testRunner_generic.py -t ./Tests/test1DDWConvolution
+    - python testRunner_generic.py -t ./Tests/test1DPad
+    - python testRunner_generic.py -t ./Tests/test2DConvolution
+    - python testRunner_generic.py -t ./Tests/test2DDWConvolution
+    - python testRunner_generic.py -t ./Tests/test2DPad
+    - python testRunner_generic.py -t ./Tests/testGEMM
+    - python testRunner_generic.py -t ./Tests/testMatMul
+    - python testRunner_generic.py -t ./Tests/testMatMulAdd
+    - python testRunner_generic.py -t ./Tests/testMaxPool
+    - python testRunner_generic.py -t ./Tests/testRequantizedConv
+  artifacts:
+    name: "$CI_JOB_NAME-$CI_COMMIT_REF_NAME-$CI_COMMIT_SHORT_SHA"
+    paths:
+      - ./deeploytest/out.txt
+
+run_generic_test_models:   # This job runs in the test stage.
+  stage: run              # It only starts when the job in the build stage completes successfully.
+  dependencies:
+    - build_deeploy
+  script:
+    - bash && source ~/.bashrc && source ~/.zshenv
+    - conda activate dumpoci
+    - pip install -e .
+    - cd deeploytest
+    - python testRunner_generic.py -t ./Tests/simpleRegression
+    - python testRunner_generic.py -t ./Tests/WaveFormer
+    - python testRunner_generic.py -t ./Tests/simpleCNN
+  artifacts:
+    name: "$CI_JOB_NAME-$CI_COMMIT_REF_NAME-$CI_COMMIT_SHORT_SHA"
+    paths:
+      - ./deeploytest/out.txt
+
+format_python:
+  stage: lint
+  script:
+    - bash && source ~/.bashrc && source ~/.zshenv
+    - conda activate dumpoci
+    - pip install yapf
+    - yapf -rpd Deeploy scripts
+
+format_c:
+  stage: lint
+  script:
+    - bash && source ~/.bashrc && source ~/.zshenv
+    - conda activate dumpoci
+    - pip install clang-format
+    - python scripts/run_clang_format.py -e "*/third_party/*" -r Deeploy scripts
+
