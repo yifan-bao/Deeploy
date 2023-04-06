@@ -5,8 +5,8 @@ requires = [
 ]
 build-backend = "setuptools.build_meta"
 [project]
-name = "DumpO"
-description = "DumpO - Bring your networks to your platforms"
+name = "Deeploy"
+description = "Deeploy - Bring your networks to your platforms"
 version = '0.0.1'
 readme = "README.md"
 requires-python = ">=3.7"
@@ -19,12 +19,10 @@ dependencies = [
 'argparse',
 'pylink-square',
 'pyserial',
+'clang-format',
+'toml',
+'yapf',
 "onnx-graphsurgeon @ https://developer.download.nvidia.com/compute/redist/onnx-graphsurgeon/onnx_graphsurgeon-0.3.20-py2.py3-none-any.whl"
 ]
 [tool.setuptools]
-packages = ['DumpO']
-[tool.yapf]
-based_on_style = "google"
-column_limit = 120
-split_before_logical_operator = true
-spaces_around_default_or_named_assign = true
+packages = ['Deeploy']
