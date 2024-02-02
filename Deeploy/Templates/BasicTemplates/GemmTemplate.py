@@ -23,10 +23,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import Dict, Tuple
-from mako.template import Template
+from typing import Dict, List, Tuple
 
-from Deeploy.DeeployTypes import NodeTemplate, NetworkContext
+from Deeploy.DeeployTypes import NetworkContext, NodeTemplate
 
 
 class _GemmTemplate(NodeTemplate):
@@ -34,44 +33,54 @@ class _GemmTemplate(NodeTemplate):
     def __init__(self, templateStr):
         super().__init__(templateStr)
 
-    def alignToContext(self, ctxt: NetworkContext, nodeRep: Dict) -> Tuple[NetworkContext, Dict]:
+    def alignToContext(self, ctxt: NetworkContext, nodeRep: Dict) -> Tuple[NetworkContext, Dict, List[str]]:
         ctxt = ctxt.copy()
 
         A = ctxt.lookup(nodeRep['A'])
         B = ctxt.lookup(nodeRep['B'])
         C = ctxt.lookup(nodeRep['C'])
         Y = ctxt.lookup(nodeRep['data_out'])
-        nodeRep['A_offset'] = (A._signed == 0) * int(A.nLevels / 2)
-        nodeRep['B_offset'] = (B._signed == 0) * int(B.nLevels / 2)
-        nodeRep['C_offset'] = -(C._signed == 0) * int(C.nLevels / 2)
-        nodeRep['Y_offset'] = -(Y._signed == 0) * int(Y.nLevels / 2)
 
-        return ctxt, nodeRep
+        nodeRep['A_offset'] = 0
+        nodeRep['B_offset'] = 0
+        nodeRep['C_offset'] = 0
+        nodeRep['Y_offset'] = 0
+
+        if hasattr(A, "_signed") and hasattr(A, "nLevels"):
+            nodeRep['A_offset'] = (A._signed == 0) * int(A.nLevels / 2)
+        if hasattr(B, "_signed") and hasattr(B, "nLevels"):
+            nodeRep['B_offset'] = (B._signed == 0) * int(B.nLevels / 2)
+        if hasattr(C, "_signed") and hasattr(C, "nLevels"):
+            nodeRep['C_offset'] = -(C._signed == 0) * int(C.nLevels / 2)
+        if hasattr(Y, "_signed") and hasattr(Y, "nLevels"):
+            nodeRep['Y_offset'] = -(Y._signed == 0) * int(Y.nLevels / 2)
+
+        return ctxt, nodeRep, []
 
 
 referenceTemplate = _GemmTemplate("""
-// GEMM (Name: ${node_name}, Op: ${node_op})
+// GEMM (Name: ${nodeName}, Op: ${nodeOp})
 BEGIN_SINGLE_CORE
-    ${A_type._name_}* ref_${data_out}_${A} = ${A};
-    ${B_type._name_}* ref_${data_out}_${B} = ${B};
-    ${C_type._name_}* ref_${data_out}_${C} = ${C};
-    ${data_out_type._name_}* ref_${data_out}_${data_out} = ${data_out};
+    ${A_type.typeName} ref_${data_out}_${A} = ${A};
+    ${B_type.typeName} ref_${data_out}_${B} = ${B};
+    ${C_type.typeName} ref_${data_out}_${C} = ${C};
+    ${data_out_type.typeName} ref_${data_out}_${data_out} = ${data_out};
 
     for(uint32_t i=0;i<${batch};i++){
-        Gemm_s${A_type._value_}_s${B_type._value_}_s${C_type._value_}_s${data_out_type._value_}(
-            ref_${data_out}_${A}, 
-            ref_${data_out}_${B}, 
-            ref_${data_out}_${C}, 
-            ref_${data_out}_${data_out}, 
-            ${M}, 
-            ${N}, 
+        Gemm_s${A_type.referencedType.typeWidth}_s${B_type.referencedType.typeWidth}_s${C_type.referencedType.typeWidth}_s${data_out_type.referencedType.typeWidth}(
+            ref_${data_out}_${A},
+            ref_${data_out}_${B},
+            ref_${data_out}_${C},
+            ref_${data_out}_${data_out},
+            ${M},
+            ${N},
             ${O},
             ${alpha},
             ${beta},
             ${transA},
             ${transB},
-            ${A_offset}, 
-            ${B_offset}, 
+            ${A_offset},
+            ${B_offset},
             ${C_offset},
             ${Y_offset}
         );

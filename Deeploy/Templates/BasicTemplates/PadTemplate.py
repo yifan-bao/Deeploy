@@ -23,10 +23,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import Dict, Tuple
-from mako.template import Template
+from typing import Dict, List, Tuple
 
-from Deeploy.DeeployTypes import NodeTemplate, NetworkContext
+from Deeploy.DeeployTypes import NetworkContext, NodeTemplate
 
 # SCHEREMO: ASSUMES NHWC
 
@@ -36,17 +35,16 @@ class _Pad2DTemplate(NodeTemplate):
     def __init__(self, templateStr):
         super().__init__(templateStr)
 
-    def alignToContext(self, ctxt: NetworkContext, nodeRep: Dict) -> Tuple[NetworkContext, Dict]:
+    def alignToContext(self, ctxt: NetworkContext, nodeRep: Dict) -> Tuple[NetworkContext, Dict, List[str]]:
         ctxt = ctxt.copy()
 
         # Align padding value to input signedness
 
         data_in = ctxt.lookup(nodeRep['data_in'])
-        assert data_in._signed is not None
-        if data_in._signed == False:
+        if hasattr(data_in, "_signed") and hasattr(data_in, "nLevels") and not data_in._signed:
             nodeRep['value'] = nodeRep['value'] - int(data_in.nLevels / 2)
 
-        return ctxt, nodeRep
+        return ctxt, nodeRep, []
 
 
 reference2DTemplate = _Pad2DTemplate("""
@@ -63,9 +61,9 @@ reference2DTemplate = _Pad2DTemplate("""
 batchOffsetOut = dim_im_out_ch * dim_im_out_x * dim_im_out_y
 %>
 
-// 2D Pad (Name: ${node_name}, Op: ${node_op})
+// 2D Pad (Name: ${nodeName}, Op: ${nodeOp})
 BEGIN_SINGLE_CORE
-    memset(${data_out}, ${value}, ${data_out_size}*sizeof(${data_out_type._name_}));
+    memset(${data_out}, ${value}, ${data_out_size}*sizeof(${data_out_type.referencedType.typeName}));
     uint32_t xoffset_${data_out}_${data_in};
     uint32_t offset_in_${data_out}_${data_in} = 0;
 
@@ -75,7 +73,7 @@ BEGIN_SINGLE_CORE
         xoffset_${data_out}_${data_in} = n*${batchOffsetOut} + ${pad_y}*${dim_im_out_y}+${pad_x};
         for (uint32_t c=0; c<${dim_im_in_ch}; ++c) {
             for(uint32_t h=0; h<${dim_im_in_x}; h++){
-                memcpy(${data_out} + xoffset_${data_out}_${data_in}, ${data_in}+offset_in_${data_out}_${data_in}, ${dim_im_in_y}*sizeof(${data_out_type._name_}));
+                memcpy(${data_out} + xoffset_${data_out}_${data_in}, ${data_in}+offset_in_${data_out}_${data_in}, ${dim_im_in_y}*sizeof(${data_out_type.referencedType.typeName}));
                 xoffset_${data_out}_${data_in} += ${dim_im_out_y};
                 offset_in_${data_out}_${data_in} += ${dim_im_in_y};
             }
@@ -87,7 +85,7 @@ BEGIN_SINGLE_CORE
     for(uint32_t n=0; n<${batch}; n++){
         xoffset_${data_out}_${data_in} = n*${batchOffsetOut} + ${startPosX};
         for(uint32_t h=0; h<${dim_im_in_x}; h++){
-            memcpy(${data_out}+xoffset_${data_out}_${data_in}, ${data_in}+offset_in_${data_out}_${data_in}, ${width}*sizeof(${data_out_type._name_}));
+            memcpy(${data_out}+xoffset_${data_out}_${data_in}, ${data_in}+offset_in_${data_out}_${data_in}, ${width}*sizeof(${data_out_type.referencedType.typeName}));
             xoffset_${data_out}_${data_in} += ${addoffsetOut};
             offset_in_${data_out}_${data_in} += ${addoffsetIn};
         }
@@ -102,17 +100,16 @@ class _Pad1DTemplate(NodeTemplate):
     def __init__(self, templateStr):
         super().__init__(templateStr)
 
-    def alignToContext(self, ctxt: NetworkContext, nodeRep: Dict) -> Tuple[NetworkContext, Dict]:
+    def alignToContext(self, ctxt: NetworkContext, nodeRep: Dict) -> Tuple[NetworkContext, Dict, List[str]]:
         ctxt = ctxt.copy()
 
         # Align padding value to input signedness
 
         data_in = ctxt.lookup(nodeRep['data_in'])
-        assert data_in._signed is not None
-        if data_in._signed == False:
+        if hasattr(data_in, "_signed") and hasattr(data_in, "nLevels") and not data_in._signed:
             nodeRep['value'] = nodeRep['value'] - int(data_in.nLevels / 2)
 
-        return ctxt, nodeRep
+        return ctxt, nodeRep, []
 
 
 reference1DTemplate = _Pad1DTemplate("""
@@ -125,9 +122,9 @@ reference1DTemplate = _Pad1DTemplate("""
 batchOffsetOut = dim_im_out_ch * dim_im_out_y
 %>
 
-// 1D Pad (Name: ${node_name}, Op: ${node_op})
+// 1D Pad (Name: ${nodeName}, Op: ${nodeOp})
 BEGIN_SINGLE_CORE
-    memset(${data_out}, ${value}, ${data_out_size}*sizeof(${data_out_type._name_}));
+    memset(${data_out}, ${value}, ${data_out_size}*sizeof(${data_out_type.referencedType.typeName}));
     uint32_t xoffset_${data_out}_${data_in};
     uint32_t offset_in_${data_out}_${data_in} = 0;
 
@@ -136,7 +133,7 @@ BEGIN_SINGLE_CORE
     for(uint32_t n=0; n<${batch}; n++){
         xoffset_${data_out}_${data_in} = n*${batchOffsetOut} +${pad_y};
         for (uint32_t c=0; c<${dim_im_in_ch}; ++c) {
-            memcpy(${data_out} + xoffset_${data_out}_${data_in}, ${data_in}+offset_in_${data_out}_${data_in}, ${dim_im_in_y}*sizeof(${data_out_type._name_}));
+            memcpy(${data_out} + xoffset_${data_out}_${data_in}, ${data_in}+offset_in_${data_out}_${data_in}, ${dim_im_in_y}*sizeof(${data_out_type.referencedType.typeName}));
             xoffset_${data_out}_${data_in} += ${dim_im_out_y};
             offset_in_${data_out}_${data_in} += ${dim_im_in_y};
         }
@@ -145,7 +142,7 @@ BEGIN_SINGLE_CORE
     // NHWC Layout
     for(uint32_t n=0; n<${batch}; n++){
         xoffset_${data_out}_${data_in} = n*${batchOffsetOut} + ${startPosX};
-        memcpy(${data_out}+xoffset_${data_out}_${data_in}, ${data_in}+offset_in_${data_out}_${data_in}, ${width}*sizeof(${data_out_type._name_}));
+        memcpy(${data_out}+xoffset_${data_out}_${data_in}, ${data_in}+offset_in_${data_out}_${data_in}, ${width}*sizeof(${data_out_type.referencedType.typeName}));
         offset_in_${data_out}_${data_in} += ${width};
     }
     %endif

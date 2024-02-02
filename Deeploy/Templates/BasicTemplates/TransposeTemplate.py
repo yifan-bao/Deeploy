@@ -26,9 +26,9 @@
 from Deeploy.DeeployTypes import NodeTemplate
 
 referenceTemplate = NodeTemplate("""
-// Transpose ${data_in_shape} -> ${data_out_shape} (Name: ${node_name}, Op: ${node_op})
+// Transpose ${data_in_shape} -> ${data_out_shape} (Name: ${nodeName}, Op: ${nodeOp})
 BEGIN_SINGLE_CORE
-${data_out_type._name_}* dummy_${data_out} = ${data_out};
+${data_out_type.typeName} dummy_${data_out} = ${data_out};
 <%
     dimStr = ''
     accessStr = ''
@@ -48,7 +48,7 @@ ${data_out_type._name_}* dummy_${data_out} = ${data_out};
 %>
 for(uint32_t i_${i} = 0; i_${i}<${shape}; i_${i}++){
 % endfor
-*dummy_${data_out}++ = ((${data_in_type._name_} (*)${shapeStr})${data_in})${accessStr};
+*dummy_${data_out}++ = ((${data_in_type.referencedType.typeName} (*)${shapeStr})${data_in})${accessStr};
 % for idx, i in enumerate(perm):
 }
 % endfor

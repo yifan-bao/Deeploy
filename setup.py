@@ -1,4 +1,5 @@
-import setuptools
 import os
+
+import setuptools
 
 setuptools.setup()

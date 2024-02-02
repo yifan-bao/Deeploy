@@ -26,6 +26,6 @@
 from Deeploy.DeeployTypes import NodeTemplate
 
 referenceTemplate = NodeTemplate("""
-// Dummy (Name: ${node_name}, Op: ${node_op})
+// Dummy (Name: ${nodeName}, Op: ${nodeOp})
 SINGLE_CORE void DummyOP(${data_in}, ${data_out}, ${size});
 """)

@@ -23,13 +23,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import mako
 from typing import Dict, Tuple
-from mako.template import Template
-import numpy as np
 
-from Deeploy.DeeployTypes import NodeTemplate, NetworkContext
-from .CMSISUtils import bindFCParams
+from Deeploy.DeeployTypes import NetworkContext, NodeTemplate
 
 
 class _LinearAttentionTemplate(NodeTemplate):

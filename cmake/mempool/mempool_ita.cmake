@@ -27,7 +27,7 @@ set(axi_data_width  128     CACHE STRING "AXI bus data width (in bits)")
 set(ro_line_width  512      CACHE STRING "Read-only cache line width in AXI interconnect (in bits)")
 
 # Number of DMA backends in each group
-set(dmas_per_group  4       CACHE STRING "Number of DMA backends in each group")
+set(dmas_per_group  3       CACHE STRING "Number of DMA backends in each group")
 
 #############################
 ##  Xqueues configuration  ##
@@ -78,6 +78,7 @@ set(ita_s  64          CACHE STRING "ITA sequence length")
 set(ita_p  64          CACHE STRING "ITA projection size")
 set(ita_e  64          CACHE STRING "ITA embedding size")
 set(ita_h  1           CACHE STRING "ITA number of heads")
+set(ita_pe 16          CACHE STRING "ITA number of processing engines per ITA core")
 
 math_shell("${num_cores} / ${num_groups}" num_cores_per_group)
 math_shell("(${num_cores} / ${num_groups}) / ${num_cores_per_tile}" num_tiles_per_group)
@@ -90,7 +91,6 @@ add_compile_definitions(
 )
 
 add_compile_definitions(
-    __XPULPIMG
 
     PRINTF_DISABLE_SUPPORT_FLOAT
     PRINTF_DISABLE_SUPPORT_LONG_LONG
@@ -103,6 +103,7 @@ add_compile_definitions(
     ITA_P=${ita_p}
     ITA_E=${ita_e}
     ITA_H=${ita_h}
+    ITA_PE=${ita_pe}
 
     NUM_THREADS=${num_threads}
     NUM_GROUPS=${num_groups}

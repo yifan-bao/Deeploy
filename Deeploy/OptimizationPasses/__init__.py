@@ -24,3 +24,6 @@
 # limitations under the License.
 
 from . import *
+from .BindingsOptimizationPasses import *
+from .NetworkOptimizationPasses import *
+from .TopologyOptimizationPasses import *

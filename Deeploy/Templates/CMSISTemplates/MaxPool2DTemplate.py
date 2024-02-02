@@ -23,11 +23,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import Dict, Tuple
-from mako.template import Template
+from typing import Dict, List, Tuple
 
-from Deeploy.DeeployTypes import NodeTemplate, NetworkContext
-from .CMSISUtils import bindFCParams
+from Deeploy.DataTypes.CMSISDataTypes import CMSISDataTypes
+from Deeploy.DeeployTypes import NetworkContext, NodeTemplate
 
 
 class _MaxPool2DTemplate(NodeTemplate):
@@ -35,50 +34,45 @@ class _MaxPool2DTemplate(NodeTemplate):
     def __init__(self, templateStr):
         super().__init__(templateStr)
 
-    def alignToContext(self, ctxt: NetworkContext, nodeRep: Dict) -> Tuple[NetworkContext, Dict]:
+    def alignToContext(self, ctxt: NetworkContext, nodeRep: Dict) -> Tuple[NetworkContext, Dict, List[str]]:
         ctxt = ctxt.copy()
+
+        nameList = []
 
         data_out_name = nodeRep['data_out']
 
-        ctxtDict = {
-            'buf': 0,  #f'{node.name}_ctxt_buffer',
-            'size': 0
-        }
+        ctxtDict = {'buf': None, 'size': 0}
 
-        ctxt.hoistStruct(ctxtDict, f'{data_out_name}_ctxt', 'cmsis_nn_context')
+        nameList += [ctxt.hoistStruct(ctxtDict, f'{data_out_name}_ctxt', CMSISDataTypes.cmsis_nn_context)]
         nodeRep['ctxt'] = f'{data_out_name}_ctxt'
 
         strideDict = {'h': nodeRep['stride_x'], 'w': nodeRep['stride_y']}
-        ctxt.hoistStruct(strideDict, f'{data_out_name}_stride', 'cmsis_nn_tile')
-        # padding
         paddingDict = {'h': nodeRep['padding_x'], 'w': nodeRep['padding_y']}
-        ctxt.hoistStruct(paddingDict, f'{data_out_name}_padding', 'cmsis_nn_tile')
-
-        # SCHEREMO: Fix this at some point...
         activationDict = {'min': -2**7, 'max': 2**7 - 1}
-        ctxt.hoistStruct(activationDict, f'{data_out_name}_activation', 'cmsis_nn_activation')
 
         convParamsDict = {
-            'stride': ctxt._mangle(ctxt.lookup(f'{data_out_name}_stride').name),
-            'padding': ctxt._mangle(ctxt.lookup(f'{data_out_name}_padding').name),
-            'activation': ctxt._mangle(ctxt.lookup(f'{data_out_name}_activation').name),
+            'stride': strideDict,
+            'padding': paddingDict,
+            'activation': activationDict,
         }
-        ctxt.hoistStruct(convParamsDict, f'{data_out_name}_pool_params', 'cmsis_nn_pool_params')
-        nodeRep[f'pool_params'] = ctxt.lookup(f'{data_out_name}_pool_params').name
+        nameList += [
+            ctxt.hoistStruct(convParamsDict, f'{data_out_name}_pool_params', CMSISDataTypes.cmsis_nn_pool_params)
+        ]
+        nodeRep['pool_params'] = ctxt.lookup(f'{data_out_name}_pool_params').name
 
         inputDimsDict = {'n': 1, 'h': nodeRep['dim_im_in_x'], 'w': nodeRep['dim_im_in_y'], 'c': nodeRep['ch_im_in']}
-        ctxt.hoistStruct(inputDimsDict, f'{data_out_name}_input_dims', 'cmsis_nn_dims')
+        nameList += [ctxt.hoistStruct(inputDimsDict, f'{data_out_name}_input_dims', CMSISDataTypes.cmsis_nn_dims)]
         nodeRep['input_dims'] = ctxt.lookup(f'{data_out_name}_input_dims').name
 
         filterDimsDict = {'n': 1, 'h': nodeRep['dim_kernel_x'], 'w': nodeRep['dim_kernel_y'], 'c': 1}
-        ctxt.hoistStruct(filterDimsDict, f'{data_out_name}_filter_dims', 'cmsis_nn_dims')
+        nameList += [ctxt.hoistStruct(filterDimsDict, f'{data_out_name}_filter_dims', CMSISDataTypes.cmsis_nn_dims)]
         nodeRep['filter_dims'] = ctxt.lookup(f'{data_out_name}_filter_dims').name
 
         outputDimsDict = {'n': 1, 'h': nodeRep['dim_im_out_x'], 'w': nodeRep['dim_im_out_y'], 'c': nodeRep['ch_im_out']}
-        ctxt.hoistStruct(outputDimsDict, f'{data_out_name}_output_dims', 'cmsis_nn_dims')
+        nameList += [ctxt.hoistStruct(outputDimsDict, f'{data_out_name}_output_dims', CMSISDataTypes.cmsis_nn_dims)]
         nodeRep['output_dims'] = ctxt.lookup(f'{data_out_name}_output_dims').name
 
-        return ctxt, nodeRep
+        return ctxt, nodeRep, nameList
 
 
 cmsisTemplate = _MaxPool2DTemplate("""

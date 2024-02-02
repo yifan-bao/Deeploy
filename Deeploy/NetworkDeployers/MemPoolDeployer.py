@@ -23,46 +23,40 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from Deeploy.DeeployTypes import *
+from typing import Callable, Dict
 
-from Deeploy.Parsers.BasicParsers import *
+import onnx_graphsurgeon as gs
 
-from Deeploy.Layers.BasicLayers import *
-from Deeploy.Layers.MemPoolLayers import *
+from Deeploy.AbstractDataTypes import PointerType
+from Deeploy.DeeployTypes import DeploymentPlatform, NetworkDeployer, TopologyOptimizer
+from Deeploy.NetworkDeployers.SignPropDeployer import SignPropDeployer
+from Deeploy.OptimizationPasses.TopologyOptimizationPasses.BasicPasses import TransposeConstOptPass, TransposeMergePass
+from Deeploy.OptimizationPasses.TopologyOptimizationPasses.DebugPasses import DebugPrintMergePass
+from Deeploy.OptimizationPasses.TopologyOptimizationPasses.LoweringOptimizationPasses import NCHWtoNHWCPass, \
+    TransposeMatmulInputsPass
 
-from Deeploy.OptimizationPasses.BasicPasses import *
-from Deeploy.OptimizationPasses.DebugPasses import *
-from Deeploy.OptimizationPasses.MemPoolPasses import *
 
-from Deeploy.OptimizationPasses.LoweringOptimizationPasses import *
-
-
-class MemPoolDeployer(NetworkDeployer):
+class MemPoolDeployer(SignPropDeployer):
 
     def __init__(self,
                  graph: gs.Graph,
                  deploymentPlatform: DeploymentPlatform,
-                 loweringOptimizer: NetworkOptimizer,
+                 inputTypes: Dict[str, PointerType],
+                 loweringOptimizer: TopologyOptimizer,
                  scheduler: Callable = lambda x: x,
                  name: str = 'DeeployNetwork',
-                 input_n_levels: Dict[str, int] = {'input_0': 256},
-                 input_signed: Dict[str, bool] = {'input_0': False},
-                 default_channels_first = True):
-        super().__init__(graph, deploymentPlatform, loweringOptimizer, scheduler, name, input_n_levels, input_signed,
-                         default_channels_first)
+                 default_channels_first: bool = True,
+                 deeployStateDir: str = "DeeployState",
+                 inputOffsets: Dict[str, int] = {}):
+        super().__init__(graph, deploymentPlatform, inputTypes, loweringOptimizer, scheduler, name,
+                         default_channels_first, deeployStateDir)
 
-    def postLoweringOptimization(self):
-        # Insert appropriate transposes
-        TransposeMatMulInputs(self.graph)
-        NCHWtoNHWC(self.graph, self.default_channels_first)
+        self.inputOffsets = inputOffsets
 
-        newCtxt, ret = self.baseParse(
-        )  # This sanity checks the graph and generates a base context for lowering/optimization
-        postLoweringOptimizer = NetworkOptimizer([TransposeMergePass(), TransposeConstOptPass(), DebugMergePass()])
-        postLoweringOptimizer.optimize(newCtxt, self.graph)
-        # Reparse
-        newCtxt, ret = self.baseParse(
-        )  # This sanity checks the graph and generates a base context for lowering/optimization
-        if not ret:
-            raise RuntimeError("Lowering of the graph failed!")
-        return newCtxt, self.graph
+        self.loweringOptimizer.passes += [
+            TransposeMatmulInputsPass(),
+            NCHWtoNHWCPass(self.default_channels_first),
+            TransposeMergePass(),
+            TransposeConstOptPass(),
+            DebugPrintMergePass()
+        ]

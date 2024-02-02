@@ -23,17 +23,15 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import mako
-from typing import Dict, Tuple
-from mako.template import Template
-import numpy as np
 import copy
+from typing import Dict, List, Tuple
 
-from Deeploy.DeeployTypes import NodeTemplate, NetworkContext, VariableBuffer
-from Deeploy.DataTypes.BasicDataTypes import DataTypes
-from .CMSISUtils import bindFCParams, bindConvParams
+import numpy as np
 
+from Deeploy.DataTypes.BasicDataTypes import IntegerDataTypes as DataTypes
+from Deeploy.DeeployTypes import NetworkContext, NodeTemplate, VariableBuffer
 from Deeploy.Templates.BasicTemplates import ReduceMeanTemplate, RequantShiftTemplate, TransposeTemplate
+
 from . import ConvTemplate, GEMMTemplate
 
 
@@ -69,9 +67,9 @@ class _CLCATemplate(NodeTemplate):
 
         ctxt, nodeRep = copy.deepcopy(ctxt), copy.deepcopy(nodeRep)
 
-        K = ctxt.lookup(f"K", _id = nodeRep['id'])
-        V = ctxt.lookup(f"V", _id = nodeRep['id'])
-        A = ctxt.lookup(f"A", _id = nodeRep['id'])
+        K = ctxt.lookup("K", _id = nodeRep['id'])
+        V = ctxt.lookup("V", _id = nodeRep['id'])
+        A = ctxt.lookup("A", _id = nodeRep['id'])
 
         nodeRep['A'] = K.name
         nodeRep['B'] = V.name
@@ -91,8 +89,8 @@ class _CLCATemplate(NodeTemplate):
         return ctxt, nodeRep
 
     def transQGenerator(self, ctxt: NetworkContext, nodeRep: Dict) -> Tuple[NetworkContext, Dict]:
-        Q = ctxt.lookup(f"Q", _id = nodeRep['id'])
-        QT = ctxt.lookup(f"QT", _id = nodeRep['id'])
+        Q = ctxt.lookup("Q", _id = nodeRep['id'])
+        QT = ctxt.lookup("QT", _id = nodeRep['id'])
 
         nodeRep['data_in'] = Q.name
         nodeRep['data_in_type'] = Q._type
@@ -105,8 +103,8 @@ class _CLCATemplate(NodeTemplate):
         return ctxt, nodeRep
 
     def transOGenerator(self, ctxt: NetworkContext, nodeRep: Dict) -> Tuple[NetworkContext, Dict]:
-        O = ctxt.lookup(f"O", _id = nodeRep['id'])
-        OT = ctxt.lookup(f"OT", _id = nodeRep['id'])
+        O = ctxt.lookup("O", _id = nodeRep['id'])
+        OT = ctxt.lookup("OT", _id = nodeRep['id'])
 
         nodeRep['data_in'] = O.name
         nodeRep['data_in_type'] = O._type
@@ -120,8 +118,8 @@ class _CLCATemplate(NodeTemplate):
 
     def rqsDeltaGenerator(self, ctxt: NetworkContext, nodeRep: Dict) -> Tuple[NetworkContext, Dict]:
 
-        K = ctxt.lookup(f"K", _id = nodeRep['id'])
-        RK = ctxt.lookup(f"RK", _id = nodeRep['id'])
+        K = ctxt.lookup("K", _id = nodeRep['id'])
+        RK = ctxt.lookup("RK", _id = nodeRep['id'])
 
         nodeRep['data_in'] = K.name
         nodeRep['data_in_type'] = K._type
@@ -136,8 +134,8 @@ class _CLCATemplate(NodeTemplate):
 
     def rqsKGenerator(self, ctxt: NetworkContext, nodeRep: Dict) -> Tuple[NetworkContext, Dict]:
 
-        V = ctxt.lookup(f"V", _id = nodeRep['id'])
-        K = ctxt.lookup(f"K", _id = nodeRep['id'])
+        V = ctxt.lookup("V", _id = nodeRep['id'])
+        K = ctxt.lookup("K", _id = nodeRep['id'])
 
         nodeRep['data_in'] = V.name
         nodeRep['data_in_type'] = V._type
@@ -153,7 +151,7 @@ class _CLCATemplate(NodeTemplate):
     def convOGenerator(self, ctxt: NetworkContext, nodeRep: Dict) -> Tuple[NetworkContext, Dict]:
         convCtxt, convRep = self.convGenerator(ctxt, nodeRep)
 
-        OT = ctxt.lookup(f"OT", _id = nodeRep['id'])
+        OT = ctxt.lookup("OT", _id = nodeRep['id'])
 
         convRep['data_in'] = OT.name
         convRep['weight'] = convRep['wo_weight']
@@ -170,7 +168,7 @@ class _CLCATemplate(NodeTemplate):
     def convVGenerator(self, ctxt: NetworkContext, nodeRep: Dict) -> Tuple[NetworkContext, Dict]:
         convCtxt, convRep = self.convGenerator(ctxt, nodeRep)
 
-        V = ctxt.lookup(f"V", _id = nodeRep['id'])
+        V = ctxt.lookup("V", _id = nodeRep['id'])
 
         convRep['data_in'] = convRep['k']
         convRep['weight'] = convRep['wk_weight']
@@ -188,7 +186,7 @@ class _CLCATemplate(NodeTemplate):
     def convQGenerator(self, ctxt: NetworkContext, nodeRep: Dict) -> Tuple[NetworkContext, Dict]:
         convCtxt, convRep = self.convGenerator(ctxt, nodeRep)
 
-        Q = ctxt.lookup(f"Q", _id = nodeRep['id'])
+        Q = ctxt.lookup("Q", _id = nodeRep['id'])
 
         convRep['data_in'] = convRep['q']
         convRep['weight'] = convRep['wq_weight']
@@ -223,8 +221,8 @@ class _CLCATemplate(NodeTemplate):
         return convCtxt, convRep
 
     def reduceMeanGenerator(self, ctxt: NetworkContext, nodeRep: Dict) -> Tuple[NetworkContext, Dict]:
-        K = ctxt.lookup(f"K", _id = nodeRep['id'])
-        E = ctxt.lookup(f"E", _id = nodeRep['id'])
+        K = ctxt.lookup("K", _id = nodeRep['id'])
+        E = ctxt.lookup("E", _id = nodeRep['id'])
 
         nodeRep['data_in'] = K.name
         nodeRep['data_in_type'] = K._type
@@ -239,64 +237,64 @@ class _CLCATemplate(NodeTemplate):
 
         return ctxt, nodeRep
 
-    def alignToContext(self, ctxt: NetworkContext, nodeRep: Dict) -> Tuple[NetworkContext, Dict]:
+    def alignToContext(self, ctxt: NetworkContext, nodeRep: Dict) -> Tuple[NetworkContext, Dict, List[str]]:
 
-        Q = VariableBuffer(f"Q", [nodeRep['heads'], nodeRep['dim_head'], nodeRep['q_shape'][-1]], 256)
+        Q = VariableBuffer("Q", [nodeRep['heads'], nodeRep['dim_head'], nodeRep['q_shape'][-1]], 256)
         Q._type = DataTypes.int8_t
         Q._signed = False
         Q._deploy = False
 
-        QT = VariableBuffer(f"QT", [nodeRep['heads'], nodeRep['q_shape'][-1], nodeRep['dim_head']], 256)
+        QT = VariableBuffer("QT", [nodeRep['heads'], nodeRep['q_shape'][-1], nodeRep['dim_head']], 256)
         QT._type = DataTypes.int8_t
         QT._signed = False
         QT._deploy = False
 
-        K = VariableBuffer(f"K", [nodeRep['heads'], nodeRep['dim_head'], nodeRep['kv_shape'][-1]], 256)
+        K = VariableBuffer("K", [nodeRep['heads'], nodeRep['dim_head'], nodeRep['kv_shape'][-1]], 256)
         K._type = DataTypes.int8_t
         K._signed = False
         K._deploy = False
 
-        RK = VariableBuffer(f"RK", [nodeRep['heads'], nodeRep['dim_head'], nodeRep['kv_shape'][-1]], 256)
+        RK = VariableBuffer("RK", [nodeRep['heads'], nodeRep['dim_head'], nodeRep['kv_shape'][-1]], 256)
         RK._type = DataTypes.int8_t
         RK._signed = True
         RK._deploy = False
 
-        V = VariableBuffer(f"V", [nodeRep['heads'], nodeRep['dim_head'], nodeRep['kv_shape'][-1]], 256)
+        V = VariableBuffer("V", [nodeRep['heads'], nodeRep['dim_head'], nodeRep['kv_shape'][-1]], 256)
         V._type = DataTypes.int8_t
         V._signed = True
         V._deploy = False
 
-        VT = VariableBuffer(f"VT", [nodeRep['heads'], nodeRep['kv_shape'][-1], nodeRep['dim_head']], 256)
+        VT = VariableBuffer("VT", [nodeRep['heads'], nodeRep['kv_shape'][-1], nodeRep['dim_head']], 256)
         VT._type = DataTypes.int8_t
         VT._signed = True
         VT._deploy = False
 
-        E = VariableBuffer(f"E", [nodeRep['heads'], nodeRep['dim_head'], 1], 256)
+        E = VariableBuffer("E", [nodeRep['heads'], nodeRep['dim_head'], 1], 256)
         E._type = DataTypes.int8_t
         E._signed = False
         E._deploy = False
 
-        A = VariableBuffer(f"A", [nodeRep['heads'], nodeRep['dim_head'], nodeRep['dim_head']], 256)
+        A = VariableBuffer("A", [nodeRep['heads'], nodeRep['dim_head'], nodeRep['dim_head']], 256)
         A._type = DataTypes.int8_t
         A._signed = False
         A._deploy = False
 
-        AA = VariableBuffer(f"AA", [nodeRep['heads'], nodeRep['dim_head'], nodeRep['q_shape'][-1]], 2**32)
+        AA = VariableBuffer("AA", [nodeRep['heads'], nodeRep['dim_head'], nodeRep['q_shape'][-1]], 2**32)
         AA._type = DataTypes.int32_t
         AA._signed = True
         AA._deploy = False
 
-        B = VariableBuffer(f"B", [nodeRep['heads'], nodeRep['q_shape'][-1], 1], 2**32)
+        B = VariableBuffer("B", [nodeRep['heads'], nodeRep['q_shape'][-1], 1], 2**32)
         B._type = DataTypes.int32_t
         B._signed = True
         B._deploy = False
 
-        O = VariableBuffer(f"O", [1, nodeRep['heads'], nodeRep['q_shape'][-1], nodeRep['dim_head']], 256)
+        O = VariableBuffer("O", [1, nodeRep['heads'], nodeRep['q_shape'][-1], nodeRep['dim_head']], 256)
         O._type = DataTypes.int8_t
         O._signed = True
         O._deploy = False
 
-        OT = VariableBuffer(f"OT", [
+        OT = VariableBuffer("OT", [
             1,
             nodeRep['heads'] * nodeRep['dim_head'],
             nodeRep['q_shape'][-1],
@@ -332,7 +330,7 @@ class _CLCATemplate(NodeTemplate):
         ctxt.add(OT, 'internal', _id = nodeRep['id'])
         nodeRep['OT'] = OT.name
 
-        return ctxt, nodeRep
+        return ctxt, nodeRep, []
 
 
 referenceTemplate = _CLCATemplate("""

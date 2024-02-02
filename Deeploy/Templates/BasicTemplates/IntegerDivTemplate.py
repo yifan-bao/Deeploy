@@ -26,6 +26,6 @@
 from Deeploy.DeeployTypes import NodeTemplate
 
 referenceTemplate = NodeTemplate("""
-// Integer Division (Name: ${node_name}, Op: ${node_op})
-SINGLE_CORE Div_s${A_type._value_}_s${B_type._value_}(${A}, ${B}, ${sizeA}, ${sizeB}, ${nomStep}, ${denomStep}, ${C}, ${Delta}, ${eps}, ${eta});
+// Integer Division (Name: ${nodeName}, Op: ${nodeOp})
+SINGLE_CORE Div_s${A_type.referencedType.typeWidth}_s${B_type.referencedType.typeWidth}(${A}, ${B}, ${sizeA}, ${sizeB}, ${nomStep}, ${denomStep}, ${C}, ${Delta}, ${eps}, ${eta});
 """)

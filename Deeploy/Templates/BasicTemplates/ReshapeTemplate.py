@@ -23,10 +23,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import Dict, Tuple
-from mako.template import Template
+from typing import Dict, List, Tuple
 
-from Deeploy.DeeployTypes import NodeTemplate, NetworkContext
+from Deeploy.DeeployTypes import NetworkContext, NodeTemplate
 
 
 class _ReshapeTemplate(NodeTemplate):
@@ -34,7 +33,7 @@ class _ReshapeTemplate(NodeTemplate):
     def __init__(self, templateStr):
         super().__init__(templateStr)
 
-    def alignToContext(self, ctxt: NetworkContext, nodeRep: Dict) -> Tuple[NetworkContext, Dict]:
+    def alignToContext(self, ctxt: NetworkContext, nodeRep: Dict) -> Tuple[NetworkContext, Dict, List[str]]:
         ctxt = ctxt.copy()
 
         # SCHEREMO: Selectively mark 'indices' dead, since we don't need them
@@ -42,10 +41,10 @@ class _ReshapeTemplate(NodeTemplate):
             ctxt.globalObjects[nodeRep['indices']]._deploy = False
             ctxt.globalObjects[nodeRep['indices']]._live = False
 
-        return ctxt, nodeRep
+        return ctxt, nodeRep, []
 
 
 referenceTemplate = _ReshapeTemplate("""
-// Reshape (Name: ${node_name}, Op: ${node_op})
+// Reshape (Name: ${nodeName}, Op: ${nodeOp})
 SINGLE_CORE ${data_out} = ${data_in};
 """)

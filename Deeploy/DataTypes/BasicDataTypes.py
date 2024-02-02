@@ -23,11 +23,21 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from enum import Enum
+from Deeploy.AbstractDataTypes import DataTypeCollection, IntegerType
 
 
-class DataTypes(Enum):
-    int8_t = 8
-    int16_t = 16
-    int32_t = 32
-    int64_t = 64
+class SignedIntegerDataTypes(DataTypeCollection):
+    int8_t = IntegerType(width = 8, signed = True)
+    int16_t = IntegerType(width = 16, signed = True)
+    int32_t = IntegerType(width = 32, signed = True)
+    int64_t = IntegerType(width = 64, signed = True)
+
+
+class UnsignedIntegerDataTypes(DataTypeCollection):
+    uint8_t = IntegerType(width = 8, signed = False)
+    uint16_t = IntegerType(width = 16, signed = False)
+    uint32_t = IntegerType(width = 32, signed = False)
+    uint64_t = IntegerType(width = 64, signed = False)
+
+
+IntegerDataTypes = SignedIntegerDataTypes + UnsignedIntegerDataTypes

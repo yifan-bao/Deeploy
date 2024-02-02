@@ -23,10 +23,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import Dict, Tuple
-from mako.template import Template
+from typing import Dict, List, Tuple
 
-from Deeploy.DeeployTypes import NodeTemplate, NetworkContext
+from Deeploy.DeeployTypes import NetworkContext, NodeTemplate
 
 
 class _Conv2D_Template(NodeTemplate):
@@ -34,17 +33,21 @@ class _Conv2D_Template(NodeTemplate):
     def __init__(self, templateStr):
         super().__init__(templateStr)
 
-    def alignToContext(self, ctxt: NetworkContext, nodeRep: Dict) -> Tuple[NetworkContext, Dict]:
+    def alignToContext(self, ctxt: NetworkContext, nodeRep: Dict) -> Tuple[NetworkContext, Dict, List[str]]:
         ctxt = ctxt.copy()
 
         data_in = ctxt.lookup(nodeRep['data_in'])
         data_out = ctxt.lookup(nodeRep['data_out'])
 
-        nodeRep['input_offset'] = (data_in._signed == 0) * int(data_in.nLevels // 2)
-        nodeRep['output_offset'] = -(data_out._signed == 0) * int(data_out.nLevels // 2)
+        nodeRep['input_offset'] = 0
+        if hasattr(data_in, "_signed") and hasattr(data_in, "nLevels"):
+            nodeRep['input_offset'] = (data_in._signed == 0) * int(data_in.nLevels // 2)
+        nodeRep['output_offset'] = 0
+        if hasattr(data_out, "_signed") and hasattr(data_out, "nLevels"):
+            nodeRep['output_offset'] = -(data_out._signed == 0) * int(data_out.nLevels // 2)
 
         # import ipdb; ipdb.set_trace()
-        return ctxt, nodeRep
+        return ctxt, nodeRep, []
 
 
 MemPoolParallel1DTemplate = _Conv2D_Template("""
@@ -53,15 +56,15 @@ batchOffsetIn = ch_im_in  * dim_im_in_y
 batchOffsetOut = ch_im_out * dim_im_out_y
 %>
 
-// 1D Conv Parallel (Name: ${node_name}, Op: ${node_op})
+// 1D Conv Parallel (Name: ${nodeName}, Op: ${nodeOp})
 mempool_barrier(numThreads);
-${data_in_type._name_}* ref_${data_out}_${data_in} = ${data_in};
-${data_out_type._name_}* ref_${data_out}_${data_out} = ${data_out};
+${data_in_type.typeName} ref_${data_out}_${data_in} = ${data_in};
+${data_out_type.typeName} ref_${data_out}_${data_out} = ${data_out};
 
 for (uint32_t n=0; n<${batch}; ++n) {
-    Conv2d_parallel_s${data_in_type._value_}_NCHW(
-        ref_${data_out}_${data_in}, ${ch_im_in}, 1, ${dim_im_in_y}, 
-        ${weight}, ${ch_im_out}, 1, ${dim_kernel_y}, 
+    Conv2d_parallel_s${data_in_type.referencedType.typeWidth}_NCHW(
+        ref_${data_out}_${data_in}, ${ch_im_in}, 1, ${dim_im_in_y},
+        ${weight}, ${ch_im_out}, 1, ${dim_kernel_y},
         1, ${stride_y},
         ref_${data_out}_${data_out}, ${input_offset}, ${output_offset},
         core_id,
@@ -79,15 +82,15 @@ batchOffsetIn = ch_im_in * dim_im_in_x * dim_im_in_y
 batchOffsetOut = ch_im_out * dim_im_out_x * dim_im_out_y
 %>
 
-// 2D Conv Parallel (Name: ${node_name}, Op: ${node_op})
+// 2D Conv Parallel (Name: ${nodeName}, Op: ${nodeOp})
 mempool_barrier(numThreads);
-${data_in_type._name_}* ref_${data_out}_${data_in} = ${data_in};
-${data_out_type._name_}* ref_${data_out}_${data_out} = ${data_out};
+${data_in_type.typeName} ref_${data_out}_${data_in} = ${data_in};
+${data_out_type.typeName} ref_${data_out}_${data_out} = ${data_out};
 
 for (uint32_t n=0; n<${batch}; ++n) {
-    Conv2d_parallel_s${data_in_type._value_}_NCHW(
-        ref_${data_out}_${data_in}, ${ch_im_in}, ${dim_im_in_x}, ${dim_im_in_y}, 
-        ${weight}, ${ch_im_out}, ${dim_kernel_x}, ${dim_kernel_y}, 
+    Conv2d_parallel_s${data_in_type.referencedType.typeWidth}_NCHW(
+        ref_${data_out}_${data_in}, ${ch_im_in}, ${dim_im_in_x}, ${dim_im_in_y},
+        ${weight}, ${ch_im_out}, ${dim_kernel_x}, ${dim_kernel_y},
         ${stride_x}, ${stride_y},
         ref_${data_out}_${data_out}, ${input_offset}, ${output_offset},
         core_id,

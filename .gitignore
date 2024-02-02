@@ -7,3 +7,11 @@ dist
 .DS_Store
 *.html
 .ipynb_checkpoints/
+*#
+toolchain/**/*
+install/
+*.onnx
+*.pkl
+*.data
+*#
+toolchain/**/*

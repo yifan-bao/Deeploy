@@ -25,16 +25,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import copy
 import numpy as np
 import onnx_graphsurgeon as gs
 
-from Deeploy.DeeployTypes import *
-from Deeploy.Layers.BasicLayers import *
-from Deeploy.OptimizationPasses.PassClasses import *
+from Deeploy.OptimizationPasses.Matchers import Match
+from Deeploy.OptimizationPasses.PassClasses import ReplaceSequentialPatternPass, contextagnostic
 
 
-def merge_conv_rq_fun(ctxt: NetworkContext, graph: gs.Graph, match: Match, name: str):
+def _merge_conv_rq_fun(graph: gs.Graph, match: Match, name: str):
     matched_nodes = [m for k, m in match.nodes_map.items()]
     conv = matched_nodes[0]
     rqs = matched_nodes[1]
@@ -68,13 +66,13 @@ def merge_conv_rq_fun(ctxt: NetworkContext, graph: gs.Graph, match: Match, name:
     rqsConv = gs.Node(op = 'RequantizedConv', name = name, attrs = {**conv.attrs, **rqs.attrs})
     graph.replaceInsertNode(_inputs, _outputs, rqsConv)
 
-    return ctxt, graph
+    return graph
 
 
+@contextagnostic
 class ConvRequantMergePass(ReplaceSequentialPatternPass):
 
     def __init__(self):
-        passes = []
         graph = gs.Graph()
         _input = gs.Variable(name = 'input_1')
         output = graph.layer(inputs = [_input], outputs = ['conv_out'], op = 'Conv', name = 'conv1')
@@ -82,11 +80,11 @@ class ConvRequantMergePass(ReplaceSequentialPatternPass):
         graph.outputs.append(output)
         graph.inputs.append(_input)
 
-        name = f"_MERGE_CONVRQ_PASS"
-        super().__init__(graph, merge_conv_rq_fun, name)
+        name = "_MERGE_CONVRQ_PASS"
+        super().__init__(graph, _merge_conv_rq_fun, name)
 
 
-def merge_gemm_rq_fun(ctxt: NetworkContext, graph: gs.Graph, match: Match, name: str):
+def _merge_gemm_rq_fun(graph: gs.Graph, match: Match, name: str):
     matched_nodes = [m for k, m in match.nodes_map.items()]
     gemm = matched_nodes[0]
     rqs = matched_nodes[1]
@@ -96,8 +94,6 @@ def merge_gemm_rq_fun(ctxt: NetworkContext, graph: gs.Graph, match: Match, name:
     rqs.inputs[-1].values = np.round(rqs.inputs[-1].values / (rqs.inputs[-2].values + 1e-3))  # normalize add
 
     # Reweight multiplicators:
-    # Get maximum:
-    maxMult = rqs.inputs[1].values.max()
     # Get maximum shift possible:
     MultShift = min(totalShift, np.floor(np.log2(2**31 - rqs.inputs[1].values.max())))
     # get remaining shift:
@@ -105,7 +101,6 @@ def merge_gemm_rq_fun(ctxt: NetworkContext, graph: gs.Graph, match: Match, name:
 
     # shift mult:
     rqs.inputs[1].values = rqs.inputs[1].values * 2**MultShift
-    shiftNode = gs.Constant(f'{gemm.name}_shift', np.array(remainingShift))
     # rqs.inputs[-1].values = np.round(rqs.inputs[-1].values / rqs.inputs[-2].values) # normalize add
     # #import IPython; IPython.embed()
     # shiftNode = gs.Constant(f'{gemm.name}_shift', np.array((31-np.log2(rqs.attrs['div'].values),)))
@@ -127,13 +122,13 @@ def merge_gemm_rq_fun(ctxt: NetworkContext, graph: gs.Graph, match: Match, name:
     rqsGemm = gs.Node(op = 'RequantizedGemm', name = name, attrs = attrs)
     graph.replaceInsertNode(_inputs, _outputs, rqsGemm)
 
-    return ctxt, graph
+    return graph
 
 
+@contextagnostic
 class GEMMRequantMergePass(ReplaceSequentialPatternPass):
 
     def __init__(self):
-        passes = []
         graph = gs.Graph()
         _input = gs.Variable(name = 'input_1')
         output = graph.layer(inputs = [_input], outputs = ['gemm_out'], op = 'Gemm', name = 'gemm')
@@ -141,14 +136,14 @@ class GEMMRequantMergePass(ReplaceSequentialPatternPass):
         graph.outputs.append(output)
         graph.inputs.append(_input)
 
-        name = f"_MERGE_GEMM_RQ_PASS"
-        super().__init__(graph, merge_gemm_rq_fun, name)
+        name = "_MERGE_GEMM_RQ_PASS"
+        super().__init__(graph, _merge_gemm_rq_fun, name)
 
 
+@contextagnostic
 class MatMulRequantMergePass(ReplaceSequentialPatternPass):
 
     def __init__(self):
-        passes = []
         graph = gs.Graph()
         _input = gs.Variable(name = 'input_1')
         output = graph.layer(inputs = [_input], outputs = ['gemm_out'], op = 'MatMul', name = 'gemm')
@@ -156,11 +151,11 @@ class MatMulRequantMergePass(ReplaceSequentialPatternPass):
         graph.outputs.append(output)
         graph.inputs.append(_input)
 
-        name = f"_MERGE_MATMUL_RQ_PASS"
-        super().__init__(graph, merge_gemm_rq_fun, name)
+        name = "_MERGE_MATMUL_RQ_PASS"
+        super().__init__(graph, _merge_gemm_rq_fun, name)
 
 
-def align_mhsa_fun(ctxt: NetworkContext, graph: gs.Graph, match: Match, name: str):
+def _align_mhsa_fun(graph: gs.Graph, match: Match, name: str):
     matched_nodes = [m for k, m in match.nodes_map.items()]
     mhsa = matched_nodes[0]
 
@@ -179,24 +174,24 @@ def align_mhsa_fun(ctxt: NetworkContext, graph: gs.Graph, match: Match, name: st
         mhsa.attrs[f'{name}_requant_shift'] = gs.Constant(name = f'{name}_requant_shift',
                                                           values = np.array(remainingShift))
 
-    return ctxt, graph
+    return graph
 
 
+@contextagnostic
 class MHSAAlignmentPass(ReplaceSequentialPatternPass):
 
     def __init__(self):
-        passes = []
         graph = gs.Graph()
         _input = gs.Variable(name = 'input_1')
         output = graph.layer(inputs = [_input], outputs = ['gemm_out'], op = 'MultiHeadSelfAttention', name = 'mhsa')
         graph.outputs.append(output)
         graph.inputs.append(_input)
 
-        name = f"_ALIGN_MHSA_PASS"
-        super().__init__(graph, align_mhsa_fun, name)
+        name = "_ALIGN_MHSA_PASS"
+        super().__init__(graph, _align_mhsa_fun, name)
 
 
-def align_linear_attention_fun(ctxt: NetworkContext, graph: gs.Graph, match: Match, name: str):
+def _align_linear_attention_fun(graph: gs.Graph, match: Match, name: str):
     matched_nodes = [m for k, m in match.nodes_map.items()]
     linearattn = matched_nodes[0]
 
@@ -218,18 +213,18 @@ def align_linear_attention_fun(ctxt: NetworkContext, graph: gs.Graph, match: Mat
         linearattn.attrs[f'{name}_requant_shift'] = gs.Constant(name = f'{name}_requant_shift',
                                                                 values = np.array(remainingShift))
 
-    return ctxt, graph
+    return graph
 
 
+@contextagnostic
 class LinearAttentionAlignmentPass(ReplaceSequentialPatternPass):
 
     def __init__(self):
-        passes = []
         graph = gs.Graph()
         _input = gs.Variable(name = 'input_1')
         output = graph.layer(inputs = [_input], outputs = ['gemm_out'], op = 'LinearAttention', name = 'LA')
         graph.outputs.append(output)
         graph.inputs.append(_input)
 
-        name = f"_ALIGN_LinearAttention_PASS"
-        super().__init__(graph, align_linear_attention_fun, name)
+        name = "_ALIGN_LinearAttention_PASS"
+        super().__init__(graph, _align_linear_attention_fun, name)

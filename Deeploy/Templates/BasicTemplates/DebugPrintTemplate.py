@@ -1,6 +1,6 @@
 # ----------------------------------------------------------------------
 #
-# File: DebugTemplate.py
+# File: DebugPrintTemplate.py
 #
 # Last edited: 14.12.2022
 #
@@ -23,19 +23,17 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import Dict, Tuple
-from mako.template import Template
+from typing import Dict, List, Tuple
 
-from Deeploy.DeeployTypes import NodeTemplate, NetworkContext
-from Deeploy.DataTypes.BasicDataTypes import *
+from Deeploy.DeeployTypes import NetworkContext, NodeTemplate
 
 
-class _DebugTemplate(NodeTemplate):
+class _DebugPrintTemplate(NodeTemplate):
 
     def __init__(self, templateStr):
         super().__init__(templateStr)
 
-    def alignToContext(self, ctxt: NetworkContext, nodeRep: Dict) -> Tuple[NetworkContext, Dict]:
+    def alignToContext(self, ctxt: NetworkContext, nodeRep: Dict) -> Tuple[NetworkContext, Dict, List[str]]:
         ctxt = ctxt.copy()
 
         data_in = ctxt.lookup(nodeRep['data_in'])
@@ -46,31 +44,37 @@ class _DebugTemplate(NodeTemplate):
         nodeRep['data_in_signed'] = data_in._signed
         nodeRep['offset'] = (data_in._signed == 0) * int(data_in.nLevels / 2)
 
-        return ctxt, nodeRep
+        nodeRep['output_name'] = ctxt._mangle("outputs") + "[0]" if ctxt.outputs(
+        )[0].name == data_out.name else ctxt._mangle(data_out.name)
+
+        return ctxt, nodeRep, []
 
 
-referenceTemplate = _DebugTemplate("""
+referenceTemplate = _DebugPrintTemplate("""
 <%
-tensor_type = "Input" if "input" in node_name else "Output"
-tensor_name = node_name.replace("_input", "").replace("_output", "")
+tensor_type = "Input" if "input" in nodeName else "Output"
+tensor_name = nodeName.replace("_input", "").replace("_output", "")
 %>
 
-// Debug (Name: ${node_name}, Op: ${node_op})
+// Debug Print (Name: ${nodeName}, Op: ${nodeOp})
 BEGIN_SINGLE_CORE
     ${data_out} = ${data_in};
+% if output_name != data_out:
+    ${output_name} = ${data_out};
+%endif
     deeploy_log("[DEBUG] ${tensor_type} ${tensor_name} (Buffer ${data_in}, Signed: ${data_in_signed}):\\r\\n");
 
     %if channels_first:
     %if data_in_signed:
-        PrintMatrix_s${data_in_type._value_}_NCHW(${data_in}, ${batch}, ${dim_im_in_ch}, ${dim_im_in_x}, ${dim_im_in_y}, ${offset});
+        PrintMatrix_s${data_in_type.referencedType.typeWidth}_NCHW(${data_in}, ${batch}, ${dim_im_in_ch}, ${dim_im_in_x}, ${dim_im_in_y}, ${offset});
     %else:
-        PrintMatrix_u${data_in_type._value_}_NCHW((uint${data_in_type._value_}_t *) ${data_in}, ${batch}, ${dim_im_in_ch}, ${dim_im_in_x}, ${dim_im_in_y}, ${offset});
+        PrintMatrix_u${data_in_type.referencedType.typeWidth}_NCHW((uint${data_in_type.referencedType.typeWidth}_t *) ${data_in}, ${batch}, ${dim_im_in_ch}, ${dim_im_in_x}, ${dim_im_in_y}, ${offset});
     %endif
     %else:
     %if data_in_signed:
-        PrintMatrix_s${data_in_type._value_}_NHWC(${data_in}, ${batch}, ${dim_im_in_ch}, ${dim_im_in_x}, ${dim_im_in_y}, ${offset});
+        PrintMatrix_s${data_in_type.referencedType.typeWidth}_NHWC(${data_in}, ${batch}, ${dim_im_in_ch}, ${dim_im_in_x}, ${dim_im_in_y}, ${offset});
     %else:
-        PrintMatrix_u${data_in_type._value_}_NHWC((uint${data_in_type._value_}_t *) ${data_in}, ${batch}, ${dim_im_in_ch}, ${dim_im_in_x}, ${dim_im_in_y}, ${offset});
+        PrintMatrix_u${data_in_type.referencedType.typeWidth}_NHWC((uint${data_in_type.referencedType.typeWidth}_t *) ${data_in}, ${batch}, ${dim_im_in_ch}, ${dim_im_in_x}, ${dim_im_in_y}, ${offset});
     %endif
     %endif
 END_SINGLE_CORE

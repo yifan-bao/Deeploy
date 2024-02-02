@@ -25,18 +25,19 @@
 
 from Deeploy.DeeployTypes import NodeTemplate
 
-referenceInitTemplate = NodeTemplate("${type}* ${name};\n")
-referenceAllocateTemplate = NodeTemplate("${name} = (${type}*) deeploy_malloc(sizeof(${type}) * ${size});\n")
+referenceInitTemplate = NodeTemplate("${type.typeName} ${name};\n")
+referenceAllocateTemplate = NodeTemplate(
+    "${name} = (${type.typeName}) deeploy_malloc(${type.referencedType.typeWidth//8} * ${size});\n")
 
-referenceGlobalInitTemplate = NodeTemplate("static ${type} ${name}[${size}] = {${values}};\n")
+referenceGlobalInitTemplate = NodeTemplate("static ${type.referencedType.typeName} ${name}[${size}] = {${values}};\n")
 #referenceGlobalInitTemplate = NodeTemplate("static const ${type} ${name}[${size}];\n")
 referenceGlobalAllocateTemplate = NodeTemplate("")
 
 referenceStructInitTemplate = NodeTemplate("""
-static ${type} ${name};
+static ${type.typeName} ${name};
 """)
 #static const ${type}* ${name} = &${name}_UL;
 
-referenceStructAllocateTemplate = NodeTemplate(""" % for key, value in structDict.items():
-    ${name}.${key} = ${value};
-% endfor """)
+referenceStructAllocateTemplate = NodeTemplate("""
+    ${name} = (${structDict.typeName}) ${str(structDict)};
+""")

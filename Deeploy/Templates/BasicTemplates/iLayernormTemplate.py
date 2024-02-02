@@ -23,9 +23,26 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from Deeploy.DeeployTypes import NodeTemplate
+from typing import Dict, Tuple
 
-referenceTemplate = NodeTemplate("""
-// iLayernorm (Name: ${node_name}, Op: ${node_op})
-SINGLE_CORE Layernorm_s${data_in_type._value_}_s${data_out_type._value_}(${data_in}, ${data_out}, ${weight}, ${bias}, ${size}, ${lastDimLength}, ${log2D});
+from Deeploy.DeeployTypes import NetworkContext, NodeTemplate
+
+
+class _iLayerNormTemplate(NodeTemplate):
+
+    def __init__(self, templateStr):
+        super().__init__(templateStr)
+
+    def alignToContext(self, ctxt: NetworkContext, nodeRep: Dict) -> Tuple[NetworkContext, Dict]:
+        ctxt = ctxt.copy()
+
+        data_in = ctxt.lookup(nodeRep['data_in'])
+        nodeRep['input_offset'] = (data_in._signed == 0) * int(data_in.nLevels / 2)
+
+        return ctxt, nodeRep, []
+
+
+referenceTemplate = _iLayerNormTemplate("""
+// iLayernorm (Name: ${nodeName}, Op: ${nodeOp})
+SINGLE_CORE Layernorm_s${data_in_type.referencedType.typeWidth}_s${data_out_type.referencedType.typeWidth}(${data_in}, ${data_out}, ${weight}, ${bias}, ${input_offset}, ${size}, ${lastDimLength}, ${log2D});
 """)

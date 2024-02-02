@@ -10,3 +10,6 @@
 [submodule "deeploybasiclibs"]
 	path = deeploybasiclibs
 	url = git@iis-git.ee.ethz.ch:deeploy/deeploybasiclibs.git
+[submodule "deeploypulplibs"]
+	path = deeploypulplibs
+	url = git@iis-git.ee.ethz.ch:deeploy/deeploypulplibs.git

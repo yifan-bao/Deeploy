@@ -7,13 +7,13 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "Deeploy"
 description = "Deeploy - Bring your networks to your platforms"
-version = '0.0.1'
+version = '0.1.0'
 readme = "README.md"
 requires-python = ">=3.7"
 dependencies = [
-'protobuf',
+'protobuf==4.23.3',
 'numpy',
-'onnx',
+'onnx==1.14.0',
 'mako',
 'IPython',
 'argparse',
@@ -21,7 +21,11 @@ dependencies = [
 'pyserial',
 'clang-format',
 'toml',
-'yapf',
+'dill',
+'pytest',
+'yapf==0.33.0',
+'isort==5.12.0',
+"ortools",
 "onnx-graphsurgeon @ https://developer.download.nvidia.com/compute/redist/onnx-graphsurgeon/onnx_graphsurgeon-0.3.20-py2.py3-none-any.whl"
 ]
 [tool.setuptools]
