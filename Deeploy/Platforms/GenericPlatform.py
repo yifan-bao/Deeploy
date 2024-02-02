@@ -25,36 +25,51 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import onnx_graphsurgeon as gs
+from typing import List
 
-from Deeploy.Parsers.BasicParsers import *
-from Deeploy.Parsers.GenericParsers import *
-
-from Deeploy.Layers.BasicLayers import *
-
-from Deeploy.Bindings.BasicBindings import *
-
-from Deeploy.OptimizationPasses.BasicPasses import *
-from Deeploy.OptimizationPasses.DebugPasses import *
+from Deeploy.Bindings.BasicBindings import BasicAddBindings, BasicConv1DBinding, BasicConv2DBinding, \
+    BasicDebugPrintBindings, BasicDWConv1DBinding, BasicDWConv2DBinding, BasicGatherBindings, BasicGELUBinding, \
+    BasicGEMMBinding, BasicIntegerDivBinding, BasicITASoftmaxBinding, BasicLayerNormBinding, BasicMatMulBinding, \
+    BasicMaxPool2DBinding, BasicMulBindings, BasicPad1DBindings, BasicPad2DBindings, BasicReduceMeanBindings, \
+    BasicReduceSumBindings, BasicReshapeBindings, BasicRQIntegerDivBinding, BasicRQSBindings, BasicRQSGELUBinding, \
+    BasicSliceBindings, BasicSoftmaxBinding, BasicTransposeBindings, DummyBinding
+from Deeploy.DataTypes.BasicDataTypes import SignedIntegerDataTypes as DataTypes
+from Deeploy.DeeployTypes import ConstantBuffer, DeploymentPlatform, NodeMapper, NodeTemplate, StructBuffer, \
+    TopologyOptimizer, TransientBuffer, VariableBuffer
+from Deeploy.Layers.BasicLayers import AddLayer, ConvLayer, DebugPrintLayer, GatherLayer, GEMMLayer, IntegerDivLayer, \
+    ITAMaxLayer, MatMulLayer, MaxPoolLayer, MulLayer, PadLayer, ReduceMeanLayer, ReduceSumLayer, RequantShiftLayer, \
+    ReshapeLayer, RQIntegerDivLayer, RQSiGELULayer, SliceLayer, TransposeLayer, iGELULayer, iLayerNormLayer, \
+    iSoftmaxLayer
+from Deeploy.OptimizationPasses.TopologyOptimizationPasses.BasicPasses import ExtractPaddingFromConvPass, \
+    ExtractPaddingFromPoolPass, MatMulAddMergePass, MergeConstAddAndRequantPass, iGELURequantMergePass
+from Deeploy.Parsers.BasicParsers import AddParser, DebugParser, DummyParser, FlattenParser, GatherParser, \
+    IntegerDivParser, ITAMaxParser, MatMulParser, MulParser, Pad1DParser, Pad2DParser, ReduceMeanParser, \
+    ReduceSumParser, RequantShiftParser, ReshapeParser, RQIntegerDivParser, RQSiGELUParser, SliceParser, \
+    TransposeParser, UnsqueezeParser, iGELUParser, iLayerNormParser, iSoftmaxParser
+from Deeploy.Parsers.GenericParsers import GenericConv1DParser, GenericConv2DParser, GenericDWConv1DParser, \
+    GenericDWConv2DParser, GenericGEMMParser, GenericMaxPool2DParser
+from Deeploy.Templates.BasicTemplates import AllocateTemplate, FreeTemplate
 
 AddMapper = NodeMapper(AddParser(), BasicAddBindings)
 Conv1DMapper = NodeMapper(GenericConv1DParser(), [BasicConv1DBinding])
-DWConv1DMapper = NodeMapper(GenericDWConv1DParser(), [BasicDWConv1DBinding])
 Conv2DMapper = NodeMapper(GenericConv2DParser(), [BasicConv2DBinding])
+DebugMapper = NodeMapper(DebugParser(), BasicDebugPrintBindings)
+DWConv1DMapper = NodeMapper(GenericDWConv1DParser(), [BasicDWConv1DBinding])
 DWConv2DMapper = NodeMapper(GenericDWConv2DParser(), [BasicDWConv2DBinding])
-DebugMapper = NodeMapper(DebugParser(), BasicDebugBindings)
 FlattenMapper = NodeMapper(FlattenParser(), BasicReshapeBindings)
 GatherMapper = NodeMapper(GatherParser(), BasicGatherBindings)
 GELUMapper = NodeMapper(iGELUParser(), [BasicGELUBinding])
 GEMMMapper = NodeMapper(GenericGEMMParser(), [BasicGEMMBinding])
 iLayerNormMapper = NodeMapper(iLayerNormParser(), [BasicLayerNormBinding])
 IntegerDivMapper = NodeMapper(IntegerDivParser(), [BasicIntegerDivBinding])
+ITAMaxMapper = NodeMapper(ITAMaxParser(), [BasicITASoftmaxBinding])
 MatMulMapper = NodeMapper(MatMulParser(), [BasicMatMulBinding])
 MaxPoolMapper = NodeMapper(GenericMaxPool2DParser(), [BasicMaxPool2DBinding])
 MulMapper = NodeMapper(MulParser(), BasicMulBindings)
 Pad1DMapper = NodeMapper(Pad1DParser(), BasicPad1DBindings)
 Pad2DMapper = NodeMapper(Pad2DParser(), BasicPad2DBindings)
 ReduceMeanMapper = NodeMapper(ReduceMeanParser(), BasicReduceMeanBindings)
+ReduceSumMapper = NodeMapper(ReduceSumParser(), BasicReduceSumBindings)
 RequantShiftMapper = NodeMapper(RequantShiftParser(), BasicRQSBindings)
 ReshapeMapper = NodeMapper(ReshapeParser(), BasicReshapeBindings)
 RQGELUMapper = NodeMapper(RQSiGELUParser(), [BasicRQSGELUBinding])
@@ -63,6 +78,8 @@ SoftmaxMapper = NodeMapper(iSoftmaxParser(), [BasicSoftmaxBinding])
 TransposeMapper = NodeMapper(TransposeParser(), BasicTransposeBindings)
 UnsqueezeMapper = NodeMapper(UnsqueezeParser(), BasicReshapeBindings)
 
+SliceMapper = NodeMapper(SliceParser(), BasicSliceBindings)
+
 # Dummy nodes are intended for development purposes only!
 # They should always generate compiler errors to not accidentally end up in production code
 DummyMapper = NodeMapper(DummyParser(), [DummyBinding])
@@ -70,7 +87,7 @@ DummyMapper = NodeMapper(DummyParser(), [DummyBinding])
 GenericMapping = {
     'Add': AddLayer([AddMapper]),
     'Conv': ConvLayer([Conv2DMapper, DWConv2DMapper, Conv1DMapper, DWConv1DMapper]),
-    'Debug': DebugLayer([DebugMapper]),
+    'DebugPrint': DebugPrintLayer([DebugMapper]),
     'Div': IntegerDivLayer([IntegerDivMapper]),
     'Flatten': ReshapeLayer([FlattenMapper]),
     'Gather': GatherLayer([GatherMapper]),
@@ -80,19 +97,21 @@ GenericMapping = {
     'IntegerDiv': IntegerDivLayer([IntegerDivMapper]),
     'IntegerMean': ReduceMeanLayer([ReduceMeanMapper]),
     'iSoftmax': iSoftmaxLayer([SoftmaxMapper]),
+    'ITAMax': ITAMaxLayer([ITAMaxMapper]),
     'MatMul': GEMMLayer([MatMulMapper]),
     'MatMulInteger': MatMulLayer([MatMulMapper]),
     'MaxPool': MaxPoolLayer([MaxPoolMapper]),
     'Mul': MulLayer([MulMapper]),
     'Pad': PadLayer([Pad1DMapper, Pad2DMapper]),
     'ReduceMean': ReduceMeanLayer([ReduceMeanMapper]),
+    'ReduceSum': ReduceSumLayer([ReduceSumMapper]),
     'RequantizediGELU': RQSiGELULayer([RQGELUMapper]),
     'RequantShift': RequantShiftLayer([RequantShiftMapper]),
-    'RQIntegerDiv': RQIntegerDivLayer([RQIntegerDivMapper]),
     'Reshape': ReshapeLayer([ReshapeMapper]),
+    'RQIntegerDiv': RQIntegerDivLayer([RQIntegerDivMapper]),
     'Transpose': TransposeLayer([TransposeMapper]),
     'Unsqueeze': ReshapeLayer([UnsqueezeMapper]),
-
+    'Slice': SliceLayer([SliceMapper])
     # # For example, you can use the DummpyMapper, in case you want to test
     # # deployment or optimizations with GlobalAveragePool nodes but did not yet
     # # implement the corresponding kernel
@@ -100,110 +119,35 @@ GenericMapping = {
 }
 
 
-def GenericTypeInfer(node: gs.Node):
-    if hasattr(node, 'values'):
-        assert len(node.outputs) <= 1, "Expected node for type inference to only have ONE output!"
-        outNode = node
-    else:
-        import IPython
-        IPython.embed()
-        raise ValueError("TypeInfer was given a wrong type of node!")
+class GenericVariableBuffer(VariableBuffer):
 
-    if hasattr(outNode, 'signed') and outNode.attrs['signed']:
-        signed = True
-    else:
-        signed = False
-
-    for _type in DataTypes:
-        if signed and outNode.values.max() < 2**(_type._value_ - 1) and outNode.values.min() >= -2**(_type._value_ - 1):
-            return _type
-        # For nor we only have signed kernels
-        elif not signed and outNode.values.max() < 2**(_type._value_ - 1):
-            return _type
-
-    raise TypeError(f'Could not infer type of node {node.name}')
+    initTemplate = AllocateTemplate.referenceInitTemplate
+    allocTemplate = AllocateTemplate.referenceAllocateTemplate
+    deallocTemplate = FreeTemplate.referenceLocalTemplate
 
 
-class SimpleVariableBuffer(VariableBuffer):
+class GenericTransientBuffer(TransientBuffer):
 
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-
-    def init(self):
-        return AllocateTemplate.referenceInitTemplate.generate(type = self._type._name_, name = self.name)
-
-    def alloc(self):
-        return AllocateTemplate.referenceAllocateTemplate.generate(type = self._type._name_,
-                                                                   name = self.name,
-                                                                   size = np.prod(self.shape))
-
-    def dealloc(self):
-        return FreeTemplate.referenceLocalTemplate.generate(name = self.name)
+    initTemplate = AllocateTemplate.referenceInitTemplate
+    allocTemplate = AllocateTemplate.referenceAllocateTemplate
+    deallocTemplate = FreeTemplate.referenceLocalTemplate
 
 
-class SimpleTransientBuffer(TransientBuffer):
+class GenericConstantBuffer(ConstantBuffer):
 
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-
-    def init(self):
-        return AllocateTemplate.referenceInitTemplate.generate(type = "void", name = self.name)
-
-    def alloc(self):
-        return AllocateTemplate.referenceAllocateTemplate.generate(type = "int8_t", name = self.name, size = self.size)
-
-    def dealloc(self):
-        return FreeTemplate.referenceLocalTemplate.generate(name = self.name)
+    initTemplate = AllocateTemplate.referenceGlobalInitTemplate
+    allocTemplate = AllocateTemplate.referenceGlobalAllocateTemplate
+    deallocTemplate = FreeTemplate.referenceGlobalTemplate
 
 
-class SimpleConstantBuffer(ConstantBuffer):
+class GenericStructBuffer(StructBuffer):
 
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-
-    def init(self):
-        values = list(self.values.reshape(-1))
-        strValues = [str(value) for value in values]
-        valueString = ', '.join(strValues)
-        return AllocateTemplate.referenceGlobalInitTemplate.generate(type = self._type._name_,
-                                                                     name = self.name,
-                                                                     size = int(np.prod(self.shape)),
-                                                                     values = valueString)
-
-    def alloc(self):
-        values = list(self.values.reshape(-1))
-        strValues = [str(value) for value in values]
-        valueString = ', '.join(strValues)
-
-        return AllocateTemplate.referenceGlobalAllocateTemplate.generate(type = self._type._name_,
-                                                                         name = self.name,
-                                                                         size = int(np.prod(self.shape)),
-                                                                         values = valueString)
-
-    def dealloc(self):
-        return FreeTemplate.referenceGlobalTemplate.generate(name = self.name)
+    initTemplate = AllocateTemplate.referenceStructInitTemplate
+    allocTemplate = AllocateTemplate.referenceStructAllocateTemplate
+    deallocTemplate = NodeTemplate("")
 
 
-class SimpleStructBuffer(StructBuffer):
-
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-
-    def init(self):
-        return AllocateTemplate.referenceStructInitTemplate.generate(type = self._type,
-                                                                     name = self.name,
-                                                                     structDict = self.structDict)
-
-    def alloc(self) -> str:
-        return AllocateTemplate.referenceStructAllocateTemplate.generate(type = self._type,
-                                                                         name = self.name,
-                                                                         structDict = self.structDict)
-
-    def dealloc(self) -> str:
-        return FreeTemplate.referenceLocalTemplate.generate(name = self.name)
-
-
-GenericOptimizer = NetworkOptimizer([
+GenericOptimizer = TopologyOptimizer([
     iGELURequantMergePass(),
     MatMulAddMergePass(),
     MergeConstAddAndRequantPass(),
@@ -221,11 +165,9 @@ class GenericPlatform(DeploymentPlatform):
     def __init__(self,
                  Mapping = GenericMapping,
                  DataTypes = DataTypes,
-                 TypeInfer = GenericTypeInfer,
-                 VariableBuffer = SimpleVariableBuffer,
-                 ConstantBuffer = SimpleConstantBuffer,
-                 StructBuffer = SimpleStructBuffer,
-                 TransientBuffer = SimpleTransientBuffer,
+                 VariableBuffer = GenericVariableBuffer,
+                 ConstantBuffer = GenericConstantBuffer,
+                 StructBuffer = GenericStructBuffer,
+                 TransientBuffer = GenericTransientBuffer,
                  includeList: List[str] = includeList):
-        super().__init__(Mapping, DataTypes, TypeInfer, VariableBuffer, ConstantBuffer, StructBuffer, TransientBuffer,
-                         includeList)
+        super().__init__(Mapping, DataTypes, VariableBuffer, ConstantBuffer, StructBuffer, TransientBuffer, includeList)

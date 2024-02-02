@@ -23,12 +23,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import mako
-from typing import Dict, Tuple
-from mako.template import Template
+from typing import Dict, List, Tuple
+
 import numpy as np
 
-from Deeploy.DeeployTypes import NodeTemplate, NetworkContext
+from Deeploy.DeeployTypes import NetworkContext, NodeTemplate
+
 from .CMSISUtils import bindFCParams
 
 
@@ -37,12 +37,7 @@ class _MHSATemplate(NodeTemplate):
     def __init__(self, templateStr):
         super().__init__(templateStr)
 
-    def alignToContext(self, ctxt: NetworkContext, nodeRep: Dict) -> Tuple[NetworkContext, Dict]:
-        inputs = [
-            'q', 'k', 'v', 'wq_weight', 'wq_bias', 'wk_weight', 'wk_bias', 'wv_weight', 'wv_bias', 'wo_weight',
-            'wo_bias'
-        ]
-
+    def alignToContext(self, ctxt: NetworkContext, nodeRep: Dict) -> Tuple[NetworkContext, Dict, List[str]]:
         s = ctxt.lookup(nodeRep['q']).shape[1]
 
         data_in = ctxt.lookup(nodeRep['q'])
@@ -136,7 +131,7 @@ class _MHSATemplate(NodeTemplate):
                                      "postattn_",
                                      bias = False)
 
-        return ctxt, nodeRep
+        return ctxt, nodeRep, []
 
 
 referenceTemplate = _MHSATemplate("""

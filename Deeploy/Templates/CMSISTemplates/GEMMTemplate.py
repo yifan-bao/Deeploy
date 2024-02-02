@@ -23,10 +23,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import Dict, Tuple
-from mako.template import Template
+from typing import Dict, List, Tuple
 
-from Deeploy.DeeployTypes import NodeTemplate, NetworkContext
+from Deeploy.DeeployTypes import NetworkContext, NodeTemplate
+
 from .CMSISUtils import bindFCParams
 
 
@@ -35,18 +35,16 @@ class _GEMM_8_Template(NodeTemplate):
     def __init__(self, templateStr):
         super().__init__(templateStr)
 
-    def alignToContext(self, ctxt: NetworkContext, nodeRep: Dict) -> Tuple[NetworkContext, Dict]:
-        inputs = ['A', 'B', 'add']
+    def alignToContext(self, ctxt: NetworkContext, nodeRep: Dict) -> Tuple[NetworkContext, Dict, List[str]]:
 
         # Hoist the structs to the global ctxt
         data_in = ctxt.lookup(nodeRep['A'])
-        data_out = ctxt.lookup(nodeRep['data_out'])
         weight = ctxt.lookup(nodeRep['B'])
 
-        ctxt, nodeRep = bindFCParams(ctxt, nodeRep['data_out'], nodeRep['mul'], nodeRep['shift'], data_in, weight,
-                                     nodeRep)
+        ctxt, nodeRep, nameList = bindFCParams(ctxt, nodeRep['data_out'], nodeRep['mul'], nodeRep['shift'], data_in,
+                                               weight, nodeRep)
 
-        return ctxt, nodeRep
+        return ctxt, nodeRep, nameList
 
 
 Linear_8_Template = _GEMM_8_Template("""
@@ -68,18 +66,15 @@ class _GEMM_16_Template(NodeTemplate):
     def __init__(self, templateStr):
         super().__init__(templateStr)
 
-    def alignToContext(self, ctxt: NetworkContext, nodeRep: Dict) -> Tuple[NetworkContext, Dict]:
-        inputs = ['A', 'B', 'add']
-
+    def alignToContext(self, ctxt: NetworkContext, nodeRep: Dict) -> Tuple[NetworkContext, Dict, List[str]]:
         # Hoist the structs to the global ctxt
         data_in = ctxt.lookup(nodeRep['A'])
-        data_out = ctxt.lookup(nodeRep['data_out'])
         weight = ctxt.lookup(nodeRep['B'])
 
-        ctxt, nodeRep = bindFCParams(ctxt, nodeRep['data_out'], nodeRep['mul'], nodeRep['shift'], data_in, weight,
-                                     nodeRep)
+        ctxt, nodeRep, nameList = bindFCParams(ctxt, nodeRep['data_out'], nodeRep['mul'], nodeRep['shift'], data_in,
+                                               weight, nodeRep)
 
-        return ctxt, nodeRep
+        return ctxt, nodeRep, nameList
 
 
 Linear_16_Template = _GEMM_16_Template("""

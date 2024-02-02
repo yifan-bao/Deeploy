@@ -23,10 +23,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import Dict, Tuple
-from mako.template import Template
+from typing import Dict, List, Tuple
 
-from Deeploy.DeeployTypes import NodeTemplate, NetworkContext
+from Deeploy.DeeployTypes import NetworkContext, NodeTemplate
 
 
 class _MatMulTemplate(NodeTemplate):
@@ -34,7 +33,7 @@ class _MatMulTemplate(NodeTemplate):
     def __init__(self, templateStr):
         super().__init__(templateStr)
 
-    def alignToContext(self, ctxt: NetworkContext, nodeRep: Dict) -> Tuple[NetworkContext, Dict]:
+    def alignToContext(self, ctxt: NetworkContext, nodeRep: Dict) -> Tuple[NetworkContext, Dict, List[str]]:
         ctxt = ctxt.copy()
 
         A = ctxt.lookup(nodeRep['A'])
@@ -45,23 +44,23 @@ class _MatMulTemplate(NodeTemplate):
         nodeRep['offset_output'] = -(data_out._signed == 0) * int(data_out.nLevels / 2)
 
         # import ipdb; ipdb.set_trace()
-        return ctxt, nodeRep
+        return ctxt, nodeRep, []
 
 
 MemPoolParallelTemplate = _MatMulTemplate("""
-// MatMul Parallel (Name: ${node_name}, Op: ${node_op})
+// MatMul Parallel (Name: ${nodeName}, Op: ${nodeOp})
 mempool_barrier(numThreads);
-${A_type._name_}* ref_${data_out}_${A} = ${A};
-${B_type._name_}* ref_${data_out}_${B} = ${B};
-${data_out_type._name_}* ref_${data_out}_${data_out} = ${data_out};
+${A_type.typeName} ref_${data_out}_${A} = ${A};
+${B_type.typeName} ref_${data_out}_${B} = ${B};
+${data_out_type.typeName} ref_${data_out}_${data_out} = ${data_out};
 
 for(uint32_t i=0;i<${batch};i++){
-    MatMul_parallel_s${A_type._value_}(
-        ref_${data_out}_${A}, 
-        ref_${data_out}_${B}, 
-        ref_${data_out}_${data_out}, 
-        ${M}, 
-        ${N}, 
+    MatMul_parallel_s${A_type.referencedType.typeWidth}(
+        ref_${data_out}_${A},
+        ref_${data_out}_${B},
+        ref_${data_out}_${data_out},
+        ${M},
+        ${N},
         ${O},
         ${A_offset}, ${B_offset}, ${offset_output},
         core_id,

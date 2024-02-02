@@ -15,17 +15,17 @@ Any and all merge requests you submit can only be accepted under the Apache 2.0 
 
 ## Style guide
 
-Deeploy mainly consists of code implemented in C, Makefile, and Python. To facilitate efficient collaboration among users and contributors, it is important to maintain a consistent coding style. To achieve this, it is strongly recommend to use autoformatting tools with the provided configuration files. Additionally, the Continuous Integration (CI) system checks the adherence to the style guide for each pushed commit. Currently configuration for C using `clang-format` and for Python using `yapf`, are provided.
+Deeploy mainly consists of code implemented in C, Makefile, and Python. To facilitate efficient collaboration among users and contributors, it is important to maintain a consistent coding style. To achieve this, it is strongly recommend to use autoformatting tools with the provided configuration files. Additionally, the Continuous Integration (CI) system checks the adherence to the style guide for each pushed commit. Currently configuration for C using `clang-format` and for Python using `yapf` and `isort` are provided.
 
-To recursively format all Pyton files run
+To recursively format all Python files run
 ```bash
 $> yapf -ipr .
+$> isort Deeploy
 ```
 
 And for C files
 ```bash
-$> python scripts/run_clang_format.py -e "*/third_party/*" -ir .
+$> python scripts/run_clang_format.py -e "*/third_party/*" -e "*/install/*" -e "*/toolchain/*" -ir .
 ```
 
-Note, that third party applications should not be formatted.
-
+Note that third party applications should not be formatted.

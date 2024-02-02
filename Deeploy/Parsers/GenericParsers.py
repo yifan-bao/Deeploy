@@ -23,13 +23,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from typing import Tuple
+
 import numpy as np
-import math
 import onnx_graphsurgeon as gs
 
-from Deeploy.DeeployTypes import *
-from Deeploy.Parsers.BasicParsers import *
-from Deeploy.Bindings.BasicBindings import DataTypes
+from Deeploy.DeeployTypes import ConstantBuffer, NetworkContext
+from Deeploy.Parsers.BasicParsers import Conv1DParser, Conv2DParser, GEMMParser, MaxPool2DParser
 
 
 class GenericMaxPool2DParser(MaxPool2DParser):
@@ -41,16 +41,9 @@ class GenericMaxPool2DParser(MaxPool2DParser):
 
         wellFormed = super().parseNode(node)
         if wellFormed:
-            wellFormed = all([all([pad == 0 for pad in self.parserDict['pads']]), self.parserDict['ceil_mode'] == 0])
-            if wellFormed:
-                self.parserDict['padding_x'] = int(self.parserDict['pads'][0])
-                self.parserDict['padding_y'] = int(self.parserDict['pads'][1])
-                self.parserDict['stride_x'] = int(self.parserDict['strides'][0])
-                self.parserDict['stride_y'] = int(self.parserDict['strides'][1])
-                self.parserDict['dim_kernel_x'] = int(self.parserDict['kernel_shape'][0])
-                self.parserDict['dim_kernel_y'] = int(self.parserDict['kernel_shape'][1])
+            ret = all([all([pad == 0 for pad in self.parserDict['pads']]), self.parserDict['ceil_mode'] == 0],)
 
-        return wellFormed
+            return ret
 
     def parseNodeCtxt(self,
                       ctxt: NetworkContext,
@@ -58,28 +51,7 @@ class GenericMaxPool2DParser(MaxPool2DParser):
                       channels_first: bool = True) -> Tuple[NetworkContext, bool]:
 
         ctxt = ctxt.copy()
-        newCtxt, ret = super().parseNodeCtxt(ctxt, node)
-
-        if ret:
-
-            data_in = newCtxt.lookup(self.parserDict['data_in'])
-            data_out = newCtxt.lookup(self.parserDict['data_out'])
-
-            self.parserDict['batch'] = data_in.shape[0]
-            if channels_first:
-                self.parserDict['ch_im_in'] = data_in.shape[1]
-                self.parserDict['dim_im_in_x'] = data_in.shape[2]
-                self.parserDict['dim_im_in_y'] = data_in.shape[3]
-                self.parserDict['ch_im_out'] = data_out.shape[1]
-                self.parserDict['dim_im_out_x'] = data_out.shape[2]
-                self.parserDict['dim_im_out_y'] = data_out.shape[3]
-            else:
-                self.parserDict['ch_im_in'] = data_in.shape[3]
-                self.parserDict['dim_im_in_x'] = data_in.shape[1]
-                self.parserDict['dim_im_in_y'] = data_in.shape[2]
-                self.parserDict['ch_im_out'] = data_out.shape[3]
-                self.parserDict['dim_im_out_x'] = data_out.shape[1]
-                self.parserDict['dim_im_out_y'] = data_out.shape[2]
+        newCtxt, ret = super().parseNodeCtxt(ctxt, node, channels_first)
 
         return newCtxt, ret
 
@@ -95,18 +67,12 @@ class GenericConv1DParser(Conv1DParser):
         if wellFormed:
             ret = all([
                 # Make sure padding is square
-                node.op == 'Conv',
                 self.parserDict['group'] == 1,
                 self.parserDict['pads'][0] == self.parserDict['pads'][1],
                 self.parserDict['pads'][0] == 0,
                 all([coeff == 1 for coeff in self.parserDict['dilations']]),
             ])
 
-            if ret:
-                self.parserDict['dim_kernel_y'] = int(self.parserDict['kernel_shape'][0])
-                self.parserDict['dilation_y'] = int(self.parserDict['dilations'][0])
-                self.parserDict['padding_y'] = int(self.parserDict['pads'][0])
-                self.parserDict['stride_y'] = int(self.parserDict['strides'][0])
             return ret
 
     def parseNodeCtxt(self,
@@ -115,28 +81,12 @@ class GenericConv1DParser(Conv1DParser):
                       channels_first: bool = True) -> Tuple[NetworkContext, bool]:
 
         ctxt = ctxt.copy()
-        newCtxt, ret = super().parseNodeCtxt(ctxt, node)
+        newCtxt, ret = super().parseNodeCtxt(ctxt, node, channels_first)
 
         if ret:
             inputs = ['data_in', 'weight']
             for idx, inputNode in enumerate(node.inputs):
                 self.parserDict[inputs[idx]] = ctxt.lookup(inputNode.name).name
-
-            data_in = newCtxt.lookup(self.parserDict['data_in'])
-            data_out = newCtxt.lookup(self.parserDict['data_out'])
-
-            self.parserDict['batch'] = data_in.shape[0]
-            if channels_first:
-                self.parserDict['ch_im_in'] = data_in.shape[1]
-                self.parserDict['dim_im_in_y'] = data_in.shape[2]
-                self.parserDict['ch_im_out'] = data_out.shape[1]
-                self.parserDict['dim_im_out_y'] = data_out.shape[2]
-            else:
-                self.parserDict['ch_im_in'] = data_in.shape[2]
-                self.parserDict['dim_im_in_y'] = data_in.shape[1]
-                self.parserDict['ch_im_out'] = data_out.shape[2]
-                self.parserDict['dim_im_out_y'] = data_out.shape[1]
-            # import IPython;IPython.embed()
 
             return newCtxt, True
 
@@ -154,17 +104,11 @@ class GenericDWConv1DParser(Conv1DParser):
         if wellFormed:
             ret = all([
                 # Make sure padding is square
-                node.op == 'Conv',
                 self.parserDict['pads'][0] == self.parserDict['pads'][1],
                 self.parserDict['pads'][0] == 0,
                 all([coeff == 1 for coeff in self.parserDict['dilations']]),
             ])
 
-            if ret:
-                self.parserDict['dim_kernel_y'] = int(self.parserDict['kernel_shape'][0])
-                self.parserDict['dilation_y'] = int(self.parserDict['dilations'][0])
-                self.parserDict['padding_y'] = int(self.parserDict['pads'][0])
-                self.parserDict['stride_y'] = int(self.parserDict['strides'][0])
             return ret
 
     def parseNodeCtxt(self,
@@ -173,27 +117,12 @@ class GenericDWConv1DParser(Conv1DParser):
                       channels_first: bool = True) -> Tuple[NetworkContext, bool]:
 
         ctxt = ctxt.copy()
-        newCtxt, ret = super().parseNodeCtxt(ctxt, node)
+        newCtxt, ret = super().parseNodeCtxt(ctxt, node, channels_first)
 
         if ret:
             inputs = ['data_in', 'weight']
             for idx, inputNode in enumerate(node.inputs):
                 self.parserDict[inputs[idx]] = ctxt.lookup(inputNode.name).name
-
-            data_in = newCtxt.lookup(self.parserDict['data_in'])
-            data_out = newCtxt.lookup(self.parserDict['data_out'])
-
-            self.parserDict['batch'] = data_in.shape[0]
-            if channels_first:
-                self.parserDict['ch_im_in'] = data_in.shape[1]
-                self.parserDict['dim_im_in_y'] = data_in.shape[2]
-                self.parserDict['ch_im_out'] = data_out.shape[1]
-                self.parserDict['dim_im_out_y'] = data_out.shape[2]
-            else:
-                self.parserDict['ch_im_in'] = data_in.shape[2]
-                self.parserDict['dim_im_in_y'] = data_in.shape[1]
-                self.parserDict['ch_im_out'] = data_out.shape[2]
-                self.parserDict['dim_im_out_y'] = data_out.shape[1]
 
             if self.parserDict['group'] == self.parserDict['ch_im_in']:
                 return newCtxt, True
@@ -212,7 +141,6 @@ class GenericConv2DParser(Conv2DParser):
         if wellFormed:
             ret = all([
                 # Make sure padding is square
-                node.op == 'Conv',
                 self.parserDict['group'] == 1,
                 self.parserDict['pads'][0] == self.parserDict['pads'][2],
                 self.parserDict['pads'][1] == self.parserDict['pads'][3],
@@ -220,16 +148,6 @@ class GenericConv2DParser(Conv2DParser):
                 self.parserDict['pads'][0] == 0,
                 all([coeff == 1 for coeff in self.parserDict['dilations']]),
             ])
-
-            if ret:
-                self.parserDict['dim_kernel_x'] = int(self.parserDict['kernel_shape'][0])
-                self.parserDict['dim_kernel_y'] = int(self.parserDict['kernel_shape'][1])
-                self.parserDict['dilation_x'] = int(self.parserDict['dilations'][0])
-                self.parserDict['dilation_y'] = int(self.parserDict['dilations'][1])
-                self.parserDict['padding_x'] = int(self.parserDict['pads'][0])
-                self.parserDict['padding_y'] = int(self.parserDict['pads'][1])
-                self.parserDict['stride_x'] = int(self.parserDict['strides'][0])
-                self.parserDict['stride_y'] = int(self.parserDict['strides'][1])
 
             return ret
 
@@ -239,33 +157,12 @@ class GenericConv2DParser(Conv2DParser):
                       channels_first: bool = True) -> Tuple[NetworkContext, bool]:
 
         ctxt = ctxt.copy()
-        newCtxt, ret = super().parseNodeCtxt(ctxt, node)
+        newCtxt, ret = super().parseNodeCtxt(ctxt, node, channels_first)
 
         if ret:
             inputs = ['data_in', 'weight']
             for idx, inputNode in enumerate(node.inputs):
                 self.parserDict[inputs[idx]] = ctxt.lookup(inputNode.name).name
-
-            data_in = newCtxt.lookup(self.parserDict['data_in'])
-            data_out = newCtxt.lookup(self.parserDict['data_out'])
-
-            self.parserDict['batch'] = data_in.shape[0]
-            if channels_first:
-                self.parserDict['ch_im_in'] = data_in.shape[1]
-                self.parserDict['dim_im_in_x'] = data_in.shape[2]
-                self.parserDict['dim_im_in_y'] = data_in.shape[3]
-                self.parserDict['ch_im_out'] = data_out.shape[1]
-                self.parserDict['dim_im_out_x'] = data_out.shape[2]
-                self.parserDict['dim_im_out_y'] = data_out.shape[3]
-            else:
-                self.parserDict['ch_im_in'] = data_in.shape[3]
-                self.parserDict['dim_im_in_x'] = data_in.shape[1]
-                self.parserDict['dim_im_in_y'] = data_in.shape[2]
-                self.parserDict['ch_im_out'] = data_out.shape[3]
-                self.parserDict['dim_im_out_x'] = data_out.shape[1]
-                self.parserDict['dim_im_out_y'] = data_out.shape[2]
-            # import IPython;IPython.embed()
-
             return newCtxt, True
 
         return ctxt, False
@@ -282,23 +179,12 @@ class GenericDWConv2DParser(Conv2DParser):
         if wellFormed:
             ret = all([
                 # Make sure padding is square
-                node.op == 'Conv',
                 self.parserDict['pads'][0] == self.parserDict['pads'][2],
                 self.parserDict['pads'][1] == self.parserDict['pads'][3],
                 self.parserDict['pads'][0] == self.parserDict['pads'][1],
                 self.parserDict['pads'][0] == 0,
                 all([coeff == 1 for coeff in self.parserDict['dilations']]),
             ])
-
-            if ret:
-                self.parserDict['dim_kernel_x'] = int(self.parserDict['kernel_shape'][0])
-                self.parserDict['dim_kernel_y'] = int(self.parserDict['kernel_shape'][1])
-                self.parserDict['dilation_x'] = int(self.parserDict['dilations'][0])
-                self.parserDict['dilation_y'] = int(self.parserDict['dilations'][1])
-                self.parserDict['padding_x'] = int(self.parserDict['pads'][0])
-                self.parserDict['padding_y'] = int(self.parserDict['pads'][1])
-                self.parserDict['stride_x'] = int(self.parserDict['strides'][0])
-                self.parserDict['stride_y'] = int(self.parserDict['strides'][1])
 
             return ret
 
@@ -308,32 +194,12 @@ class GenericDWConv2DParser(Conv2DParser):
                       channels_first: bool = True) -> Tuple[NetworkContext, bool]:
 
         ctxt = ctxt.copy()
-        newCtxt, ret = super().parseNodeCtxt(ctxt, node)
+        newCtxt, ret = super().parseNodeCtxt(ctxt, node, channels_first)
 
         if ret:
             inputs = ['data_in', 'weight']
             for idx, inputNode in enumerate(node.inputs):
                 self.parserDict[inputs[idx]] = ctxt.lookup(inputNode.name).name
-
-            data_in = newCtxt.lookup(self.parserDict['data_in'])
-            data_out = newCtxt.lookup(self.parserDict['data_out'])
-
-            self.parserDict['batch'] = data_in.shape[0]
-            if channels_first:
-                self.parserDict['ch_im_in'] = data_in.shape[1]
-                self.parserDict['dim_im_in_x'] = data_in.shape[2]
-                self.parserDict['dim_im_in_y'] = data_in.shape[3]
-                self.parserDict['ch_im_out'] = data_out.shape[1]
-                self.parserDict['dim_im_out_x'] = data_out.shape[2]
-                self.parserDict['dim_im_out_y'] = data_out.shape[3]
-            else:
-                self.parserDict['ch_im_in'] = data_in.shape[3]
-                self.parserDict['dim_im_in_x'] = data_in.shape[1]
-                self.parserDict['dim_im_in_y'] = data_in.shape[2]
-                self.parserDict['ch_im_out'] = data_out.shape[3]
-                self.parserDict['dim_im_out_x'] = data_out.shape[1]
-                self.parserDict['dim_im_out_y'] = data_out.shape[2]
-
             if self.parserDict['group'] == self.parserDict['ch_im_in']:
                 return newCtxt, True
 
@@ -356,7 +222,7 @@ class GenericGEMMParser(GEMMParser):
                       channels_first: bool = True) -> Tuple[NetworkContext, bool]:
 
         ctxt = ctxt.copy()
-        newCtxt, ret = super().parseNodeCtxt(ctxt, node)
+        newCtxt, ret = super().parseNodeCtxt(ctxt, node, channels_first)
         if ret:
             # Try to scale A offline if possible, else fail
             if not self.parserDict['alpha'].is_integer():

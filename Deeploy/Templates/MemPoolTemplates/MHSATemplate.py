@@ -23,12 +23,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import Dict, Tuple
-from mako.template import Template
-import numpy as np
+from typing import Dict, List, Tuple
 
-from Deeploy.DeeployTypes import NodeTemplate, NetworkContext, ConstantBuffer
-from Deeploy.DataTypes.BasicDataTypes import DataTypes
+import numpy as np
+import onnx_graphsurgeon as gs
+
+from Deeploy.AbstractDataTypes import Pointer
+from Deeploy.DataTypes.BasicDataTypes import IntegerDataTypes as DataTypes
+from Deeploy.DeeployTypes import ConstantBuffer, NetworkContext, NodeTemplate
 
 # ITA Configuration
 _SPLIT = 4
@@ -43,7 +45,9 @@ class _MHSATemplate(NodeTemplate):
         super().__init__(templateStr)
 
     def alignToContext(self, ctxt: NetworkContext, nodeRep: Dict) -> Tuple[NetworkContext, Dict]:
-        node_name = nodeRep['node_name']
+        nameList = []
+
+        nodeName = nodeRep['nodeName']
 
         data_out = ctxt.lookup(nodeRep['data_out'])
 
@@ -57,7 +61,7 @@ class _MHSATemplate(NodeTemplate):
         wo_weight = ctxt.lookup(nodeRep['wo_weight'])
         q = ctxt.lookup(nodeRep['q'])
         k = ctxt.lookup(nodeRep['k'])
-        v = ctxt.lookup(nodeRep['v'])
+        # v = ctxt.lookup(nodeRep['v'])
 
         # Disable buffers
         wq_bias._deploy = False
@@ -138,47 +142,90 @@ class _MHSATemplate(NodeTemplate):
             wq_bias_ita,
         ])
 
-        data_in = ctxt.ConstantBuffer(name = f'{node_name}_input', nLevels = 256, shape = data.shape, values = data)
-        data_in._type = DataTypes.int8_t
-        data_in._signed = True
+        data_in = ctxt.ConstantBuffer(name = f'{nodeName}_input', shape = data.shape, values = data)
         ctxt.add(data_in, 'global')
+        data_in._type = Pointer(DataTypes.int8_t)
         nodeRep['data_in'] = data_in.name
+        nameList += [data_in.name]
 
-        requantization_dict = {
-            'preattn_requant_mul': nodeRep['preattn_requant_mul'],
-            'preattn_requant_div': nodeRep['preattn_requant_div'],
-            'postattn_requant_mul': nodeRep['postattn_requant_mul'],
-            'postattn_requant_div': nodeRep['postattn_requant_div'],
-            'wo_requant_mul': nodeRep['wo_requant_mul'],
-            'wo_requant_div': nodeRep['wo_requant_div'],
-            'wq_requant_mul': nodeRep['wq_requant_mul'],
-            'wq_requant_div': nodeRep['wq_requant_div'],
-            'wk_requant_mul': nodeRep['wk_requant_mul'],
-            'wk_requant_div': nodeRep['wk_requant_div'],
-            'wv_requant_mul': nodeRep['wv_requant_mul'],
-            'wv_requant_div': nodeRep['wv_requant_div']
-        }
+        def unsignedToSigned(n, byte_count):
+            return int.from_bytes(n.to_bytes(byte_count, 'little', signed = False), 'little', signed = True)
 
-        ctxt.hoistStruct(requantization_dict, f'{node_name}_rqs', 'ita_rqs_t')
-        nodeRep['requantization'] = f'{node_name}_rqs'
+        requant_mult_data = np.array([
+            unsignedToSigned(nodeRep['wq_requant_mul'], 1),
+            unsignedToSigned(nodeRep['wk_requant_mul'], 1),
+            unsignedToSigned(nodeRep['preattn_requant_mul'], 1),
+            unsignedToSigned(nodeRep['wv_requant_mul'], 1),
+            unsignedToSigned(nodeRep['postattn_requant_mul'], 1),
+            unsignedToSigned(nodeRep['wo_requant_mul'], 1),
+            0,
+            0,
+        ])
+        requant_mult = ctxt.ConstantBuffer(name = f'{nodeName}_requant_mult',
+                                           shape = requant_mult_data.shape,
+                                           values = requant_mult_data)
+        ctxt.add(requant_mult, 'global')
+        requant_mult._type = Pointer(DataTypes.int8_t)
+        nodeRep['requant_mult'] = requant_mult.name
+        nameList += [requant_mult.name]
+
+        requant_shift_data = np.array([
+            unsignedToSigned(int(np.log2(nodeRep['wq_requant_div'])), 1),
+            unsignedToSigned(int(np.log2(nodeRep['wk_requant_div'])), 1),
+            unsignedToSigned(int(np.log2(nodeRep['preattn_requant_div'])), 1),
+            unsignedToSigned(int(np.log2(nodeRep['wv_requant_div'])), 1),
+            unsignedToSigned(int(np.log2(nodeRep['postattn_requant_div'])), 1),
+            unsignedToSigned(int(np.log2(nodeRep['wo_requant_div'])), 1),
+            0,
+            0,
+        ])
+        requant_shift = ctxt.ConstantBuffer(name = f'{nodeName}_requant_shift',
+                                            shape = requant_shift_data.shape,
+                                            values = requant_shift_data)
+        ctxt.add(requant_shift, 'global')
+        requant_shift._type = Pointer(DataTypes.int8_t)
+        nodeRep['requant_shift'] = requant_shift.name
+        nameList += [requant_shift.name]
+
+        requant_add_data = np.array([
+            nodeRep['wq_requant_add'],
+            nodeRep['wk_requant_add'],
+            nodeRep['preattn_requant_add'],
+            nodeRep['wv_requant_add'],
+            nodeRep['postattn_requant_add'],
+            nodeRep['wo_requant_add'],
+            0,
+            0,
+        ])
+        requant_add = ctxt.ConstantBuffer(name = f'{nodeName}_requant_add',
+                                          shape = requant_add_data.shape,
+                                          values = requant_add_data)
+        ctxt.add(requant_add, 'global')
+        requant_add._type = Pointer(DataTypes.int8_t)
+        nodeRep['requant_add'] = requant_add.name
+        nameList += [requant_add.name]
 
         nodeRep['q_offset'] = (q._signed == 0) * int(q.nLevels // 2)
         nodeRep['k_offset'] = (k._signed == 0) * int(k.nLevels // 2)
-        nodeRep['output_offset'] = -(data_out._signed == 0) * int(data_out.nLevels // 2)
+        nodeRep['output_offset'] = 0
+        if hasattr(data_out, "_signed") and hasattr(data_out, "nLevels"):
+            nodeRep['output_offset'] = -(data_out._signed == 0) * int(data_out.nLevels // 2)
 
         # import IPython; IPython.embed()
-        return ctxt, nodeRep
+        return ctxt, nodeRep, nameList
 
 
 MemPoolParallelTemplate = _MHSATemplate("""
 
 
-// ITA MHSA (Name: ${node_name}, Op: ${node_op})
+// ITA MHSA (Name: ${nodeName}, Op: ${nodeOp})
 mempool_barrier(numThreads);
 MHSA_s8_ITA(
     ${q}, ${k}, ${data_in},
     ${S}, ${E},
-    &${requantization},
+    ${requant_mult},
+    ${requant_shift},
+    ${requant_add},
     ${data_out},
     ${q_offset}, ${k_offset}, ${output_offset},
     core_id,

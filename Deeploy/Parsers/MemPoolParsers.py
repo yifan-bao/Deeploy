@@ -23,13 +23,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import numpy as np
-import math
+from typing import Tuple
+
 import onnx_graphsurgeon as gs
 
-from Deeploy.DeeployTypes import *
-from Deeploy.Parsers.BasicParsers import *
-from Deeploy.Bindings.BasicBindings import DataTypes
+from Deeploy.DeeployTypes import NetworkContext
+from Deeploy.Parsers.BasicParsers import MHSAParser
 
 
 class MemPoolMHSAParser(MHSAParser):
@@ -44,7 +43,21 @@ class MemPoolMHSAParser(MHSAParser):
                 self.parserDict['dim_head'] <= 64,  # Projection Size
                 self.parserDict['dim'] <= 64,  # Sequence Length
                 self.parserDict['n_levels'] == 256,
+                'preattn_requant_add' in node.attrs,
+                'postattn_requant_add' in node.attrs,
+                'wo_requant_add' in node.attrs,
+                'wq_requant_add' in node.attrs,
+                'wk_requant_add' in node.attrs,
+                'wv_requant_add' in node.attrs,
             ])
+
+        if wellFormed:
+            self.parserDict['preattn_requant_add'] = int(node.attrs['preattn_requant_add'])
+            self.parserDict['postattn_requant_add'] = int(node.attrs['postattn_requant_add'])
+            self.parserDict['wo_requant_add'] = int(node.attrs['wo_requant_add'])
+            self.parserDict['wq_requant_add'] = int(node.attrs['wq_requant_add'])
+            self.parserDict['wk_requant_add'] = int(node.attrs['wk_requant_add'])
+            self.parserDict['wv_requant_add'] = int(node.attrs['wv_requant_add'])
 
         return wellFormed
 
@@ -54,7 +67,7 @@ class MemPoolMHSAParser(MHSAParser):
                       channels_first: bool = True) -> Tuple[NetworkContext, bool]:
 
         ctxt = ctxt.copy()
-        newCtxt, ret = super().parseNodeCtxt(ctxt, node)
+        newCtxt, ret = super().parseNodeCtxt(ctxt, node, channels_first)
 
         K = ctxt.lookup(self.parserDict['k'])
         V = ctxt.lookup(self.parserDict['v'])
@@ -80,18 +93,6 @@ class DebugMemPoolMHSAParser(MemPoolMHSAParser):
         if wellFormed:
             wellFormed = all([
                 self.parserDict['heads'] == 1,
-                self.parserDict['wq_requant_div'] == 2**14,
-                self.parserDict['wk_requant_div'] == 2**14,
-                self.parserDict['wv_requant_div'] == 2**14,
-                self.parserDict['preattn_requant_div'] == 2**14,
-                self.parserDict['postattn_requant_div'] == 2**14,
-                self.parserDict['wo_requant_div'] == 2**14,
-                self.parserDict['wq_requant_mul'] == 52,
-                self.parserDict['wk_requant_mul'] == 66,
-                self.parserDict['wv_requant_mul'] == 54,
-                self.parserDict['preattn_requant_mul'] == 19,
-                self.parserDict['postattn_requant_mul'] == 76,
-                self.parserDict['wo_requant_mul'] == 6,
             ])
 
         return wellFormed
@@ -101,6 +102,6 @@ class DebugMemPoolMHSAParser(MemPoolMHSAParser):
                       node: gs.Node,
                       channels_first: bool = True) -> Tuple[NetworkContext, bool]:
         ctxt = ctxt.copy()
-        newCtxt, ret = super().parseNodeCtxt(ctxt, node)
+        newCtxt, ret = super().parseNodeCtxt(ctxt, node, channels_first)
 
         return newCtxt, ret

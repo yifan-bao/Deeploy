@@ -23,30 +23,23 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import onnx
-import onnx_graphsurgeon as gs
-from typing import List
+from typing import List, Tuple
 
-from Deeploy.DeeployTypes import *
+import numpy as np
+
+from Deeploy.DeeployTypes import NetworkContext, NodeMapper, ONNXLayer, Shape
+
+
+class SliceLayer(ONNXLayer):
+
+    def __init__(self, maps: List[NodeMapper]):
+        super().__init__(maps)
 
 
 class ReshapeLayer(ONNXLayer):
 
     def __init__(self, maps: List[NodeMapper]):
         super().__init__(maps)
-
-    def generate(self, ctxt: NetworkContext, verbose: bool = False) -> Tuple[NetworkContext, List[str]]:
-        outputs = [node for node in self.node.outputs]
-        inputs = [node for node in self.node.inputs]
-
-        outputNames = [node.name for node in outputs]
-        inputNames = [node.name for node in inputs]
-
-        alloc = ctxt.allocLocal(self.node.name, outputNames)
-        call = self.mapper.generate(ctxt, verbose = verbose)
-        dealloc = ctxt.freeLocal(self.node.name, inputNames)
-
-        return (ctxt, [call])
 
 
 class GatherLayer(ONNXLayer):
@@ -61,14 +54,14 @@ class iGELULayer(ONNXLayer):
         super().__init__(maps)
 
     def computeOps(self):
-        compAbs = self.mapper.nodeRep['size']
-        compAdd = self.mapper.nodeRep['size']
-        compSqr = self.mapper.nodeRep['size']
-        compMul = self.mapper.nodeRep['size']
-        compAdd = self.mapper.nodeRep['size']
-        compMul2 = self.mapper.nodeRep['size']
-        compAdd2 = self.mapper.nodeRep['size']
-        compDiv = self.mapper.nodeRep['size']
+        compAbs = self.mapper.parser.parserDict['size']
+        compAdd = self.mapper.parser.parserDict['size']
+        compSqr = self.mapper.parser.parserDict['size']
+        compMul = self.mapper.parser.parserDict['size']
+        compAdd = self.mapper.parser.parserDict['size']
+        compMul2 = self.mapper.parser.parserDict['size']
+        compAdd2 = self.mapper.parser.parserDict['size']
+        compDiv = self.mapper.parser.parserDict['size']
         return compAbs + compAdd + compSqr + compMul + compAdd + compMul2 + compAdd2 + compDiv
 
 
@@ -84,6 +77,12 @@ class iSoftmaxLayer(ONNXLayer):
         super().__init__(maps)
 
 
+class ITAMaxLayer(ONNXLayer):
+
+    def __init__(self, maps: List[NodeMapper]):
+        super().__init__(maps)
+
+
 class RequantShiftLayer(ONNXLayer):
 
     def __init__(self, maps: List[NodeMapper]):
@@ -93,13 +92,13 @@ class RequantShiftLayer(ONNXLayer):
                       channels_first) -> Tuple[Shape, Shape]:
 
         channel_dim = inputShapes[0][1]
-        inputShapes[2] = [inputShapes[0][0], channel_dim] + list(inputShapes[1][1:])
+        inputShapes[2] = [inputShapes[0][0], channel_dim] + list(inputShapes[2][1:])
         inputShapes[1] = [inputShapes[0][0], channel_dim] + list(inputShapes[1][1:])
 
         return (inputShapes, outputShapes)
 
     def computeOps(self):
-        return self.mapper.nodeRep['size'] * 3  # One add, one mul, one div
+        return self.mapper.parser.parserDict['size'] * 3  # One add, one mul, one div
 
 
 class AddLayer(ONNXLayer):
@@ -116,7 +115,7 @@ class AddLayer(ONNXLayer):
         return (inputShapes, outputShapes)
 
     def computeOps(self):
-        return self.mapper.nodeRep['size']
+        return self.mapper.parser.parserDict['size']
 
 
 class MatMulLayer(ONNXLayer):
@@ -124,12 +123,29 @@ class MatMulLayer(ONNXLayer):
     def __init__(self, maps: List[NodeMapper]):
         super().__init__(maps)
 
-    def computeShapes(self, inputShapes: Shape, outputShapes: Shape, parserDict, channels_first) -> Tuple[Shape, Shape]:
+    def computeOps(self):
+        return 2 * self.mapper.parser.parserDict['M'] * self.mapper.parser.parserDict[
+            'N'] * self.mapper.parser.parserDict['O'] * self.mapper.parser.parserDict['batch']
+
+
+class RQMatMulLayer(MatMulLayer):
+
+    def __init__(self, maps: List[NodeMapper]):
+        super().__init__(maps)
+
+    def computeShapes(self, inputShapes: List[Shape], outputShapes: Shape, parserDict,
+                      channels_first) -> Tuple[Shape, Shape]:
+
+        channel_dim = inputShapes[0][1]
+        inputShapes[3] = [inputShapes[0][0]] + list(inputShapes[3][1:])
+        inputShapes[2] = [inputShapes[0][0]] + list(inputShapes[2][1:])
+
         return (inputShapes, outputShapes)
 
     def computeOps(self):
-        return 2 * self.mapper.nodeRep['M'] * self.mapper.nodeRep['N'] * self.mapper.nodeRep['O'] * self.mapper.nodeRep[
-            'batch']
+        matmul = super().computeOps()
+        rqs = self.mapper.parser.parserDict['size'] * 3
+        return matmul + rqs
 
 
 class IntegerDivLayer(ONNXLayer):
@@ -137,8 +153,11 @@ class IntegerDivLayer(ONNXLayer):
     def __init__(self, maps: List[NodeMapper]):
         super().__init__(maps)
 
-    def computeShapes(self, inputShapes: Shape, outputShapes: Shape, parserDict, channels_first) -> Tuple[Shape, Shape]:
-        return (inputShapes, outputShapes)
+
+class RQIntegerDivLayer(IntegerDivLayer):
+
+    def __init__(self, maps: List[NodeMapper]):
+        super().__init__(maps)
 
 
 class GEMMLayer(ONNXLayer):
@@ -162,6 +181,49 @@ class GEMMLayer(ONNXLayer):
 
         return (inputShapes, outputShapes)
 
+    def computeOps(self):
+        matmul = 2 * self.mapper.parser.parserDict['M'] * self.mapper.parser.parserDict[
+            'N'] * self.mapper.parser.parserDict['O'] * self.mapper.parser.parserDict['batch']
+        gemm = matmul + 3 * self.mapper.parser.parserDict['M'] * self.mapper.parser.parserDict[
+            'O'] * self.mapper.parser.parserDict['batch']
+
+        return gemm
+
+
+class RQGEMMLayer(GEMMLayer):
+
+    def __init__(self, maps: List[NodeMapper]):
+        super().__init__(maps)
+
+    def computeShapes(self, inputShapes: List[Shape], outputShapes: Shape, parserDict,
+                      channels_first) -> Tuple[Shape, Shape]:
+        if parserDict['transA']:
+            M = inputShapes[0][-1]
+        else:
+            M = inputShapes[0][-2]
+
+        if parserDict['transB']:
+            N = inputShapes[1][-2]
+        else:
+            N = inputShapes[1][-1]
+
+        if len(inputShapes) == 5:
+            inputShapes[2] = [M, N]
+            inputShapes[4] = [inputShapes[0][0]] + list(inputShapes[4][1:])
+            inputShapes[3] = [inputShapes[0][0]] + list(inputShapes[3][1:])
+        else:
+            inputShapes[3] = [inputShapes[0][0]] + list(inputShapes[3][1:])
+            inputShapes[2] = [
+                inputShapes[0][0],
+            ] + list(inputShapes[2][1:])
+
+        return (inputShapes, outputShapes)
+
+    def computeOps(self):
+        gemm = super().computeOps()
+        rqs = self.mapper.parser.parserDict['size'] * 3
+        return gemm + rqs
+
 
 class MulLayer(ONNXLayer):
 
@@ -183,6 +245,36 @@ class ConvLayer(ONNXLayer):
             inputShapes[2] = inputShapes[1][-1]
         return (inputShapes, outputShapes)
 
+    def computeOps(self):
+        if "group" in self.mapper.parser.parserDict:
+            groups = self.mapper.parser.parserDict['group']
+        else:
+            groups = 1
+        opsPerPx = int(
+            np.prod(self.mapper.parser.parserDict['kernel_shape']) * self.mapper.parser.parserDict['ch_im_in'] *
+            self.mapper.parser.parserDict['ch_im_out'] / groups) * 2
+        if 'dim_im_out_y' in self.mapper.parser.parserDict:
+            numPx = self.mapper.parser.parserDict['dim_im_out_x'] * self.mapper.parser.parserDict['dim_im_out_y']
+        else:
+            numPx = self.mapper.parser.parserDict['dim_im_out_x']
+        return numPx * opsPerPx
+
+
+class RQSConvLayer(ConvLayer):
+
+    def __init__(self, maps: List[NodeMapper]):
+        super().__init__(maps)
+
+    def computeOps(self):
+        conv = super().computeOps()
+
+        if 'dim_im_out_y' in self.mapper.parser.parserDict:
+            rqs = self.mapper.parser.parserDict['dim_im_out_x'] * self.mapper.parser.parserDict['dim_im_out_y'] * 3
+        else:
+            rqs = self.mapper.parser.parserDict['dim_im_out_x'] * 3
+
+        return conv + rqs
+
 
 class PadLayer(ONNXLayer):
 
@@ -202,18 +294,24 @@ class ReduceMeanLayer(ONNXLayer):
         super().__init__(maps)
 
 
+class ReduceSumLayer(ONNXLayer):
+
+    def __init__(self, maps: List[NodeMapper]):
+        super().__init__(maps)
+
+
 class iLayerNormLayer(ONNXLayer):
 
     def __init__(self, maps: List[NodeMapper]):
         super().__init__(maps)
 
     def computeOps(self):
-        compAverage = self.mapper.nodeRep['size']
-        compNormalize = self.mapper.nodeRep['size']
-        compSqr = self.mapper.nodeRep['size']
-        compSum = self.mapper.nodeRep['size']
-        compSqrt = self.mapper.nodeRep['size']
-        compDiv = self.mapper.nodeRep['size']
+        compAverage = self.mapper.parser.parserDict['size']
+        compNormalize = self.mapper.parser.parserDict['size']
+        compSqr = self.mapper.parser.parserDict['size']
+        compSum = self.mapper.parser.parserDict['size']
+        compSqrt = self.mapper.parser.parserDict['size']
+        compDiv = self.mapper.parser.parserDict['size']
         return compAverage + compNormalize + compSqr + compSum + compSqrt + compDiv
 
 
@@ -237,10 +335,10 @@ class LinearAttentionLayer(ONNXLayer):
         return (inputShapes, outputShapes)
 
     def computeOps(self):
-        # seqLen = self.mapper.nodeRep['in_C']
-        # dim = self.mapper.nodeRep['dim']
-        # dim_head = self.mapper.nodeRep['dim_head']
-        # heads = self.mapper.nodeRep['heads']
+        # seqLen = self.mapper.parser.parserDict['in_C']
+        # dim = self.mapper.parser.parserDict['dim']
+        # dim_head = self.mapper.parser.parserDict['dim_head']
+        # heads = self.mapper.parser.parserDict['heads']
         # QOps = seqLen * dim * dim_head * heads * 2
         # # WQ * Q (H )
         # KOps = seqLen * dim * dim_head * heads * 2
@@ -300,12 +398,12 @@ class CLCALayer(ONNXLayer):
 
     def computeOps(self):
 
-        qLen = self.mapper.nodeRep['q_shape'][-1]
-        kLen = self.mapper.nodeRep['kv_shape'][-1]
-        inDim = self.mapper.nodeRep['q_shape'][-2]
-        heads = self.mapper.nodeRep['heads']
-        dim_head = self.mapper.nodeRep['dim_head']
-        out_dim = self.mapper.nodeRep['out_dim']
+        qLen = self.mapper.parser.parserDict['q_shape'][-1]
+        kLen = self.mapper.parser.parserDict['kv_shape'][-1]
+        inDim = self.mapper.parser.parserDict['q_shape'][-2]
+        heads = self.mapper.parser.parserDict['heads']
+        dim_head = self.mapper.parser.parserDict['dim_head']
+        out_dim = self.mapper.parser.parserDict['out_dim']
 
         # q -> Q
         QOps = qLen * 1 * inDim * heads * dim_head * 2
@@ -334,14 +432,11 @@ class MHSALayer(ONNXLayer):
     def __init__(self, maps: List[NodeMapper]):
         super().__init__(maps)
 
-    def computeShapes(self, inputShapes: Shape, outputShapes: Shape, parserDict, channels_first) -> Tuple[Shape, Shape]:
-        return (inputShapes, outputShapes)
-
     def computeOps(self):
-        seqLen = self.mapper.nodeRep['S']
-        dim = self.mapper.nodeRep['dim']
-        dim_head = self.mapper.nodeRep['dim_head']
-        heads = self.mapper.nodeRep['heads']
+        seqLen = self.mapper.parser.parserDict['S']
+        dim = self.mapper.parser.parserDict['dim']
+        dim_head = self.mapper.parser.parserDict['dim_head']
+        heads = self.mapper.parser.parserDict['heads']
         QOps = seqLen * dim * dim_head * heads * 2
         # WQ * Q (H )
         KOps = seqLen * dim * dim_head * heads * 2
@@ -358,35 +453,7 @@ class MHSALayer(ONNXLayer):
         return totOps
 
 
-class RQIntegerDivLayer(ONNXLayer):
+class DebugPrintLayer(ONNXLayer):
 
     def __init__(self, maps: List[NodeMapper]):
         super().__init__(maps)
-
-    def computeShapes(self, inputShapes: Shape, outputShapes: Shape, parserDict, channels_first) -> Tuple[Shape, Shape]:
-        return (inputShapes, outputShapes)
-
-
-class DebugLayer(ONNXLayer):
-
-    def __init__(self, maps: List[NodeMapper]):
-        super().__init__(maps)
-
-    def computeShapes(self, inputShapes: Shape, outputShapes: Shape, parserDict, channels_first) -> Tuple[Shape, Shape]:
-        return (inputShapes, outputShapes)
-
-    def generate(self, ctxt: NetworkContext, verbose: bool = False) -> Tuple[NetworkContext, List[str]]:
-        outputs = [node for node in self.node.outputs]
-        inputs = [node for node in self.node.inputs]
-
-        outputNames = [node.name for node in outputs]
-        inputNames = [node.name for node in inputs]
-
-        # Prevent buffers from being allocated
-        # In the template we set the pointer of data_out to the value of data_in
-        ctxt.allocLocal(self.node.name, outputNames)
-        call = self.mapper.generate(ctxt, verbose = verbose)
-        ctxt.freeLocal(self.node.name, inputNames)
-
-        # Only return function call without allocation and deallocation code unlike implementation in base class
-        return (ctxt, [call])

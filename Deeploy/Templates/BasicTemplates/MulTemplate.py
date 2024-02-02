@@ -23,9 +23,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import Dict, Tuple
-from mako.template import Template
-from Deeploy.DeeployTypes import NodeTemplate, NetworkContext
+from typing import Dict, List, Tuple
+
+from Deeploy.DeeployTypes import NetworkContext, NodeTemplate
 
 
 class _MulTemplate(NodeTemplate):
@@ -33,21 +33,27 @@ class _MulTemplate(NodeTemplate):
     def __init__(self, templateStr):
         super().__init__(templateStr)
 
-    def alignToContext(self, ctxt: NetworkContext, nodeRep: Dict) -> Tuple[NetworkContext, Dict]:
+    def alignToContext(self, ctxt: NetworkContext, nodeRep: Dict) -> Tuple[NetworkContext, Dict, List[str]]:
         ctxt = ctxt.copy()
 
         A = ctxt.lookup(nodeRep['A'])
         B = ctxt.lookup(nodeRep['B'])
         C = ctxt.lookup(nodeRep['C'])
-        nodeRep['A_offset'] = (A._signed == 0) * int(A.nLevels / 2)
-        nodeRep['B_offset'] = (B._signed == 0) * int(B.nLevels / 2)
-        nodeRep['C_offset'] = -(C._signed == 0) * int(C.nLevels / 2)
+        nodeRep['A_offset'] = 0
+        nodeRep['B_offset'] = 0
+        nodeRep['C_offset'] = 0
+        if hasattr(A, "_signed") and hasattr(A, "nLevels"):
+            nodeRep['A_offset'] = (A._signed == 0) * int(A.nLevels / 2)
+        if hasattr(B, "_signed") and hasattr(B, "nLevels"):
+            nodeRep['B_offset'] = (B._signed == 0) * int(B.nLevels / 2)
+        if hasattr(C, "_signed") and hasattr(C, "nLevels"):
+            nodeRep['C_offset'] = -(C._signed == 0) * int(C.nLevels / 2)
 
-        return ctxt, nodeRep
+        return ctxt, nodeRep, []
 
 
 referenceTemplate = _MulTemplate("""
-// Mul (Name: ${node_name}, Op: ${node_op})
+// Mul (Name: ${nodeName}, Op: ${nodeOp})
 BEGIN_SINGLE_CORE
     for (uint32_t i=0;i<${size};i++){
         ${C}[i] = ((${A}[i] + ${A_offset}) * (*${B} + ${B_offset}) + ${C_offset});

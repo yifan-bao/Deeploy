@@ -25,55 +25,81 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from Deeploy.DeeployTypes import *
+from Deeploy.AbstractDataTypes import Pointer
+from Deeploy.CodeTransformationPasses import ArgumentStructGeneration, FutureGeneration, MemoryManagementGeneration, \
+    MemoryPassthroughGeneration
+from Deeploy.DataTypes.BasicDataTypes import IntegerDataTypes, SignedIntegerDataTypes, UnsignedIntegerDataTypes
+from Deeploy.DeeployTypes import CodeTransformation, NodeBinding
+from Deeploy.Templates.BasicTemplates import AddTemplate, ConvTemplate, DebugPrintTemplate, DummyTemplate, \
+    DWConvTemplate, GatherTemplate, GemmTemplate, IntegerDivTemplate, ITAMaxTemplate, MatMulTemplate, MaxPoolTemplate, \
+    MulTemplate, PadTemplate, ReduceMeanTemplate, ReduceSumTemplate, RequantShiftTemplate, ReshapeTemplate, \
+    RQIntegerDivTemplate, RQSiGELUTemplate, SliceTemplate, TransposeTemplate, iGELUTemplate, iLayernormTemplate, \
+    iSoftmaxTemplate
+from Deeploy.TypeCheckers.BasicCheckers import AddChecker, ConvChecker, DebugPrintChecker, DummyChecker, \
+    GatherChecker, GELUChecker, GEMMChecker, IntegerDivChecker, MatMulChecker, MaxPoolChecker, MulChecker, PadChecker, \
+    ReduceMeanChecker, ReduceSumChecker, RequantShiftChecker, ReshapeChecker, RQIntegerDivChecker, SliceChecker, \
+    SoftmaxChecker, TransposeChecker, iLayerNormChecker
 
-from Deeploy.DataTypes.BasicDataTypes import DataTypes
-from Deeploy.TypeCheckers.BasicCheckers import *
-from Deeploy.Templates.BasicTemplates import *
+BasicTransformer = CodeTransformation([ArgumentStructGeneration(), MemoryManagementGeneration(), FutureGeneration()])
 
-BasicAddBindings = [NodeBinding(AddChecker([type, type], [DataTypes.int32_t]), AddTemplate.referenceTemplate) for type in DataTypes]
+ReshapeSkipTransformer = CodeTransformation([ArgumentStructGeneration(), MemoryPassthroughGeneration(), FutureGeneration()])
 
-BasicConv1DBinding = NodeBinding(ConvChecker([DataTypes.int8_t, DataTypes.int8_t], [DataTypes.int32_t]), ConvTemplate.reference1DTemplate)
+BasicSliceBindings = [
+    NodeBinding(SliceChecker([Pointer(type), Pointer(UnsignedIntegerDataTypes.uint8_t), Pointer(UnsignedIntegerDataTypes.uint8_t),
+                              Pointer(UnsignedIntegerDataTypes.uint8_t), Pointer(UnsignedIntegerDataTypes.uint8_t)], [Pointer(type)]), SliceTemplate.referenceTemplate, BasicTransformer) for type in SignedIntegerDataTypes + UnsignedIntegerDataTypes
+]
 
-BasicDWConv1DBinding = NodeBinding(ConvChecker([DataTypes.int8_t, DataTypes.int8_t], [DataTypes.int32_t]), DWConvTemplate.reference1DTemplate)
+BasicAddBindings = [NodeBinding(AddChecker([Pointer(type), Pointer(type)], [Pointer(SignedIntegerDataTypes.int32_t)]), AddTemplate.referenceTemplate, BasicTransformer) for type in SignedIntegerDataTypes + UnsignedIntegerDataTypes]
 
-BasicConv2DBinding = NodeBinding(ConvChecker([DataTypes.int8_t, DataTypes.int8_t], [DataTypes.int32_t]), ConvTemplate.reference2DTemplate)
+BasicConv1DBinding = NodeBinding(ConvChecker([Pointer(SignedIntegerDataTypes.int8_t), Pointer(SignedIntegerDataTypes.int8_t)], [Pointer(SignedIntegerDataTypes.int32_t)]), ConvTemplate.reference1DTemplate, BasicTransformer)
 
-BasicDWConv2DBinding = NodeBinding(ConvChecker([DataTypes.int8_t, DataTypes.int8_t], [DataTypes.int32_t]), DWConvTemplate.reference2DTemplate)
+BasicDWConv1DBinding = NodeBinding(ConvChecker([Pointer(SignedIntegerDataTypes.int8_t), Pointer(SignedIntegerDataTypes.int8_t)], [Pointer(SignedIntegerDataTypes.int32_t)]), DWConvTemplate.reference1DTemplate, BasicTransformer)
 
-BasicDebugBindings = [NodeBinding(DebugChecker([type], [type]), DebugTemplate.referenceTemplate) for type in DataTypes]
+BasicConv2DBinding = NodeBinding(ConvChecker([Pointer(SignedIntegerDataTypes.int8_t), Pointer(SignedIntegerDataTypes.int8_t)], [Pointer(SignedIntegerDataTypes.int32_t)]), ConvTemplate.reference2DTemplate, BasicTransformer)
 
-BasicGatherBindings = [NodeBinding(GatherChecker([type, DataTypes.int32_t], [type]), GatherTemplate.referenceTemplate) for type in DataTypes]
+BasicDWConv2DBinding = NodeBinding(ConvChecker([Pointer(SignedIntegerDataTypes.int8_t), Pointer(SignedIntegerDataTypes.int8_t)], [Pointer(SignedIntegerDataTypes.int32_t)]), DWConvTemplate.reference2DTemplate, BasicTransformer)
 
-BasicGELUBinding = NodeBinding(GELUChecker([DataTypes.int8_t], [DataTypes.int32_t]), iGELUTemplate.referenceTemplate)
+BasicDebugPrintBindings = [NodeBinding(DebugPrintChecker([Pointer(type)], [Pointer(type)]), DebugPrintTemplate.referenceTemplate, ReshapeSkipTransformer) for type in SignedIntegerDataTypes]
 
-BasicGEMMBinding = NodeBinding(GEMMChecker([DataTypes.int8_t, DataTypes.int8_t, DataTypes.int32_t], [DataTypes.int32_t]), GemmTemplate.referenceTemplate)
+BasicGatherBindings = [NodeBinding(GatherChecker([Pointer(type), Pointer(SignedIntegerDataTypes.int32_t)], [Pointer(type)]), GatherTemplate.referenceTemplate, BasicTransformer) for type in SignedIntegerDataTypes]
 
-BasicIntegerDivBinding = NodeBinding(IntegerDivChecker([DataTypes.int32_t, DataTypes.int32_t], [DataTypes.int32_t]), IntegerDivTemplate.referenceTemplate)
+BasicGELUBinding = NodeBinding(GELUChecker([Pointer(SignedIntegerDataTypes.int8_t)], [Pointer(SignedIntegerDataTypes.int32_t)]), iGELUTemplate.referenceTemplate, BasicTransformer)
 
-BasicLayerNormBinding = NodeBinding(iLayerNormChecker([DataTypes.int8_t, DataTypes.int32_t, DataTypes.int32_t], [DataTypes.int8_t]), iLayernormTemplate.referenceTemplate)
+BasicGEMMBinding = NodeBinding(GEMMChecker([Pointer(SignedIntegerDataTypes.int8_t), Pointer(SignedIntegerDataTypes.int8_t), Pointer(SignedIntegerDataTypes.int32_t)], [Pointer(SignedIntegerDataTypes.int32_t)]), GemmTemplate.referenceTemplate, BasicTransformer)
 
-BasicMatMulBinding = NodeBinding(MatMulChecker([DataTypes.int8_t, DataTypes.int8_t], [DataTypes.int32_t]), MatMulTemplate.referenceTemplate)
+BasicIntegerDivBinding = NodeBinding(IntegerDivChecker([Pointer(SignedIntegerDataTypes.int32_t), Pointer(SignedIntegerDataTypes.int32_t)], [Pointer(SignedIntegerDataTypes.int32_t)]), IntegerDivTemplate.referenceTemplate, BasicTransformer)
 
-BasicMaxPool2DBinding = NodeBinding(MaxPoolChecker([DataTypes.int8_t], [DataTypes.int8_t]), MaxPoolTemplate.referenceTemplate)
+BasicITASoftmaxBinding = NodeBinding(SoftmaxChecker([Pointer(SignedIntegerDataTypes.int8_t)], [Pointer(SignedIntegerDataTypes.int8_t)]), ITAMaxTemplate.referenceTemplate, BasicTransformer)
 
-BasicMulBindings = [NodeBinding(MulChecker([typeA, DataTypes.int32_t], [DataTypes.int32_t]), MulTemplate.referenceTemplate) for typeA in DataTypes]
+BasicLayerNormBinding = NodeBinding(iLayerNormChecker([Pointer(SignedIntegerDataTypes.int8_t), Pointer(SignedIntegerDataTypes.int32_t), Pointer(SignedIntegerDataTypes.int32_t)], [Pointer(SignedIntegerDataTypes.int8_t)]), iLayernormTemplate.referenceTemplate, BasicTransformer)
 
-BasicPad1DBindings = [NodeBinding(PadChecker([type], [type]), PadTemplate.reference1DTemplate) for type in DataTypes]
-BasicPad2DBindings = [NodeBinding(PadChecker([type], [type]), PadTemplate.reference2DTemplate) for type in DataTypes]
+BasicMatMulBinding = NodeBinding(MatMulChecker([Pointer(SignedIntegerDataTypes.int8_t), Pointer(SignedIntegerDataTypes.int8_t)], [Pointer(SignedIntegerDataTypes.int32_t)]), MatMulTemplate.referenceTemplate, BasicTransformer)
 
-BasicReduceMeanBindings = [NodeBinding(ReduceMeanChecker([type], [type]), ReduceMeanTemplate.referenceTemplate) for type in DataTypes]
+BasicMaxPool2DBinding = NodeBinding(MaxPoolChecker([Pointer(SignedIntegerDataTypes.int8_t)], [Pointer(SignedIntegerDataTypes.int8_t)]), MaxPoolTemplate.referenceTemplate, BasicTransformer)
 
-BasicReshapeBindings = [NodeBinding(ReshapeChecker([type, DataTypes.int32_t], [type]), ReshapeTemplate.referenceTemplate) for type in DataTypes]
+BasicMulBindings = [NodeBinding(MulChecker([Pointer(typeA), Pointer(SignedIntegerDataTypes.int32_t)], [Pointer(SignedIntegerDataTypes.int32_t)]), MulTemplate.referenceTemplate, BasicTransformer) for typeA in SignedIntegerDataTypes]
 
-BasicRQSBindings = [NodeBinding(RequantShiftChecker([type, DataTypes.int32_t, DataTypes.int32_t], [DataTypes.int8_t]), RequantShiftTemplate.referenceTemplate) for type in DataTypes]
+BasicPad1DBindings = [NodeBinding(PadChecker([Pointer(type)], [Pointer(type)]), PadTemplate.reference1DTemplate, BasicTransformer) for type in SignedIntegerDataTypes]
+BasicPad2DBindings = [NodeBinding(PadChecker([Pointer(type)], [Pointer(type)]), PadTemplate.reference2DTemplate, BasicTransformer) for type in SignedIntegerDataTypes]
 
-BasicRQSGELUBinding = NodeBinding(GELUChecker([DataTypes.int8_t, DataTypes.int32_t, DataTypes.int32_t, DataTypes.int32_t], [DataTypes.int8_t]), RQSiGELUTemplate.referenceTemplate)
+BasicReduceMeanBindings = [NodeBinding(ReduceMeanChecker([Pointer(type)], [Pointer(type)]), ReduceMeanTemplate.referenceTemplate, BasicTransformer) for type in SignedIntegerDataTypes]
 
-BasicRQIntegerDivBinding = NodeBinding(RQIntegerDivChecker([DataTypes.int32_t, DataTypes.int32_t, DataTypes.int32_t, DataTypes.int32_t, DataTypes.int32_t], [DataTypes.int8_t]), RQIntegerDivTemplate.referenceTemplate)
+BasicReduceSumBindings = [NodeBinding(ReduceSumChecker([Pointer(type)], [Pointer(SignedIntegerDataTypes.int32_t)]), ReduceSumTemplate.referenceTemplate, BasicTransformer) for type in SignedIntegerDataTypes]
 
-BasicSoftmaxBinding = NodeBinding(SoftmaxChecker([DataTypes.int8_t], [DataTypes.int8_t]), iSoftmaxTemplate.referenceTemplate)
+BasicReshapeBindings = [NodeBinding(ReshapeChecker([Pointer(type), Pointer(SignedIntegerDataTypes.int32_t)], [Pointer(type)]), ReshapeTemplate.referenceTemplate, ReshapeSkipTransformer) for type in IntegerDataTypes]
 
-BasicTransposeBindings = [NodeBinding(TransposeChecker([type], [type]), TransposeTemplate.referenceTemplate) for type in DataTypes]
+BasicRQSBindings = [NodeBinding(RequantShiftChecker([Pointer(type), Pointer(SignedIntegerDataTypes.int32_t), Pointer(SignedIntegerDataTypes.int32_t)], [Pointer(SignedIntegerDataTypes.int8_t)]), RequantShiftTemplate.referenceTemplate, BasicTransformer) for type in SignedIntegerDataTypes]
 
-DummyBinding = NodeBinding(DummyChecker([DataTypes.int8_t], [DataTypes.int8_t]), DummyTemplate.referenceTemplate)
+BasicRQSGELUBinding = NodeBinding(GELUChecker(
+    [Pointer(SignedIntegerDataTypes.int8_t), Pointer(SignedIntegerDataTypes.int32_t), Pointer(SignedIntegerDataTypes.int32_t), Pointer(SignedIntegerDataTypes.int32_t)], [Pointer(SignedIntegerDataTypes.int8_t)]), RQSiGELUTemplate.referenceTemplate, BasicTransformer)
+
+BasicRQIntegerDivBinding = NodeBinding(
+    RQIntegerDivChecker(
+        [Pointer(SignedIntegerDataTypes.int32_t), Pointer(SignedIntegerDataTypes.int32_t), Pointer(SignedIntegerDataTypes.int32_t),
+         Pointer(SignedIntegerDataTypes.int32_t), Pointer(SignedIntegerDataTypes.int32_t)], [Pointer(SignedIntegerDataTypes.int8_t)]), RQIntegerDivTemplate.referenceTemplate, BasicTransformer)
+
+BasicSoftmaxBinding = NodeBinding(SoftmaxChecker([Pointer(SignedIntegerDataTypes.int8_t)], [Pointer(SignedIntegerDataTypes.int8_t)]), iSoftmaxTemplate.referenceTemplate, BasicTransformer)
+
+BasicTransposeBindings = [NodeBinding(TransposeChecker([Pointer(type)], [Pointer(type)]), TransposeTemplate.referenceTemplate, BasicTransformer) for type in IntegerDataTypes]
+
+DummyBinding = NodeBinding(DummyChecker([Pointer(SignedIntegerDataTypes.int8_t)], [Pointer(SignedIntegerDataTypes.int8_t)]), DummyTemplate.referenceTemplate, BasicTransformer)

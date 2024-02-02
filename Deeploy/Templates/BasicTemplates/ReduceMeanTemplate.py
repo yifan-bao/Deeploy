@@ -23,10 +23,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import Dict, Tuple
-from mako.template import Template
+from typing import Dict, List, Tuple
 
-from Deeploy.DeeployTypes import NodeTemplate, NetworkContext
+from Deeploy.DeeployTypes import NetworkContext, NodeTemplate
 
 
 class _ReduceMeanTemplate(NodeTemplate):
@@ -34,25 +33,32 @@ class _ReduceMeanTemplate(NodeTemplate):
     def __init__(self, templateStr):
         super().__init__(templateStr)
 
-    def alignToContext(self, ctxt: NetworkContext, nodeRep: Dict) -> Tuple[NetworkContext, Dict]:
+    def alignToContext(self, ctxt: NetworkContext, nodeRep: Dict) -> Tuple[NetworkContext, Dict, List[str]]:
         ctxt = ctxt.copy()
 
         data_in = ctxt.lookup(nodeRep['data_in'])
         data_out = ctxt.lookup(nodeRep['data_out'])
-        nodeRep['input_offset'] = (data_in._signed == 0) * int(data_in.nLevels / 2)
-        nodeRep['output_offset'] = -(data_out._signed == 0) * int(data_in.nLevels / 2)
+        nodeRep['input_offset'] = 0
+        if hasattr(data_in, "_signed") and hasattr(data_in, "nLevels"):
+            nodeRep['input_offset'] = (data_in._signed == 0) * int(data_in.nLevels / 2)
+        nodeRep['output_offset'] = 0
+        if hasattr(data_out, "_signed") and hasattr(data_out, "nLevels"):
+            nodeRep['output_offset'] = -(data_out._signed == 0) * int(data_in.nLevels / 2)
 
-        return ctxt, nodeRep
+        return ctxt, nodeRep, []
 
 
 referenceTemplate = _ReduceMeanTemplate("""
-// ReduceMean (Name: ${node_name}, Op: ${node_op})
+// ReduceMean (Name: ${nodeName}, Op: ${nodeOp})
 BEGIN_SINGLE_CORE
 int32_t ${data_out}_accumulator = 0;
 <%
+
 reduceLength = 1
-for i in axes:
-    reduceLength = reduceLength * data_in_shape[i]
+for i, axis in enumerate(axes):
+    if axis < 0:
+        axes[i] += len(data_in_shape)
+    reduceLength = reduceLength * data_in_shape[axis]
 %>
 <%
     shapeStr = ''
@@ -68,7 +74,7 @@ for i in axes:
     accessStr += '[i_'+str(j)+']'
 %>
 % endfor
-${data_out_type._name_}* dummy_${data_out} = ${data_out};
+${data_out_type.typeName} dummy_${data_out} = ${data_out};
 
 <%
 restDims = set(list(range(len(data_in_shape)))).difference(set(axes))
@@ -80,13 +86,13 @@ ${data_out}_accumulator = ${input_offset}*${reduceLength};
 % for i in list(axes):
 for(uint32_t i_${i} = 0; i_${i}<${data_in_shape[i]}; i_${i}++){
 % endfor
-${data_out}_accumulator += ((${data_in_type._name_} (*)${shapeStr})${data_in})${accessStr};
+${data_out}_accumulator += ((${data_in_type.referencedType.typeName} (*)${shapeStr})${data_in})${accessStr};
 
 % for i in range(len(axes)):
 }
 % endfor
 % if keepdims:
-*dummy_${data_out}++ = (${data_out_type._name_}) ((${data_out}_accumulator + ${data_out}_sgn*(${reduceLength}>>1)) / ${reduceLength} + ${output_offset});
+*dummy_${data_out}++ = (${data_out_type.referencedType.typeName}) ((${data_out}_accumulator + ${data_out}_sgn*(${reduceLength}>>1)) / ${reduceLength} + ${output_offset});
 % else:
 <%
 
@@ -96,11 +102,11 @@ if (np.log2(reduceLength) - int(np.log2(reduceLength))) == 0:
     shift = int(np.log2(reduceLength))
 %>
 % if shift is not None:
-*dummy_${data_out}++ = (${data_out_type._name_}) (((${data_out}_accumulator + (1<<(${shift}-1))) >> ${shift}) + ${output_offset});
+*dummy_${data_out}++ = (${data_out_type.referencedType.typeName}) (((${data_out}_accumulator + (1<<(${shift}-1))) >> ${shift}) + ${output_offset});
 % else:
 int8_t ${data_out}_sgn = 0;
 ${data_out}_sgn = -(${data_out}_accumulator<0) + (${data_out}_accumulator >= 0);
-*dummy_${data_out}++ = (${data_out_type._name_}) ((${data_out}_accumulator + ${data_out}_sgn*(${reduceLength}>>1)) / ${reduceLength} + ${output_offset});
+*dummy_${data_out}++ = (${data_out_type.referencedType.typeName}) ((${data_out}_accumulator + ${data_out}_sgn*(${reduceLength}>>1)) / ${reduceLength} + ${output_offset});
 % endif
 % endif
 % for i in range(len(restDims)):

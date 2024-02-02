@@ -23,12 +23,15 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from Deeploy.DeeployTypes import NetworkContext
 import numpy as np
+
+from Deeploy.DataTypes.CMSISDataTypes import CMSISDataTypes
 
 
 def bindConvParams(ctxt, name, repName, batch, nodeRep):
     ctxt = ctxt.copy()
+
+    nameList = []
 
     # Hoist the structs to the global ctxt
 
@@ -37,11 +40,11 @@ def bindConvParams(ctxt, name, repName, batch, nodeRep):
     bufferSize = 2 * nodeRep['ch_im_in'] * nodeRep['dim_kernel_x'] * nodeRep['dim_kernel_y'] * 2
 
     ctxtDict = {
-        'buf': 0,  #f'{name}_ctxt_buffer',
+        'buf': nodeRep['ctxtBuffer'],  #f'{name}_ctxt_buffer',
         'size': bufferSize
     }
 
-    ctxt.hoistStruct(ctxtDict, f'{name}_ctxt', 'cmsis_nn_context')
+    nameList += [ctxt.hoistStruct(ctxtDict, f'{name}_ctxt', CMSISDataTypes.cmsis_nn_context)]
     nodeRep[f'{repName}_ctxt'] = f'{name}_ctxt'
 
     # Next the conv params
@@ -50,27 +53,11 @@ def bindConvParams(ctxt, name, repName, batch, nodeRep):
         'h': nodeRep['stride_x'],
         'w': nodeRep['stride_y'],
     }
-    ctxt.hoistStruct(strideDict, f'{name}_stride', 'cmsis_nn_tile')
     # padding
     paddingDict = {'h': nodeRep['padding_x'], 'w': nodeRep['padding_y']}
-    ctxt.hoistStruct(paddingDict, f'{name}_padding', 'cmsis_nn_tile')
     # dilation
     dilationDict = {'h': nodeRep['dilation_x'], 'w': nodeRep['dilation_y']}
-    ctxt.hoistStruct(dilationDict, f'{name}_dilation', 'cmsis_nn_tile')
-    # activation
-    # if nodeRep['signed']:
-    #     activationDict = {
-    #         'min': -(nodeRep['n_levels']//2),
-    #         'max': (nodeRep['n_levels']//2) - 1
-    #     }
-    # else:
-    #     activationDict = {
-    #         'min': 0,
-    #         'max': (nodeRep['n_levels'])-1
-    #     }
     activationDict = {'min': -(nodeRep['n_levels'] // 2), 'max': (nodeRep['n_levels'] // 2) - 1}
-
-    ctxt.hoistStruct(activationDict, f'{name}_activation', 'cmsis_nn_activation')
 
     if 'data_in' in nodeRep:
         data_in = ctxt.lookup(nodeRep['data_in'])
@@ -90,23 +77,25 @@ def bindConvParams(ctxt, name, repName, batch, nodeRep):
     convParamsDict = {
         'input_offset': (data_in_signed == 0) * nodeRep['n_levels'] // 2,
         'output_offset': -(data_out_signed == 0) * nodeRep['n_levels'] // 2,
-        'stride': ctxt._mangle(ctxt.lookup(f'{name}_stride').name),
-        'padding': ctxt._mangle(ctxt.lookup(f'{name}_padding').name),
-        'dilation': ctxt._mangle(ctxt.lookup(f'{name}_dilation').name),
-        'activation': ctxt._mangle(ctxt.lookup(f'{name}_activation').name),
+        'stride': strideDict,
+        'padding': paddingDict,
+        'dilation': dilationDict,
+        'activation': activationDict,
     }
-    ctxt.hoistStruct(convParamsDict, f'{name}_conv_params', 'cmsis_nn_conv_params')
+    nameList += [ctxt.hoistStruct(convParamsDict, f'{name}_conv_params', CMSISDataTypes.cmsis_nn_conv_params)]
     nodeRep[f'{repName}_conv_params'] = ctxt.lookup(f'{name}_conv_params').name
 
     convQuantDict = {
         'multiplier': ctxt._mangle(nodeRep['mul']),
         'shift': ctxt._mangle(nodeRep['shift']),
     }
-    ctxt.hoistStruct(convQuantDict, f'{name}_quant_params', 'cmsis_nn_per_channel_quant_params')
+    nameList += [
+        ctxt.hoistStruct(convQuantDict, f'{name}_quant_params', CMSISDataTypes.cmsis_nn_per_channel_quant_params)
+    ]
     nodeRep[f'{repName}_quant_params'] = ctxt.lookup(f'{name}_quant_params').name
 
     inputDimsDict = {'n': batch, 'h': nodeRep['dim_im_in_x'], 'w': nodeRep['dim_im_in_y'], 'c': nodeRep['ch_im_in']}
-    ctxt.hoistStruct(inputDimsDict, f'{name}_input_dims', 'cmsis_nn_dims')
+    nameList += [ctxt.hoistStruct(inputDimsDict, f'{name}_input_dims', CMSISDataTypes.cmsis_nn_dims)]
     nodeRep[f'{repName}_input_dims'] = ctxt.lookup(f'{name}_input_dims').name
 
     filterDimsDict = {
@@ -115,11 +104,11 @@ def bindConvParams(ctxt, name, repName, batch, nodeRep):
         'w': nodeRep['dim_kernel_y'],
         'c': nodeRep['ch_im_in']
     }
-    ctxt.hoistStruct(filterDimsDict, f'{name}_filter_dims', 'cmsis_nn_dims')
+    nameList += [ctxt.hoistStruct(filterDimsDict, f'{name}_filter_dims', CMSISDataTypes.cmsis_nn_dims)]
     nodeRep[f'{repName}_filter_dims'] = ctxt.lookup(f'{name}_filter_dims').name
 
     outputDimsDict = {'n': batch, 'h': nodeRep['dim_im_out_x'], 'w': nodeRep['dim_im_out_y'], 'c': nodeRep['ch_im_out']}
-    ctxt.hoistStruct(outputDimsDict, f'{name}_output_dims', 'cmsis_nn_dims')
+    nameList += [ctxt.hoistStruct(outputDimsDict, f'{name}_output_dims', CMSISDataTypes.cmsis_nn_dims)]
     nodeRep[f'{repName}_output_dims'] = ctxt.lookup(f'{name}_output_dims').name
 
     biasDimsDict = {
@@ -128,7 +117,7 @@ def bindConvParams(ctxt, name, repName, batch, nodeRep):
         'w': 1,
         'c': nodeRep['ch_im_out'],
     }
-    ctxt.hoistStruct(biasDimsDict, f'{name}_bias_dims', 'cmsis_nn_dims')
+    nameList += [ctxt.hoistStruct(biasDimsDict, f'{name}_bias_dims', CMSISDataTypes.cmsis_nn_dims)]
     nodeRep[f'{repName}_bias_dims'] = ctxt.lookup(f'{name}_bias_dims').name
 
     return ctxt, nodeRep
@@ -138,36 +127,21 @@ def bindFCParams(ctxt, name, mul, shift, data_in, weight, nodeRep, nodeRepPrefix
 
     ctxt = ctxt.copy()
 
-    nodeRep['in_N'] = nodeRep['M']  #np.prod(data_in.shape[0:-1])
-    nodeRep['in_C'] = nodeRep['N']  #np.prod(data_in.shape[-1:])
-    nodeRep['weight_N'] = nodeRep['N']  #nodeRep['in_C']
-    nodeRep['weight_C'] = nodeRep['O']  #np.prod(weight.shape[0:-1])
+    nameList = []
 
-    #     nodeRep['in_N'] = np.prod(data_in.shape[0:-1])
-    #     nodeRep['in_C'] = np.prod(data_in.shape[-1:])
-    #     nodeRep['weight_N'] = nodeRep['in_C']
-    #     nodeRep['weight_C'] = np.prod(weight.shape[0:-1])
+    nodeRep['in_N'] = nodeRep['M']
+    nodeRep['in_C'] = nodeRep['N']
+    nodeRep['weight_N'] = nodeRep['N']
+    nodeRep['weight_C'] = nodeRep['O']
 
-    ctxtDict = {'buf': 0, 'size': 0}
+    ctxtDict = {'buf': None, 'size': 0}
 
-    ctxt.hoistStruct(ctxtDict, f'{name}_ctxt', 'cmsis_nn_context')
+    nameList += [ctxt.hoistStruct(ctxtDict, f'{name}_ctxt', CMSISDataTypes.cmsis_nn_context)]
     nodeRep[f'{nodeRepPrefix}ctxt'] = f'{name}_ctxt'
 
     # activation
-    activationDict = {'min': -(nodeRep[f'n_levels'] // 2), 'max': (nodeRep[f'n_levels'] // 2) - 1}
-
-    # if nodeRep[f'signed']:
-    #     activationDict = {
-    #         'min': -(nodeRep[f'n_levels']//2),
-    #         'max': (nodeRep[f'n_levels']//2) - 1
-    #     }
-    # else:
-    #     activationDict = {
-    #         'min': 0,
-    #         'max': (nodeRep[f'n_levels'])-1
-    #     }
-
-    ctxt.hoistStruct(activationDict, f'{name}_activation', 'cmsis_nn_activation')
+    activationDict = {'min': -(nodeRep['n_levels'] // 2), 'max': (nodeRep['n_levels'] // 2) - 1}
+    nameList += [ctxt.hoistStruct(activationDict, f'{name}_activation', CMSISDataTypes.cmsis_nn_activation)]
 
     data_out = ctxt.lookup(nodeRep['data_out'])
 
@@ -178,7 +152,7 @@ def bindFCParams(ctxt, name, mul, shift, data_in, weight, nodeRep, nodeRepPrefix
             'input_offset': 0,
             'output_offset': 0,
             'filter_offset': 0,
-            'activation': ctxt._mangle(ctxt.lookup(f'{name}_activation').name),
+            'activation': activationDict,
         }
 
     else:
@@ -187,18 +161,33 @@ def bindFCParams(ctxt, name, mul, shift, data_in, weight, nodeRep, nodeRepPrefix
             'input_offset': (data_in._signed == 0) * nodeRep['n_levels'] // 2,
             'output_offset': -(data_out._signed == 0) * nodeRep['n_levels'] // 2,
             'filter_offset': 0,
-            'activation': ctxt._mangle(ctxt.lookup(f'{name}_activation').name),
+            'activation': activationDict,
         }
 
-    ctxt.hoistStruct(fcParamsDict, f'{name}_fc_params', 'cmsis_nn_fc_params')
+    nameList += [ctxt.hoistStruct(fcParamsDict, f'{name}_fc_params', CMSISDataTypes.cmsis_nn_fc_params)]
     nodeRep[f'{nodeRepPrefix}fc_params'] = ctxt.lookup(f'{name}_fc_params').name
 
-    gemmQuantDict = {
-        'multiplier': mul if isinstance(mul, int) else "*" + ctxt._mangle(mul),
-        'shift': shift if isinstance(shift, int) else "*" + ctxt._mangle(shift),
-    }
+    if isinstance(mul, str):
+        __mul = ctxt.lookup(mul).values
+        assert np.ndim(__mul) == 0, "Mul is not scalar!"
+        _mul = __mul.item()
+        ctxt.lookup(mul)._deploy = False
+    else:
+        _mul = mul
 
-    ctxt.hoistStruct(gemmQuantDict, f'{name}_quant_params', 'cmsis_nn_per_tensor_quant_params')
+    if isinstance(shift, str):
+        __shift = ctxt.lookup(shift).values
+        assert np.ndim(__shift) == 0, "Shift is not scalar!"
+        _shift = __shift.item()
+        ctxt.lookup(shift)._deploy = False
+    else:
+        _shift = shift
+
+    gemmQuantDict = {'multiplier': _mul, 'shift': _shift}
+
+    nameList += [
+        ctxt.hoistStruct(gemmQuantDict, f'{name}_quant_params', CMSISDataTypes.cmsis_nn_per_tensor_quant_params)
+    ]
     nodeRep[f'{nodeRepPrefix}quant_params'] = ctxt.lookup(f'{name}_quant_params').name
 
     inputDimsDict = {
@@ -207,15 +196,15 @@ def bindFCParams(ctxt, name, mul, shift, data_in, weight, nodeRep, nodeRepPrefix
         'w': 1,
         'c': nodeRep['in_C'],
     }
-    ctxt.hoistStruct(inputDimsDict, f'{name}_input_dims', 'cmsis_nn_dims')
+    nameList += [ctxt.hoistStruct(inputDimsDict, f'{name}_input_dims', CMSISDataTypes.cmsis_nn_dims)]
     nodeRep[f'{nodeRepPrefix}input_dims'] = ctxt.lookup(f'{name}_input_dims').name
 
     filterDimsDict = {'n': nodeRep['weight_N'], 'h': 1, 'w': 1, 'c': nodeRep['weight_C']}
-    ctxt.hoistStruct(filterDimsDict, f'{name}_filter_dims', 'cmsis_nn_dims')
+    nameList += [ctxt.hoistStruct(filterDimsDict, f'{name}_filter_dims', CMSISDataTypes.cmsis_nn_dims)]
     nodeRep[f'{nodeRepPrefix}filter_dims'] = ctxt.lookup(f'{name}_filter_dims').name
 
     outputDimsDict = {'n': nodeRep['in_N'], 'h': 1, 'w': 1, 'c': nodeRep['weight_C']}
-    ctxt.hoistStruct(outputDimsDict, f'{name}_output_dims', 'cmsis_nn_dims')
+    nameList += [ctxt.hoistStruct(outputDimsDict, f'{name}_output_dims', CMSISDataTypes.cmsis_nn_dims)]
     nodeRep[f'{nodeRepPrefix}output_dims'] = ctxt.lookup(f'{name}_output_dims').name
 
     biasDimsDict = {
@@ -224,7 +213,7 @@ def bindFCParams(ctxt, name, mul, shift, data_in, weight, nodeRep, nodeRepPrefix
         'w': 1,
         'c': nodeRep['weight_C'] * bias,
     }
-    ctxt.hoistStruct(biasDimsDict, f'{name}_bias_dims', 'cmsis_nn_dims')
+    nameList += [ctxt.hoistStruct(biasDimsDict, f'{name}_bias_dims', CMSISDataTypes.cmsis_nn_dims)]
     nodeRep[f'{nodeRepPrefix}bias_dims'] = ctxt.lookup(f'{name}_bias_dims').name
 
-    return ctxt, nodeRep
+    return ctxt, nodeRep, nameList

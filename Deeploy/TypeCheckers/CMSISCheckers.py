@@ -23,59 +23,61 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from enum import Enum
+from typing import Dict, List, Sequence
 
-from Deeploy.DeeployTypes import *
+from Deeploy.AbstractDataTypes import PointerClass
+from Deeploy.DeeployTypes import VariableBuffer
+from Deeploy.TypeCheckers.SignPropTypeChecker import SignPropTypeChecker
 
 
-class CMSISSaturatingAddChecker(NodeTypeChecker):
+class CMSISSaturatingAddChecker(SignPropTypeChecker):
 
-    def __init__(self, input_types: Sequence[Enum], output_types: Sequence[Enum]):
+    def __init__(self, input_types: Sequence[PointerClass], output_types: Sequence[PointerClass]):
         super().__init__(input_types, output_types)
 
-    def inferNumLevels(self, inputs: List[VariableBuffer], parserDict: Dict) -> List[int]:
-        return [min(inputs[0].nLevels + inputs[1].nLevels, 2**(self.input_types[0]._value_))]
+    def _inferNumLevels(self, inputs: List[VariableBuffer], parserDict: Dict) -> List[int]:
+        return [min(inputs[0].nLevels + inputs[1].nLevels, 2**(self.input_types[0].referencedType.typeWidth))]
 
-    def inferSignedness(self, inputs: List[VariableBuffer], parserDict: Dict) -> List[bool]:
+    def _inferSignedness(self, inputs: List[VariableBuffer], parserDict: Dict) -> List[bool]:
         if inputs[0]._signed or inputs[1]._signed:
             return [True]
         else:
             return [False]
 
 
-class CMSISLinearChecker(NodeTypeChecker):
+class CMSISLinearChecker(SignPropTypeChecker):
 
-    def __init__(self, input_types: Sequence[Enum], output_types: Sequence[Enum]):
+    def __init__(self, input_types: Sequence[PointerClass], output_types: Sequence[PointerClass]):
         super().__init__(input_types, output_types)
 
-    def inferNumLevels(self, inputs: List[VariableBuffer], parserDict: Dict) -> List[int]:
+    def _inferNumLevels(self, inputs: List[VariableBuffer], parserDict: Dict) -> List[int]:
         return [parserDict['n_levels']]
 
-    def inferSignedness(self, inputs: List[VariableBuffer], parserDict: Dict) -> List[bool]:
+    def _inferSignedness(self, inputs: List[VariableBuffer], parserDict: Dict) -> List[bool]:
         return [bool(parserDict["signed"])]
 
 
-class CMSISConvChecker(NodeTypeChecker):
+class CMSISConvChecker(SignPropTypeChecker):
 
-    def __init__(self, input_types: Sequence[Enum], output_types: Sequence[Enum]):
+    def __init__(self, input_types: Sequence[PointerClass], output_types: Sequence[PointerClass]):
         super().__init__(input_types, output_types)
 
-    def inferNumLevels(self, inputs: List[VariableBuffer], parserDict: Dict) -> List[int]:
+    def _inferNumLevels(self, inputs: List[VariableBuffer], parserDict: Dict) -> List[int]:
         return [parserDict['n_levels']]
 
-    def inferSignedness(self, inputs: List[VariableBuffer], parserDict: Dict) -> List[bool]:
+    def _inferSignedness(self, inputs: List[VariableBuffer], parserDict: Dict) -> List[bool]:
         return [bool(parserDict["signed"])]
 
 
-class CMSISMaxPoolChecker(NodeTypeChecker):
+class CMSISMaxPoolChecker(SignPropTypeChecker):
 
-    def __init__(self, input_types: Sequence[Enum], output_types: Sequence[Enum]):
+    def __init__(self, input_types: Sequence[PointerClass], output_types: Sequence[PointerClass]):
         super().__init__(input_types, output_types)
 
-    def inferNumLevels(self, inputs: List[VariableBuffer], parserDict: Dict) -> List[int]:
+    def _inferNumLevels(self, inputs: List[VariableBuffer], parserDict: Dict) -> List[int]:
         return [inputs[0].nLevels]
 
-    def inferSignedness(self, inputs: List[VariableBuffer], parserDict: Dict) -> List[bool]:
+    def _inferSignedness(self, inputs: List[VariableBuffer], parserDict: Dict) -> List[bool]:
         if inputs[0]._signed:
             return [True]
         else:

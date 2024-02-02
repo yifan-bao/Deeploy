@@ -25,26 +25,45 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from typing import List
+
+import numpy as np
 import onnx_graphsurgeon as gs
 
-from Deeploy.Parsers.BasicParsers import *
-from Deeploy.Parsers.CMSISParsers import *
-
-from Deeploy.Layers.BasicLayers import *
-from Deeploy.Layers.CMSISLayers import *
-
-from Deeploy.Bindings.BasicBindings import *
-from Deeploy.Bindings.CMSISBindings import *
-
-from Deeploy.OptimizationPasses.BasicPasses import *
-from Deeploy.OptimizationPasses.DebugPasses import *
-from Deeploy.OptimizationPasses.CMSISPasses import *
+from Deeploy.AbstractDataTypes import HelperTypes, Pointer
+from Deeploy.Bindings.BasicBindings import BasicAddBindings, BasicDebugPrintBindings, BasicGatherBindings, \
+    BasicGELUBinding, BasicIntegerDivBinding, BasicLayerNormBinding, BasicMatMulBinding, BasicMulBindings, \
+    BasicPad1DBindings, BasicPad2DBindings, BasicReduceMeanBindings, BasicReduceSumBindings, BasicReshapeBindings, \
+    BasicRQIntegerDivBinding, BasicRQSBindings, BasicRQSGELUBinding, BasicSliceBindings, BasicSoftmaxBinding, \
+    BasicTransposeBindings, DummyBinding
+from Deeploy.Bindings.CMSISBindings import CMSISCLCABinding, CMSISConv1DBindings, CMSISConv2DBinding, \
+    CMSISDWConv1DBindings, CMSISDWConv2DBinding, CMSISGEMMBindings, CMSISLinearAttentionBinding, \
+    CMSISMaxPool2DBinding
+from Deeploy.DataTypes.BasicDataTypes import SignedIntegerDataTypes
+from Deeploy.DeeployTypes import ConstantBuffer, DeploymentPlatform, NodeMapper, NodeTemplate, StructBuffer, \
+    TopologyOptimizer, TransientBuffer, VariableBuffer
+from Deeploy.Layers.BasicLayers import AddLayer, CLCALayer, DebugPrintLayer, GatherLayer, IntegerDivLayer, \
+    LinearAttentionLayer, MatMulLayer, MaxPoolLayer, MulLayer, PadLayer, ReduceMeanLayer, ReduceSumLayer, \
+    RequantShiftLayer, ReshapeLayer, RQIntegerDivLayer, RQSiGELULayer, SliceLayer, TransposeLayer, iGELULayer, \
+    iLayerNormLayer, iSoftmaxLayer
+from Deeploy.Layers.CMSISLayers import CMSISRQSConvLayer, CMSISRQSGEMMLayer
+from Deeploy.OptimizationPasses.TopologyOptimizationPasses.BasicPasses import IntegerDivRequantMergePass, \
+    MergeConstAddAndRequantPass, iGELURequantMergePass
+from Deeploy.OptimizationPasses.TopologyOptimizationPasses.CMSISPasses import ConvRequantMergePass, \
+    GEMMRequantMergePass, LinearAttentionAlignmentPass, MatMulRequantMergePass, MHSAAlignmentPass
+from Deeploy.Parsers.BasicParsers import AddParser, DebugParser, DummyParser, FlattenParser, GatherParser, \
+    IntegerDivParser, MatMulParser, MulParser, Pad1DParser, Pad2DParser, ReduceMeanParser, ReduceSumParser, \
+    RequantShiftParser, ReshapeParser, RQIntegerDivParser, RQSiGELUParser, SliceParser, TransposeParser, \
+    UnsqueezeParser, iGELUParser, iLayerNormParser, iSoftmaxParser
+from Deeploy.Parsers.CMSISParsers import CMSISCLCAParser, CMSISConv1DParser, CMSISConv2DParser, CMSISDWConv1DParser, \
+    CMSISDWConv2DParser, CMSISGEMMParser, CMSISLinearAttentionParser, CMSISMaxPool2DParser
+from Deeploy.Templates.BasicTemplates import AllocateTemplate, FreeTemplate
 
 AddMapper = NodeMapper(AddParser(), BasicAddBindings)
 CLCA_int8_Mapper = NodeMapper(CMSISCLCAParser(), [CMSISCLCABinding])
 Conv1D_Mapper = NodeMapper(CMSISConv1DParser(), CMSISConv1DBindings)
 Conv2D_int8_Mapper = NodeMapper(CMSISConv2DParser(), [CMSISConv2DBinding])
-Debug_Mapper = NodeMapper(DebugParser(), BasicDebugBindings)
+DebugPrint_Mapper = NodeMapper(DebugParser(), BasicDebugPrintBindings)
 DWConv1D_Mapper = NodeMapper(CMSISDWConv1DParser(), CMSISDWConv1DBindings)
 DWConv2D_int8_Mapper = NodeMapper(CMSISDWConv2DParser(), [CMSISDWConv2DBinding])
 FlattenMapper = NodeMapper(FlattenParser(), BasicReshapeBindings)
@@ -60,6 +79,7 @@ MulMapper = NodeMapper(MulParser(), BasicMulBindings)
 Pad1DMapper = NodeMapper(Pad1DParser(), BasicPad1DBindings)
 Pad2DMapper = NodeMapper(Pad2DParser(), BasicPad2DBindings)
 ReduceMeanMapper = NodeMapper(ReduceMeanParser(), BasicReduceMeanBindings)
+ReduceSumMapper = NodeMapper(ReduceSumParser(), BasicReduceSumBindings)
 RequantShiftMapper = NodeMapper(RequantShiftParser(), BasicRQSBindings)
 ReshapeMapper = NodeMapper(ReshapeParser(), BasicReshapeBindings)
 RQGELU_int8_Mapper = NodeMapper(RQSiGELUParser(), [BasicRQSGELUBinding])
@@ -68,6 +88,8 @@ Softmax_int8_Mapper = NodeMapper(iSoftmaxParser(), [BasicSoftmaxBinding])
 TransposeMapper = NodeMapper(TransposeParser(), BasicTransposeBindings)
 UnsqueezeMapper = NodeMapper(UnsqueezeParser(), BasicReshapeBindings)
 
+SliceMapper = NodeMapper(SliceParser(), BasicSliceBindings)
+
 # Dummy nodes are intended for development purposes only!
 # They should always generate compiler errors to not accidentally end up in production code
 DummyMapper = NodeMapper(DummyParser(), [DummyBinding])
@@ -75,7 +97,7 @@ DummyMapper = NodeMapper(DummyParser(), [DummyBinding])
 CMSISMapping = {
     'Add': AddLayer([AddMapper]),
     'CLCA': CLCALayer([CLCA_int8_Mapper]),
-    'Debug': DebugLayer([Debug_Mapper]),
+    'DebugPrint': DebugPrintLayer([DebugPrint_Mapper]),
     'Flatten': ReshapeLayer([FlattenMapper]),
     'Gather': GatherLayer([GatherMapper]),
     'iGELU': iGELULayer([GELU_int8_Mapper]),
@@ -89,6 +111,7 @@ CMSISMapping = {
     'Mul': MulLayer([MulMapper]),
     'Pad': PadLayer([Pad1DMapper, Pad2DMapper]),
     'ReduceMean': ReduceMeanLayer([ReduceMeanMapper]),
+    'ReduceSum': ReduceSumLayer([ReduceSumMapper]),
     'RequantizedConv': CMSISRQSConvLayer([Conv2D_int8_Mapper, DWConv2D_int8_Mapper, Conv1D_Mapper, DWConv1D_Mapper]),
     'RequantizedGemm': CMSISRQSGEMMLayer([GEMMMapper]),
     'RequantizediGELU': RQSiGELULayer([RQGELU_int8_Mapper]),
@@ -97,114 +120,40 @@ CMSISMapping = {
     'RQIntegerDiv': RQIntegerDivLayer([RQIntegerDivMapper]),
     'Transpose': TransposeLayer([TransposeMapper]),
     'Unsqueeze': ReshapeLayer([UnsqueezeMapper]),
+    'Slice': SliceLayer([SliceMapper])
 }
 
 
-def CMSISTypeInfer(node: gs.Node):
-    if hasattr(node, 'values'):
-        assert len(node.outputs) <= 1, "Expected node for type inference to only have ONE output!"
-        outNode = node
-    else:
-        import IPython
-        IPython.embed()
-        raise ValueError("TypeInfer was given a wrong type of node!")
+class CMSISVariableBuffer(VariableBuffer):
 
-    if hasattr(outNode, 'signed') and outNode.attrs['signed']:
-        signed = True
-    else:
-        signed = False
-
-    for _type in DataTypes:
-        if signed and outNode.values.max() < 2**(_type._value_ - 1) and outNode.values.min() >= -2**(_type._value_ - 1):
-            return _type
-        # For nor we only have signed kernels
-        elif not signed and outNode.values.max() < 2**(_type._value_ - 1):
-            return _type
-
-    raise TypeError(f'Could not infer type of node {node.name}')
+    initTemplate = AllocateTemplate.referenceInitTemplate
+    allocTemplate = AllocateTemplate.referenceAllocateTemplate
+    deallocTemplate = FreeTemplate.referenceLocalTemplate
 
 
-class SimpleVariableBuffer(VariableBuffer):
+class CMSISTransientBuffer(TransientBuffer):
 
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-
-    def init(self):
-        return AllocateTemplate.referenceInitTemplate.generate(type = self._type._name_, name = self.name)
-
-    def alloc(self):
-        return AllocateTemplate.referenceAllocateTemplate.generate(type = self._type._name_,
-                                                                   name = self.name,
-                                                                   size = np.prod(self.shape))
-
-    def dealloc(self):
-        return FreeTemplate.referenceLocalTemplate.generate(name = self.name)
+    initTemplate = AllocateTemplate.referenceInitTemplate
+    allocTemplate = AllocateTemplate.referenceAllocateTemplate
+    deallocTemplate = FreeTemplate.referenceLocalTemplate
 
 
-class SimpleTransientBuffer(TransientBuffer):
+class CMSISConstantBuffer(ConstantBuffer):
 
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-
-    def init(self):
-        return AllocateTemplate.referenceInitTemplate.generate(type = "void", name = self.name)
-
-    def alloc(self):
-        return AllocateTemplate.referenceAllocateTemplate.generate(type = "int8_t", name = self.name, size = self.size)
-
-    def dealloc(self):
-        return FreeTemplate.referenceLocalTemplate.generate(name = self.name)
+    initTemplate = AllocateTemplate.referenceGlobalInitTemplate
+    allocTemplate = AllocateTemplate.referenceGlobalAllocateTemplate
+    deallocTemplate = FreeTemplate.referenceGlobalTemplate
 
 
-class SimpleConstantBuffer(ConstantBuffer):
+class CMSISStructBuffer(StructBuffer):
 
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-
-    def init(self):
-        values = list(self.values.reshape(-1))
-        strValues = [str(value) for value in values]
-        valueString = ', '.join(strValues)
-        return AllocateTemplate.referenceGlobalInitTemplate.generate(type = self._type._name_,
-                                                                     name = self.name,
-                                                                     size = int(np.prod(self.shape)),
-                                                                     values = valueString)
-
-    def alloc(self):
-        values = list(self.values.reshape(-1))
-        strValues = [str(value) for value in values]
-        valueString = ', '.join(strValues)
-
-        return AllocateTemplate.referenceGlobalAllocateTemplate.generate(type = self._type._name_,
-                                                                         name = self.name,
-                                                                         size = int(np.prod(self.shape)),
-                                                                         values = valueString)
-
-    def dealloc(self):
-        return FreeTemplate.referenceGlobalTemplate.generate(name = self.name)
-
-
-class SimpleStructBuffer(StructBuffer):
-
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-
-    def init(self):
-        return AllocateTemplate.referenceStructInitTemplate.generate(type = self._type,
-                                                                     name = self.name,
-                                                                     structDict = self.structDict)
-
-    def alloc(self) -> str:
-        return AllocateTemplate.referenceStructAllocateTemplate.generate(type = self._type,
-                                                                         name = self.name,
-                                                                         structDict = self.structDict)
-
-    def dealloc(self) -> str:
-        return FreeTemplate.referenceLocalTemplate.generate(name = self.name)
+    initTemplate = AllocateTemplate.referenceStructInitTemplate
+    allocTemplate = AllocateTemplate.referenceStructAllocateTemplate
+    deallocTemplate = NodeTemplate("")
 
 
 # ExtractPaddingFromConvPass(),ExtractPaddingFromPoolPass(),
-CMSISOptimizer = NetworkOptimizer([
+CMSISOptimizer = TopologyOptimizer([
     IntegerDivRequantMergePass(),
     iGELURequantMergePass(),
     LinearAttentionAlignmentPass(),
@@ -217,19 +166,17 @@ CMSISOptimizer = NetworkOptimizer([
     # DebugPass("Pad", position='after'),
 ])
 
-includeList = ["arm_math.h", "arm_nnfunctions.h", "DeeployMath.h"]
+includeList = ["arm_nnfunctions.h", "DeeployMath.h"]
 
 
 class CMSISPlatform(DeploymentPlatform):
 
     def __init__(self,
                  Mapping = CMSISMapping,
-                 DataTypes = DataTypes,
-                 TypeInfer = CMSISTypeInfer,
-                 VariableBuffer = SimpleVariableBuffer,
-                 ConstantBuffer = SimpleConstantBuffer,
-                 StructBuffer = SimpleStructBuffer,
-                 TransientBuffer = SimpleTransientBuffer,
+                 DataTypes = SignedIntegerDataTypes,
+                 VariableBuffer = CMSISVariableBuffer,
+                 ConstantBuffer = CMSISConstantBuffer,
+                 StructBuffer = CMSISStructBuffer,
+                 TransientBuffer = CMSISTransientBuffer,
                  includeList: List[str] = includeList):
-        super().__init__(Mapping, DataTypes, TypeInfer, VariableBuffer, ConstantBuffer, StructBuffer, TransientBuffer,
-                         includeList)
+        super().__init__(Mapping, DataTypes, VariableBuffer, ConstantBuffer, StructBuffer, TransientBuffer, includeList)

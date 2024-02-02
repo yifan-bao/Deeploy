@@ -23,36 +23,56 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from Deeploy.DeeployTypes import *
+from Deeploy.AbstractDataTypes import Pointer
+from Deeploy.CodeTransformationPasses import ArgumentStructGeneration, FutureGeneration, MemoryManagementGeneration
+from Deeploy.DataTypes.BasicDataTypes import SignedIntegerDataTypes
+from Deeploy.DeeployTypes import CodeTransformation, NodeBinding
+from Deeploy.Templates.CMSISTemplates import CLCATemplate, ConvTemplate, DWConvTemplate, GEMMTemplate, \
+    LinearAttentionTemplate, MaxPool2DTemplate
+from Deeploy.TypeCheckers.BasicCheckers import CLCAChecker, LinearAttentionChecker
+from Deeploy.TypeCheckers.CMSISCheckers import CMSISConvChecker, CMSISLinearChecker, CMSISMaxPoolChecker
 
-from Deeploy.Bindings.BasicBindings import DataTypes
-from Deeploy.TypeCheckers.BasicCheckers import *
-from Deeploy.Templates.BasicTemplates import *
+BasicTransformer = CodeTransformation([ArgumentStructGeneration(), MemoryManagementGeneration(), FutureGeneration()])
 
-from Deeploy.TypeCheckers.CMSISCheckers import *
-from Deeploy.Templates.CMSISTemplates import *
+CMSISCLCABinding = NodeBinding(
+    CLCAChecker([Pointer(SignedIntegerDataTypes.int8_t), Pointer(SignedIntegerDataTypes.int8_t)] + [Pointer(SignedIntegerDataTypes.int8_t), Pointer(SignedIntegerDataTypes.int32_t)] * 3 +
+                [Pointer(SignedIntegerDataTypes.int32_t), Pointer(SignedIntegerDataTypes.int32_t), Pointer(SignedIntegerDataTypes.int32_t)] * 7, [Pointer(SignedIntegerDataTypes.int8_t)]), CLCATemplate.referenceTemplate, BasicTransformer)
 
-# Overwrite some templates with the basic version
-from Deeploy.Templates.BasicTemplates import AddTemplate as AddTemplate
-
-CMSISCLCABinding = NodeBinding(CLCAChecker([DataTypes.int8_t, DataTypes.int8_t] + [DataTypes.int8_t, DataTypes.int32_t] * 3 + [DataTypes.int32_t, DataTypes.int32_t, DataTypes.int32_t] * 7, [DataTypes.int8_t]), CLCATemplate.referenceTemplate)
-
-CMSISConv1DBinding_16 = NodeBinding(CMSISConvChecker([DataTypes.int16_t, DataTypes.int8_t, DataTypes.int32_t, DataTypes.int64_t, DataTypes.int32_t], [DataTypes.int16_t]), ConvTemplate.cmsis1D_16_Template)
-CMSISConv1DBinding_8 = NodeBinding(CMSISConvChecker([DataTypes.int8_t, DataTypes.int8_t, DataTypes.int32_t, DataTypes.int32_t, DataTypes.int32_t], [DataTypes.int8_t]), ConvTemplate.cmsis1D_8_Template)
+CMSISConv1DBinding_16 = NodeBinding(
+    CMSISConvChecker(
+        [Pointer(SignedIntegerDataTypes.int16_t), Pointer(SignedIntegerDataTypes.int8_t), Pointer(SignedIntegerDataTypes.int32_t),
+         Pointer(SignedIntegerDataTypes.int64_t), Pointer(SignedIntegerDataTypes.int32_t)], [Pointer(SignedIntegerDataTypes.int16_t)]), ConvTemplate.cmsis1D_16_Template, BasicTransformer)
+CMSISConv1DBinding_8 = NodeBinding(CMSISConvChecker(
+    [Pointer(SignedIntegerDataTypes.int8_t), Pointer(SignedIntegerDataTypes.int8_t), Pointer(SignedIntegerDataTypes.int32_t),
+     Pointer(SignedIntegerDataTypes.int32_t), Pointer(SignedIntegerDataTypes.int32_t)], [Pointer(SignedIntegerDataTypes.int8_t)]), ConvTemplate.cmsis1D_8_Template, BasicTransformer)
 CMSISConv1DBindings = [CMSISConv1DBinding_8, CMSISConv1DBinding_16]
 
-CMSISConv2DBinding = NodeBinding(CMSISConvChecker([DataTypes.int8_t, DataTypes.int8_t, DataTypes.int32_t, DataTypes.int32_t, DataTypes.int32_t], [DataTypes.int8_t]), ConvTemplate.cmsis2D_8_Template)
+CMSISConv2DBinding = NodeBinding(CMSISConvChecker(
+    [Pointer(SignedIntegerDataTypes.int8_t), Pointer(SignedIntegerDataTypes.int8_t), Pointer(SignedIntegerDataTypes.int32_t),
+     Pointer(SignedIntegerDataTypes.int32_t), Pointer(SignedIntegerDataTypes.int32_t)], [Pointer(SignedIntegerDataTypes.int8_t)]), ConvTemplate.cmsis2D_8_Template, BasicTransformer)
 
-CMSISDWConv1DBinding_16 = NodeBinding(CMSISConvChecker([DataTypes.int16_t, DataTypes.int8_t, DataTypes.int32_t, DataTypes.int64_t, DataTypes.int32_t], [DataTypes.int16_t]), DWConvTemplate.conv1D_16_Template)
-CMSISDWConv1DBinding_8 = NodeBinding(CMSISConvChecker([DataTypes.int8_t, DataTypes.int8_t, DataTypes.int32_t, DataTypes.int32_t, DataTypes.int32_t], [DataTypes.int8_t]), DWConvTemplate.conv1D_8_Template)
+CMSISDWConv1DBinding_16 = NodeBinding(
+    CMSISConvChecker(
+        [Pointer(SignedIntegerDataTypes.int16_t), Pointer(SignedIntegerDataTypes.int8_t), Pointer(SignedIntegerDataTypes.int32_t),
+         Pointer(SignedIntegerDataTypes.int64_t), Pointer(SignedIntegerDataTypes.int32_t)], [Pointer(SignedIntegerDataTypes.int16_t)]), DWConvTemplate.conv1D_16_Template, BasicTransformer)
+CMSISDWConv1DBinding_8 = NodeBinding(
+    CMSISConvChecker(
+        [Pointer(SignedIntegerDataTypes.int8_t), Pointer(SignedIntegerDataTypes.int8_t), Pointer(SignedIntegerDataTypes.int32_t),
+         Pointer(SignedIntegerDataTypes.int32_t), Pointer(SignedIntegerDataTypes.int32_t)], [Pointer(SignedIntegerDataTypes.int8_t)]), DWConvTemplate.conv1D_8_Template, BasicTransformer)
 CMSISDWConv1DBindings = [CMSISDWConv1DBinding_8, CMSISDWConv1DBinding_16]
 
-CMSISDWConv2DBinding = NodeBinding(CMSISConvChecker([DataTypes.int8_t, DataTypes.int8_t, DataTypes.int32_t, DataTypes.int32_t, DataTypes.int32_t], [DataTypes.int8_t]), DWConvTemplate.conv2D_8_Template)
+CMSISDWConv2DBinding = NodeBinding(CMSISConvChecker(
+    [Pointer(SignedIntegerDataTypes.int8_t), Pointer(SignedIntegerDataTypes.int8_t), Pointer(SignedIntegerDataTypes.int32_t),
+     Pointer(SignedIntegerDataTypes.int32_t), Pointer(SignedIntegerDataTypes.int32_t)], [Pointer(SignedIntegerDataTypes.int8_t)]), DWConvTemplate.conv2D_8_Template, BasicTransformer)
 
-CMSISGEMM_16_Binding = NodeBinding(CMSISLinearChecker([DataTypes.int16_t, DataTypes.int16_t, DataTypes.int64_t, DataTypes.int64_t], [DataTypes.int16_t]), GEMMTemplate.Linear_16_Template)
-CMSISGEMM_8_Binding = NodeBinding(CMSISLinearChecker([DataTypes.int8_t, DataTypes.int8_t, DataTypes.int32_t, DataTypes.int32_t], [DataTypes.int8_t]), GEMMTemplate.Linear_8_Template)
+CMSISGEMM_16_Binding = NodeBinding(CMSISLinearChecker(
+    [Pointer(SignedIntegerDataTypes.int16_t), Pointer(SignedIntegerDataTypes.int16_t), Pointer(SignedIntegerDataTypes.int64_t), Pointer(SignedIntegerDataTypes.int64_t)], [Pointer(SignedIntegerDataTypes.int16_t)]), GEMMTemplate.Linear_16_Template, BasicTransformer)
+CMSISGEMM_8_Binding = NodeBinding(CMSISLinearChecker(
+    [Pointer(SignedIntegerDataTypes.int8_t), Pointer(SignedIntegerDataTypes.int8_t), Pointer(SignedIntegerDataTypes.int32_t), Pointer(SignedIntegerDataTypes.int32_t)], [Pointer(SignedIntegerDataTypes.int8_t)]), GEMMTemplate.Linear_8_Template, BasicTransformer)
 CMSISGEMMBindings = [CMSISGEMM_8_Binding, CMSISGEMM_16_Binding]
 
-CMSISLinearAttentionBinding = NodeBinding(LinearAttentionChecker([DataTypes.int16_t, DataTypes.int16_t, DataTypes.int16_t] + [DataTypes.int8_t, DataTypes.int64_t] * 4, [DataTypes.int16_t]), LinearAttentionTemplate.referenceTemplate)
+CMSISLinearAttentionBinding = NodeBinding(
+    LinearAttentionChecker([Pointer(SignedIntegerDataTypes.int16_t), Pointer(SignedIntegerDataTypes.int16_t), Pointer(SignedIntegerDataTypes.int16_t)] + [Pointer(SignedIntegerDataTypes.int8_t), Pointer(SignedIntegerDataTypes.int64_t)] * 4, [Pointer(SignedIntegerDataTypes.int16_t)]),
+    LinearAttentionTemplate.referenceTemplate, BasicTransformer)
 
-CMSISMaxPool2DBinding = NodeBinding(CMSISMaxPoolChecker([DataTypes.int8_t], [DataTypes.int8_t]), MaxPool2DTemplate.cmsisTemplate)
+CMSISMaxPool2DBinding = NodeBinding(CMSISMaxPoolChecker([Pointer(SignedIntegerDataTypes.int8_t)], [Pointer(SignedIntegerDataTypes.int8_t)]), MaxPool2DTemplate.cmsisTemplate, BasicTransformer)

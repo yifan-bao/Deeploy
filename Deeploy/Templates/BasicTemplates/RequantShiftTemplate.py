@@ -23,12 +23,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from Deeploy.DeeployTypes import NodeTemplate
+from typing import Dict, List, Tuple
 
-from typing import Dict, Tuple
-from mako.template import Template
-
-from Deeploy.DeeployTypes import NodeTemplate, NetworkContext
+from Deeploy.DeeployTypes import NetworkContext, NodeTemplate
 
 
 class _RequantShiftTemplate(NodeTemplate):
@@ -36,20 +33,23 @@ class _RequantShiftTemplate(NodeTemplate):
     def __init__(self, templateStr):
         super().__init__(templateStr)
 
-    def alignToContext(self, ctxt: NetworkContext, nodeRep: Dict) -> Tuple[NetworkContext, Dict]:
+    def alignToContext(self, ctxt: NetworkContext, nodeRep: Dict) -> Tuple[NetworkContext, Dict, List[str]]:
         ctxt = ctxt.copy()
 
         data_in = ctxt.lookup(nodeRep['data_in'])
         data_out = ctxt.lookup(nodeRep['data_out'])
-        # nodeRep['input_offset'] = (data_in._signed == 0) * nodeRep['n_levels']//2
-        # nodeRep['output_offset'] = -(data_out._signed == 0) * nodeRep['n_levels']//2
-        nodeRep['input_offset'] = (data_in._signed == 0) * int(data_in.nLevels / 2)
-        nodeRep['output_offset'] = -(data_out._signed == 0) * nodeRep['n_levels'] // 2
+
+        nodeRep['input_offset'] = 0
+        if hasattr(data_in, "_signed") and hasattr(data_in, "nLevels"):
+            nodeRep['input_offset'] = (data_in._signed == 0) * int(data_in.nLevels / 2)
+        nodeRep['output_offset'] = 0
+        if hasattr(data_out, "_signed") and hasattr(data_out, "nLevels"):
+            nodeRep['output_offset'] = -(data_out._signed == 0) * nodeRep['n_levels'] // 2
 
         nodeRep['output_min'] = -(nodeRep['n_levels'] // 2)
         nodeRep['output_max'] = (nodeRep['n_levels'] // 2) - 1
 
-        return ctxt, nodeRep
+        return ctxt, nodeRep, []
 
 
 referenceTemplate = _RequantShiftTemplate("""
@@ -60,12 +60,12 @@ else:
     log2Dstring = "*"+log2D
 %>
 
-// RequantShift (Name: ${node_name}, Op: ${node_op})
+// RequantShift (Name: ${nodeName}, Op: ${nodeOp})
 BEGIN_SINGLE_CORE
     % if channels_first:
-    RequantShift_s${data_in_type._value_}_s${data_out_type._value_}_NCHW(${data_in}, ${size}, ${mul}, ${add}, ${data_out}, ${log2Dstring}, ${channel_width}, ${input_offset}, ${output_offset}, ${output_min}, ${output_max}, 1);
+    RequantShift_s${data_in_type.referencedType.typeWidth}_s${data_out_type.referencedType.typeWidth}_NCHW(${data_in}, ${size}, ${mul}, ${add}, ${data_out}, ${log2Dstring}, ${channel_width}, ${input_offset}, ${output_offset}, ${output_min}, ${output_max}, 1);
     % else:
-    RequantShift_s${data_in_type._value_}_s${data_out_type._value_}_NHWC(${data_in}, ${size}, ${mul}, ${add}, ${data_out}, ${log2Dstring}, ${channels}, ${input_offset}, ${output_offset}, ${output_min}, ${output_max}, 1);
+    RequantShift_s${data_in_type.referencedType.typeWidth}_s${data_out_type.referencedType.typeWidth}_NHWC(${data_in}, ${size}, ${mul}, ${add}, ${data_out}, ${log2Dstring}, ${channels}, ${input_offset}, ${output_offset}, ${output_min}, ${output_max}, 1);
     %endif
 END_SINGLE_CORE
 """)

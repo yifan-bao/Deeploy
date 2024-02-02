@@ -25,15 +25,15 @@
 
 from Deeploy.DeeployTypes import NodeTemplate
 
-MemPoolInitTemplate = NodeTemplate("${type}* ${name} __attribute__((section(\".l1\")));\n")
+MemPoolInitTemplate = NodeTemplate("${type.typeName} ${name} __attribute__((section(\".l1\")));\n")
 MemPoolAllocateTemplate = NodeTemplate("""
 if (core_id ==0) {
     ## #if DEEPLOY_TRACE_MALLOC
-    ## deeploy_log("[Deeploy] Alloc ${name} (${type} * ${size})\\r\\n");
+    ## deeploy_log("[Deeploy] Alloc ${name} (${type.referencedType.typeName} * ${size})\\r\\n");
     ## alloc_dump(get_alloc_l1());
     ## #endif
 
-    ${name} = (${type}*) deeploy_malloc(sizeof(${type}) * ${size});
+    ${name} = (${type.typeName}) deeploy_malloc(sizeof(${type.referencedType.typeName}) * ${size});
 
     ## #if DEEPLOY_TRACE_MALLOC
     ## deeploy_log("  -> @ %p\\r\\n", ${name});
@@ -43,17 +43,16 @@ if (core_id ==0) {
 """)
 
 MemPoolGlobalInitTemplate = NodeTemplate(
-    "static ${type} ${name}[${size}] __attribute__((section(\".l2\"))) = {${values}};\n")
+    "static ${type.referencedType.typeName} ${name}[${size}] __attribute__((section(\".l2\"))) = {${values}};\n")
 MemPoolGlobalAllocateTemplate = NodeTemplate("")
 
-MemPoolStructInitTemplate = NodeTemplate("""static ${type} ${name} __attribute__((section(\".l1\")));
+MemPoolStructInitTemplate = NodeTemplate("""
+static ${type.typeName} ${name} __attribute__((section(\".l1\")));
 """)
 #static const ${type}* ${name} = &${name}_UL;
 
 MemPoolStructAllocateTemplate = NodeTemplate("""
-if (core_id ==0) {
-    % for key, value in structDict.items():
-        ${name}.${key} = ${value};
-    % endfor
+if (core_id == 0) {
+    ${name} = (${structDict.typeName}) ${str(structDict)};
 }
 """)

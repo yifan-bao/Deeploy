@@ -23,11 +23,15 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from Deeploy.DeeployTypes import *
-from Deeploy.Layers.BasicLayers import *
+from typing import List, Tuple
+
+import numpy as np
+
+from Deeploy.DeeployTypes import NodeMapper, Shape
+from Deeploy.Layers.BasicLayers import RQGEMMLayer, RQSConvLayer
 
 
-class CMSISRQSConvLayer(ConvLayer):
+class CMSISRQSConvLayer(RQSConvLayer):
 
     def __init__(self, maps: List[NodeMapper]):
         super().__init__(maps)
@@ -43,32 +47,12 @@ class CMSISRQSConvLayer(ConvLayer):
             inputShapes[4] = outputShapes[0][-1]  # Channels out dimension of Kernel
         return (inputShapes, outputShapes)
 
-    def computeOps(self):
-        if "group" in self.mapper.nodeRep.keys():
-            groups = self.mapper.nodeRep['group']
-        else:
-            groups = 1
-        opsPerPx = int(
-            np.prod(self.mapper.nodeRep['kernel_shape']) * self.mapper.nodeRep['ch_im_in'] *
-            self.mapper.nodeRep['ch_im_out'] / groups) * 2
-        if 'dim_im_out_y' in self.mapper.nodeRep.keys():
-            numPx = self.mapper.nodeRep['dim_im_out_x'] * self.mapper.nodeRep['dim_im_out_y']
-        else:
-            numPx = self.mapper.nodeRep['dim_im_out_x']
-        return numPx * opsPerPx
 
-
-class CMSISRQSGEMMLayer(GEMMLayer):
+class CMSISRQSGEMMLayer(RQGEMMLayer):
 
     def __init__(self, maps: List[NodeMapper]):
         super().__init__(maps)
 
     def computeShapes(self, inputShapes: Shape, outputShapes: Shape, parserDict, channels_first) -> Tuple[Shape, Shape]:
         inputShapes[2] = inputShapes[1][-2]  # Channels out dimension of Kernel
-        # inputShapes[3] = inputShapes[1][-1] # Channels out dimension of Kernel
-        # inputShapes[4] = inputShapes[1][-1] # Channels out dimension of Kernel
         return (inputShapes, outputShapes)
-
-    def computeOps(self):
-        ops = self.mapper.nodeRep['in_N'] * self.mapper.nodeRep['in_C'] * self.mapper.nodeRep['weight_C'] * 2
-        return ops

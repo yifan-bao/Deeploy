@@ -79,7 +79,6 @@ add_compile_definitions(
 )
 
 add_compile_definitions(
-    __XPULPIMG
 
     PRINTF_DISABLE_SUPPORT_FLOAT
     PRINTF_DISABLE_SUPPORT_LONG_LONG
