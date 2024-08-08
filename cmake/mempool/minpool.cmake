@@ -41,8 +41,13 @@ set(xqueue_size  0          CACHE STRING "XQueue extension's queue size in each 
 ################################
 
 # Enable the XpulpIMG extension
-set(xpulpimg  1             CACHE STRING "Enable the XpulpIMG extension")
+set(xpulpimg  0             CACHE STRING "Enable the XpulpIMG extension")
 
+##################
+##  Simulation  ##
+##################
+
+set(BANSHEE_CONFIG ${CMAKE_CURRENT_LIST_DIR}/minpool.yaml CACHE INTERNAL "source_list")
 
 ###############
 ##  MinPool  ##
@@ -50,6 +55,8 @@ set(xpulpimg  1             CACHE STRING "Enable the XpulpIMG extension")
 
 # Number of cores
 set(num_cores  16          CACHE STRING "Number of cores")
+
+set(num_eff_cores 16       CACHE STRING "Number of effective cores")
 
 # Number of groups
 set(num_groups  4           CACHE STRING "Number of groups")
@@ -77,13 +84,14 @@ add_compile_definitions(
 )
 
 add_compile_definitions(
-    __XPULPIMG
 
     PRINTF_DISABLE_SUPPORT_FLOAT
     PRINTF_DISABLE_SUPPORT_LONG_LONG
     PRINTF_DISABLE_SUPPORT_PTRDIFF_T
 
     NUM_CORES=${num_cores}
+    NUM_EFF_CORES=${num_eff_cores}
+
     NUM_THREADS=${num_threads}
     NUM_GROUPS=${num_groups}
     NUM_CORES_PER_TILE=${num_cores_per_tile}

@@ -9,15 +9,23 @@ set(CMAKE_C_STANDARD 99)
 set(CMAKE_C_COMPILER_LAUNCHER "ccache")
 set(CMAKE_CXX_COMPILER_LAUNCHER "ccache")
 
-set(platform MemPool CACHE STRING "Platform (MemPool, CMSIS or Generic)")
-set_property(CACHE platform PROPERTY STRINGS MemPool CMSIS Generic)
+set(CMAKE_EXPORT_COMPILE_COMMANDS TRUE)
+
+if(TOOLCHAIN STREQUAL GCC)
+  set(CMAKE_INTERPROCEDURAL_OPTIMIZATION TRUE)
+endif()
+
+set(platform MemPool CACHE STRING "Platform (MemPool, QEMU, Siracusa, Siracusa_w_neureka, PULP-Open, Generic)")
+set_property(CACHE platform PROPERTY STRINGS MemPool QEMU Siracusa Siracusa_w_neureka PULP-Open Generic)
 
 if(platform STREQUAL MemPool)
   message(STATUS "Building for platform 'MemPool'")
-elseif(platform STREQUAL QEMU)
-  message(STATUS "Building for platform 'QEMU'")
+elseif(platform STREQUAL QEMU-ARM)
+  message(STATUS "Building for platform 'QEMU-ARM'")
 elseif(platform STREQUAL Siracusa)
   message(STATUS "Building for platform 'Siracusa'")
+elseif(platform STREQUAL Siracusa_w_neureka)
+  message(STATUS "Building for platform 'Siracusa_w_neureka'")
 elseif(platform STREQUAL PULPOpen)
   message(STATUS "Building for platform 'PULP-Open'")
 elseif(platform STREQUAL Generic)
@@ -29,21 +37,17 @@ endif()
 # Import useful functions / macros
 include(${CMAKE_CURRENT_LIST_DIR}/cmake/Util.cmake)
 include(${CMAKE_CURRENT_LIST_DIR}/cmake/common.cmake)
+include(${CMAKE_CURRENT_LIST_DIR}/cmake/simulation.cmake)
 
 message(STATUS "============================= Project Configuration ============================")
 message(STATUS "[Deeploy]     platform               = " ${platform})
 message(STATUS "[Deeploy]     use_dma                = " ${use_dma})
+message(STATUS "================================================================================")
+message(STATUS "")
 
 if(platform STREQUAL MemPool)
   set(mempool_flavour mempool_ita CACHE STRING "Platform (mempool, mempool_ita or minpool)")
-  set_property(CACHE mempool_flavour PROPERTY STRINGS mempool minpool)
-
-  set(banshee_stack_size 16777216 CACHE STRING "Stack size of banshee threads")
-
-  OPTION(banshee_simulation "Optimize binary for banshee simulation" OFF)
-  if(banshee_simulation)
-    add_compile_definitions(BANSHEE_SIMULATION)
-  endif()
+  set_property(CACHE mempool_flavour PROPERTY STRINGS mempool minpool mempool_ita)
 
   if(TOOLCHAIN STREQUAL LLVM)
     set(CMAKE_TOOLCHAIN_FILE ${CMAKE_CURRENT_LIST_DIR}/cmake/mempool/toolchain_llvm.cmake)
@@ -51,22 +55,18 @@ if(platform STREQUAL MemPool)
     set(CMAKE_TOOLCHAIN_FILE ${CMAKE_CURRENT_LIST_DIR}/cmake/mempool/toolchain_gcc.cmake)
   endif()
 
-  include(${CMAKE_CURRENT_LIST_DIR}/cmake/mempool/simulation.cmake)
   include(${CMAKE_CURRENT_LIST_DIR}/cmake/mempool/${mempool_flavour}.cmake)
 
   project(deeploy LANGUAGES C ASM)
 
-  add_subdirectory(deeploymempoollibs)
-  add_subdirectory(deeploybasiclibs)
-  add_subdirectory(deeploytest)
-  target_include_directories(deeploymempool PUBLIC deeploybasiclibs/inc)
+  add_subdirectory(TargetLibraries/MemPool)
+  add_subdirectory(TargetLibraries/Generic)
+  add_subdirectory(DeeployTest)
+  target_include_directories(deeploymempool PUBLIC TargetLibraries/Generic/inc)
 
-  target_link_libraries(deeploylib INTERFACE mempoolruntime deeploymempool deeploybasic)
+  target_link_libraries(deeploylib INTERFACE deeploymempool deeploybasic)
 
   message(STATUS "============================= MemPool Configuration ============================")
-  message(STATUS "[Banshee]   banshee_simulation     = " ${banshee_simulation})
-  message(STATUS "[Banshee]   banshee_stack_size     = " ${banshee_stack_size})
-  message(STATUS "[Banshee]   num_threads            = " ${num_threads})
   message(STATUS "[cMake  ]   mempool_flavour        = " ${mempool_flavour})
   message(STATUS "[cMake  ]   boot_addr              = " ${boot_addr})
   message(STATUS "[cMake  ]   l2_base                = " ${l2_base})
@@ -88,13 +88,10 @@ if(platform STREQUAL MemPool)
   message(STATUS "[cMake  ]   axi_masters_per_group  = " ${axi_masters_per_group})
   if(mempool_flavour STREQUAL mempool_ita)
     message(STATUS "=============================== ITA Configuration ==============================")
-    message(STATUS "[cMake  ]   ita_s                  = " ${ita_s})
-    message(STATUS "[cMake  ]   ita_p                  = " ${ita_p})
-    message(STATUS "[cMake  ]   ita_e                  = " ${ita_e})
-    message(STATUS "[cMake  ]   ita_h                  = " ${ita_h})
     message(STATUS "[cMake  ]   ita_pe                 = " ${ita_pe})
   endif()
   message(STATUS "================================================================================")
+  message(STATUS "")
 
 endif()
 
@@ -111,15 +108,16 @@ if(platform STREQUAL Generic)
   message(STATUS "============================= Generic Configuration ============================")
   message(STATUS "[cMake  ]   CPU                    = " ${CMAKE_SYSTEM_PROCESSOR})
   message(STATUS "================================================================================")
+  message(STATUS "")
 
-  add_subdirectory(deeploybasiclibs)
-  add_subdirectory(deeploytest)
+  add_subdirectory(TargetLibraries/Generic)
+  add_subdirectory(DeeployTest)
 
   target_link_libraries(deeploylib INTERFACE deeploybasic)
 
 endif()
 
-if(platform STREQUAL QEMU)
+if(platform STREQUAL QEMU-ARM)
 
   if(TOOLCHAIN STREQUAL LLVM)
     set(CMAKE_TOOLCHAIN_FILE ${CMAKE_CURRENT_LIST_DIR}/cmake/cmsis/toolchain_llvm.cmake)
@@ -137,16 +135,18 @@ if(platform STREQUAL QEMU)
   message(STATUS "[cMake  ]   FABI                   = " ${FABI})
   message(STATUS "[cMake  ]   FPU                    = " ${FPU})
   message(STATUS "================================================================================")
-  add_subdirectory(deeploybasiclibs)
-  add_subdirectory(deeploycmsislibs)
-  add_subdirectory(deeploytest)
+  message(STATUS "")
 
-  target_include_directories(deeploycmsis PUBLIC deeploybasiclibs/inc)
+  add_subdirectory(TargetLibraries/Generic)
+  add_subdirectory(TargetLibraries/CMSIS)
+  add_subdirectory(DeeployTest)
+
+  target_include_directories(deeploycmsis PUBLIC TargetLibraries/Generic/inc)
   target_link_libraries(deeploylib INTERFACE deeploybasic deeploycmsis)
 
 endif()
 
-if(platform STREQUAL Siracusa OR platform STREQUAL PULPOpen)
+if(platform STREQUAL Siracusa OR platform STREQUAL Siracusa_w_neureka OR platform STREQUAL PULPOpen)
 
   if(TOOLCHAIN STREQUAL LLVM)
     set(CMAKE_TOOLCHAIN_FILE ${CMAKE_CURRENT_LIST_DIR}/cmake/pulp/toolchain_llvm.cmake)
@@ -156,7 +156,7 @@ if(platform STREQUAL Siracusa OR platform STREQUAL PULPOpen)
 
   include(${CMAKE_CURRENT_LIST_DIR}/cmake/pulp/pulp.cmake)
 
-  if(platform STREQUAL Siracusa)
+  if(platform STREQUAL Siracusa OR platform STREQUAL Siracusa_w_neureka)
     include(${CMAKE_CURRENT_LIST_DIR}/cmake/pulp/siracusa/siracusa.cmake)
   elseif(platform STREQUAL PULPOpen)
     include(${CMAKE_CURRENT_LIST_DIR}/cmake/pulp/pulp-open/pulp-open.cmake)
@@ -170,13 +170,15 @@ if(platform STREQUAL Siracusa OR platform STREQUAL PULPOpen)
   message(STATUS "[cMake  ]   Fabric Controller      = " ${FC})
   message(STATUS "[cMake  ]   Number of used cores   = " ${NUM_CORES})
   message(STATUS "================================================================================")
+  message(STATUS "")
 
+  add_subdirectory(TargetLibraries/Generic)
+  add_subdirectory(TargetLibraries/PULPOpen)
+  target_include_directories(deeploypulp PUBLIC TargetLibraries/Generic/inc)
 
-  add_subdirectory(deeploybasiclibs)
-  add_subdirectory(deeploypulplibs)
-  target_include_directories(deeploypulp PUBLIC deeploybasiclibs/inc)
-
-  add_subdirectory(deeploytest)
+  add_subdirectory(DeeployTest)
   target_link_libraries(deeploylib INTERFACE deeploybasic deeploypulp)
 
 endif()
+
+print_simulation_config()

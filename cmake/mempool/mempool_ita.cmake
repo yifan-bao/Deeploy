@@ -41,8 +41,13 @@ set(xqueue_size  0          CACHE STRING "XQueue extension's queue size in each 
 ################################
 
 # Enable the XpulpIMG extension
-set(xpulpimg  1             CACHE STRING "Enable the XpulpIMG extension")
+set(xpulpimg  0             CACHE STRING "Enable the XpulpIMG extension")
 
+##################
+##  Simulation  ##
+##################
+
+set(BANSHEE_CONFIG ${CMAKE_CURRENT_LIST_DIR}/mempool_ita.yaml CACHE INTERNAL "source_list")
 
 ###############
 ##  MemPool  ##
@@ -74,10 +79,6 @@ set(axi_masters_per_group 1 CACHE STRING "Number of AXI masters per group")
 ###############
 ##  ITA  ##
 ###############
-set(ita_s  64          CACHE STRING "ITA sequence length")
-set(ita_p  64          CACHE STRING "ITA projection size")
-set(ita_e  64          CACHE STRING "ITA embedding size")
-set(ita_h  1           CACHE STRING "ITA number of heads")
 set(ita_pe 16          CACHE STRING "ITA number of processing engines per ITA core")
 
 math_shell("${num_cores} / ${num_groups}" num_cores_per_group)
@@ -99,10 +100,6 @@ add_compile_definitions(
     NUM_CORES=${num_cores}
     NUM_EFF_CORES=${num_eff_cores}
 
-    ITA_S=${ita_s}
-    ITA_P=${ita_p}
-    ITA_E=${ita_e}
-    ITA_H=${ita_h}
     ITA_PE=${ita_pe}
 
     NUM_THREADS=${num_threads}

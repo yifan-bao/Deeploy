@@ -41,8 +41,13 @@ set(xqueue_size  0          CACHE STRING "XQueue extension's queue size in each 
 ################################
 
 # Enable the XpulpIMG extension
-set(xpulpimg  1             CACHE STRING "Enable the XpulpIMG extension")
+set(xpulpimg  0             CACHE STRING "Enable the XpulpIMG extension")
 
+##################
+##  Simulation  ##
+##################
+
+set(BANSHEE_CONFIG ${CMAKE_CURRENT_LIST_DIR}/mempool.yaml CACHE INTERNAL "source_list")
 
 ###############
 ##  MemPool  ##
