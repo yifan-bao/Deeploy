@@ -1,5 +1,179 @@
 # Changelog
 
+# Unreleased
+
+## PR Refactoring + Documentation
+
+This PR integrates a first batch of changes targeted at making Deeploy open-sourceable.
+
+## Added
+
+- API Reference generation with make target `make docs` using Sphinx
+- Documentation for the core of Deeploy abstractions in `DeeployTypes.py` and `AbstractDataTypes.py`
+
+## Changed
+
+- Minor changes in library design and import strategies to facilitate automatic documentation generation.
+- Vast refactoring. Rather than splitting platforms by Deeploy abstraction, they are now integrated as Targets.
+
+## Fixed
+
+- Minor type annotation and Exception type fixes
+
+## PR Engine extension
+
+Extract the 'engine' functionality from the DeploymentPlatform into the DeploymentEngine, and add the EngineColoring extension.
+
+## Added
+
+- DeploymentEngine class that holds a name, Mapping, initCode, and an includeList
+- NetworkDeployer now implements a generateIncludeString method
+- EngineColoring extension adds new classes: EngineColoringDeployer(Wrapper), EngineMappr, EngineColoringPass, EngineDecolorationPass
+
+## Changed
+
+- DeploymentPlatform now doesn't incorporate the Mapping and includeList but has a list of DeploymentEngines
+- NetworkDeployer now maps a node to an ONNXLayer by using the first engine that has a Mapping for its operation
+- The NeurekaPlatform is now composed of 2 engines: PULPClusterEngine and NeurekaEngine
+
+## PR MemoryPlatform
+
+Add the memory-aware platform `MemoryPlatform`. It has a `memoryHierarchy` and a `defaultTargetMemoryLevel` attribute, and implements the `getTargetMemoryLevel` method.
+This should allow the use of the memory and tiler extensions without the need for engine coloring, but does preparation for easier integration of the engine extension.
+
+### Added
+
+- MemoryPlatform: new memory-aware platform class
+- MemoryPlatformWrapper: helper class that wraps an existing instance of `DeploymentPlatform` and adds memory-aware functionalities
+- TargetMemoryLevelMapping: mapping from a node and tensor to a target memory level, has to be constructed after annotating buffers with `_memoryLevel`
+- getTargetMemoryLevelMapping method to MemoryLevelAwareDeployer
+
+### Changed
+
+- MemoryLevelAwareDeployer: removed `memoryHierarchy` as an attribute
+- Tiler: all memory-related methods now require a TargetMemoryLevelMapping
+
+## PR Calculate Buffer Size
+
+This PR tries to correctly calculate the required buffer size for the network.
+
+- For `NetworkDeployer` and `MemoryLevelAwareDeployer` the global buffer size is not valid and will throw an error.
+- For `TilerAwareDeployer` the buffer size is calculated based on the memory map of the tiling solution plus the global inputs and outputs.
+
+### Added
+- Added `calculateBufferSize` method and `TilerAwareDeployer`
+
+### Changed
+- Changed `worstCaseBufferSize` attribute to calculate the buffer size
+- Use `pformat` from `pprint` to format error messages in `debugConstraints`
+
+## PR Support for Parallel Inference with Llama
+
+This PR adds support for parallel inference mode in Llama. Furthermore, it updated DeeployPULPLibs to the latest version, which fixes a bug in the softmax kernel.
+
+### Added
+- `SkipEmptyConcatPass`
+- Fixed bug in softmax kernel of `DeeployPULPLibs`
+
+### Changed
+- Renamed `SkipUnityRequantAndConcatPass` to `SkipUnityRequantPass`, to support matching for and arbitrary operator using Regex.
+- Remove empty inputs from the graph
+
+### Fix
+- Fix transpose merge if intermediate tensor is an output
+
+## PR Fix Mapper Selection
+
+This PR fixes the selection of `NodeMapper` objects based on type checking information; this enables support for heterogeneous lowering, where some templates might only be available for specific data types.
+Instead of parsing the entire network and then type checking the entire network, parsing and type checking are now down layer-by-layer.
+
+### Added
+* `_parseNode` method of `NetworkDeployer` parses a node performs type checking in a single go to determine whether a mapper - parser - binding combination is applicable
+* `ReshapeMergePass` in `NEurekaPlatform` minimizes deployed nodes for increased performance
+* `_ReferenceBuffer` class is used instead of changing `Template` objects on the fly for increased performance
+
+### Changed
+* Removed most occurences of the `deepcopy` method to improve performance
+* User-provided parsers are no longer expected to return a clean `NetworkContext` in case they fail
+* Extracted type checking from binding to enable more specific `NodeMapper`s
+
+
+## PR Updated tinyLlama Model
+
+### Added
+- Annotate ONNX graph with signedness, nLevels and deployment state in ONNX graph
+- Update ONNX graph with broadcasted shapes and inferred types
+
+### Changed
+- Export graph on binding error
+- Updated tinyLlama model
+
+### Fixed
+- Fix wrong nLevels for IO
+- Temporarily disable ICCT with ITA tests
+
+## PR N-EUREKA: Weight Memory
+
+### Added
+
+- NodeMemoryLevelChecker and MemoryAwareNodeBindings, which allow binding only nodes whose tensors are mapped to allowed memory levels
+- N-EUREKA tile constraint flow for kernels with weights in WeightMemory
+- memory level annotation pass that annotates N-EUREKA's weights to WeightMemory in a "first come, first served" manner
+- `use_wmem` flag to N-EUREKA's ConvTemplate
+- N-EUREKA's generic global init template that supports WeightMemory
+- tests for N-EUREKA with WeightMemory
+- AbsoluteHyperRectangle - a wrapper around a hyperrectangle that also saves the absolute offset
+
+### Changed
+
+- reduced the number of tests for N-EUREKA
+- serializeTilingSolution now expects AbsoluteHyperRectangle's for outputCubes
+- moved encoding of N-EUREKA colored node's weights into the N-EUREKA's special memory layout from ConvTemplate's alignToContext into a lowering
+
+## PR Llama Decoder Support
+
+### Added
+
+* `ReshapeMergePass` lowering pass to merge subsequent `Reshape` operators into a single `Reshape` operator
+* `PULPGEMMParser` to further decouple `PULPPlatform` from `CMSISParser`s
+* Generic TileConstraintFlow templates `UnaryTileConstraintFlow` for elementwise operators on single tensors and `BOPTileConstraintFlow` for elementwise operators on two tensors.
+* Support for alignment of tiles in the `MemoryScheduler`. This improves performance on systems that can take advantage of aligned accesses and fixes a bug with the L3 DMA of PULP systems. The default alignment is 4 Bytes.
+* `tinyLlama` regression test
+
+### Changed
+
+* The `Mul` operator is now understood as a binary pointwise operator, i.e. both arguments are broadcast to the same shape rather than the second argument being scalar.
+* `AddTileConstraintFlow` is now a `BOPTileConstraintFlow`
+* GELU and HardSwish TileConstraintFlows are now `UnaryTileConstraintFlow`s
+* Extracted formulaic environment setup for `.gitlab-ci.yml` tests into a single script.
+
+### Fixed
+
+* `MatMul` operators where the right hand matrix is without batch dimension are now parsed correctly and the attribute `W_batched` indicates whether the right hand matrix uses a batch dimension or not.
+* Fixed assumption that network outputs have no users; Outputs may now have an arbitrary amount of users.
+* Testing in Siracusa platform now correctly tests every output of the network rather than the first one only.
+
+## PR N-EUREKA: Pointwise Convolution
+
+### Added
+
+- Neureka Platform, Bindings, Templates, Parsers, and Tiler
+- Requantized GEMM to Requantized Pointwise Convolution pass
+- ReshapeConstOptPass - a pass that folds reshapes into constants
+- RemoveGlobalOutputReshapePass - a pass that removes a reshape on a global output because it caused unnecessary memory allocation
+- Added ReshapeConstOptPass and RemoveGlobalOutput to PULPDeployer
+
+### Changed
+
+- NCHWtoNHWCConvPass changed to NCHWtoNHWCRequantizedConvPass since it matched Requantized Convolutions, and NCHWtoNHWCConvPass now matches normal convolutions. Both are part of the NCHWtoNHWCPass.
+- Same as previous note for PULPNCHWtoNHWCDense[Requantized]ConvPass
+
+### Fixed
+
+- MemoryLevelDeployer.py: aligned the ordering of arguments of the `MemoryLevelAwareSignPropDeployer`
+- MemoryLevelDeployer.py: fixed the return type of the `memoryLevelAnnotation`
+- BasicLayers.py: wrong input shape computed for bias
+
 # v0.1.0
 
 ## PR PULP Support
@@ -379,3 +553,40 @@ Introduces the `PULPL3TilingDB` `CodeTransformation` which, similar to `PULPClus
 
 ## Changed
 * Aligned several tests with more current, less verbose setup code
+
+## PR Typing System Refactor
+
+Changes the typing system from dynamic metaclasses to static Generic classes. This facilitates static type analysis (STA) and introduces support for `pickle` pickling, which is much faster than `dill` pickling.
+
+## Added
+* `Pointer`, `Struct`, `Immediate`, `Future` types
+* `PointerClass`, `FutureClass`, `StructClass` dynamic class constructors
+
+## Removed
+* `DataTypes` field from `Platform`, since it wasn't really enforced, anyway
+* `ImmediateType`, `PointerType`, `FutureType`, and `StructType` classes
+* `DataTypeCollection` class
+
+## PR Concat
+
+Implements support for `memcpy`-based concatenation operators and associated `TileConstraintFlow`
+
+## Added
+* Layer, Parser, Mapper, Binding and reference template for Concatenation operator
+* `TileConstraintFlow` for Concatenation operator
+* Concatenation regression test
+
+## PR Tiling refactor
+
+Refactors the tiling flow
+
+## Added
+* `stablePermutation` method of the `MemoryScheduler` allows to heuristically modify the allocation schedule
+
+## Changed
+* `MemoryConstraintFlows` now correctly injects model live state for every pattern
+* `Tiler` now subtracts the injected model live state for every pattern to compute the `innerFlowState`
+
+## Fixed
+* `annotateSolution` now works correctly with any allocation ordering
+* The maximum allocation cost in each pattern of the `MemoryScheduler` is now constrained to the correct maximum value

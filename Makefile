@@ -41,10 +41,19 @@ PICOLIBC_RISCV_INSTALL_DIR      ?= ${LLVM_INSTALL_DIR}/picolibc/riscv
 PULP_SDK_INSTALL_DIR ?= ${DEEPLOY_INSTALL_DIR}/pulp-sdk
 QEMU_INSTALL_DIR ?= ${DEEPLOY_INSTALL_DIR}/qemu
 BANSHEE_INSTALL_DIR ?= ${DEEPLOY_INSTALL_DIR}/banshee
+MEMPOOL_INSTALL_DIR ?= ${DEEPLOY_INSTALL_DIR}/mempool
 
 CMAKE ?= cmake
 
-all: toolchain emulators echo-bash
+LLVM_COMMIT_HASH ?= 99902b1
+PICOLIBC_COMMIT_HASH ?= 31ff1b3601b379e4cab63837f253f59729ce1fef
+PULP_SDK_COMMIT_HASH ?= c216298881cee767afc30928e055982b9e40e568
+BANSHEE_COMMIT_HASH ?= 9644dd1d84d4899909f48f107332c59d166617f5
+MEMPOOL_COMMIT_HASH ?= affd45d94e05e375a6966af6a762deeb182a7bd6
+
+RUSTUP_CARGO ?= $$(rustup which cargo)
+
+all: toolchain emulators docs echo-bash
 
 echo-bash:
 	@echo "Please export the following symbols:"
@@ -64,38 +73,41 @@ echo-bash:
 	@echo "export PULP_SDK_HOME=${PULP_SDK_INSTALL_DIR}"
 	@echo "export LLVM_INSTALL_DIR=${LLVM_INSTALL_DIR}"
 	@echo "export PULP_RISCV_GCC_TOOLCHAIN=/PULP_SDK_IS_A_MESS"
+	@echo "export MEMPOOL_HOME=${MEMPOOL_INSTALL_DIR}"
 	@echo "export CMAKE=$$(which cmake)"
 	@echo "export PATH=${QEMU_INSTALL_DIR}/bin:${BANSHEE_INSTALL_DIR}:\$$PATH"
+	@echo "export PATH=~/.cargo/bin:$PATH"
 	@echo "source ${PULP_SDK_INSTALL_DIR}/configs/siracusa.sh"
 
 
 toolchain: llvm llvm-compiler-rt-riscv llvm-compiler-rt-arm picolibc-arm picolibc-riscv
 
-emulators: pulp-sdk qemu banshee
+emulators: pulp-sdk qemu banshee mempool
 
 ${TOOLCHAIN_DIR}/llvm-project:
 	cd ${TOOLCHAIN_DIR} && \
-	git clone git@iis-git.ee.ethz.ch:iis-compilers/llvm-project.git \
-	 -b upstream-rebase/main && \
-	cd ${TOOLCHAIN_DIR}/llvm-project && git checkout b71678d08ab87cdca39f9b489de4f579c0f92261 && \
+	git clone https://github.com/pulp-platform/llvm-project.git \
+	 -b main && \
+	cd ${TOOLCHAIN_DIR}/llvm-project && git checkout ${LLVM_COMMIT_HASH} && \
 	git submodule update --init --recursive && \
-	git apply ../llvm.patch
+	git apply ${TOOLCHAIN_DIR}/llvm.patch
 
 ${LLVM_INSTALL_DIR}: ${TOOLCHAIN_DIR}/llvm-project
 	cd ${TOOLCHAIN_DIR}/llvm-project && \
 	mkdir -p build && cd build && \
-	${CMAKE} \
+	${CMAKE} -G Ninja \
 	-DCMAKE_INSTALL_PREFIX=${LLVM_INSTALL_DIR} \
-	-DLLVM_ENABLE_PROJECTS="clang;lld;mlir" \
-	-DLLVM_TARGETS_TO_BUILD="ARM;RISCV;host;AArch64" \
+	-DLLVM_ENABLE_PROJECTS="clang;lld" \
+	-DLLVM_TARGETS_TO_BUILD="ARM;RISCV;host" \
 	-DLLVM_BUILD_DOCS="0" \
 	-DLLVM_ENABLE_BINDINGS="0" \
 	-DLLVM_ENABLE_TERMINFO="0" \
 	-DLLVM_OPTIMIZED_TABLEGEN=ON \
+	-DLLVM_PARALLEL_LINK_JOBS=2 \
 	-DCMAKE_BUILD_TYPE=Release \
 	../llvm && \
-	make -j4 && \
-	make install
+	${CMAKE} --build . -j && \
+	${CMAKE} --install .
 
 llvm: ${LLVM_INSTALL_DIR}
 
@@ -128,8 +140,8 @@ ${LLVM_CLANG_RT_RISCV_RV32IMC}: ${TOOLCHAIN_DIR}/llvm-project
 	-DCOMPILER_RT_BAREMETAL_BUILD=ON \
 	-DCOMPILER_RT_OS_DIR="baremetal/rv32imc" \
 	-DLLVM_CONFIG_PATH=${LLVM_INSTALL_DIR}/bin/llvm-config && \
-	make -j && \
-	make install
+	${CMAKE} --build . -j && \
+	${CMAKE} --install .
 
 ${LLVM_CLANG_RT_RISCV_RV32IM}: ${TOOLCHAIN_DIR}/llvm-project
 	cd ${TOOLCHAIN_DIR}/llvm-project && mkdir -p build-compiler-rt-riscv-rv32im \
@@ -160,8 +172,8 @@ ${LLVM_CLANG_RT_RISCV_RV32IM}: ${TOOLCHAIN_DIR}/llvm-project
 	-DCOMPILER_RT_BAREMETAL_BUILD=ON \
 	-DCOMPILER_RT_OS_DIR="baremetal/rv32im" \
 	-DLLVM_CONFIG_PATH=${LLVM_INSTALL_DIR}/bin/llvm-config && \
-	make -j && \
-	make install
+	${CMAKE} --build . -j && \
+	${CMAKE} --install .
 
 llvm-compiler-rt-riscv: ${LLVM_CLANG_RT_RISCV_RV32IM} ${LLVM_CLANG_RT_RISCV_RV32IMC}
 
@@ -194,22 +206,21 @@ ${LLVM_CLANG_RT_ARM}: ${TOOLCHAIN_DIR}/llvm-project
 	-DCOMPILER_RT_BAREMETAL_BUILD=ON \
 	-DCOMPILER_RT_OS_DIR="baremetal" \
 	-DLLVM_CONFIG_PATH=${LLVM_INSTALL_DIR}/bin/llvm-config && \
-	make -j && \
-	make install
-
+	${CMAKE} --build . -j && \
+	${CMAKE} --install .
 
 llvm-compiler-rt-arm: ${LLVM_CLANG_RT_ARM}
 
 ${TOOLCHAIN_DIR}/picolibc:
 	cd ${TOOLCHAIN_DIR} && \
-	git clone git@github.com:picolibc/picolibc.git && \
-	cd ${TOOLCHAIN_DIR}/picolibc && git checkout 31ff1b3601b379e4cab63837f253f59729ce1fef && \
+	git clone https://github.com/picolibc/picolibc.git && \
+	cd ${TOOLCHAIN_DIR}/picolibc && git checkout ${PICOLIBC_COMMIT_HASH} && \
 	git submodule update --init --recursive
 
 ${PICOLIBC_ARM_INSTALL_DIR}: ${TOOLCHAIN_DIR}/picolibc
 	cd ${TOOLCHAIN_DIR}/picolibc && mkdir -p build-arm && cd build-arm && \
 	cp ${TOOLCHAIN_DIR}/meson-build-script-arm.txt ../scripts && \
-	PATH=${LLVM_INSTALL_DIR}/bin:${PATH} meson setup -Dincludedir=include \
+	PATH=${LLVM_INSTALL_DIR}/bin:${PATH} meson setup --reconfigure -Dincludedir=include \
 	-Dlibdir=lib \
 	-Dspecsdir=none \
 	-Dmultilib=false \
@@ -222,7 +233,7 @@ picolibc-arm: ${PICOLIBC_ARM_INSTALL_DIR}
 ${PICOLIBC_RISCV_INSTALL_DIR}: ${TOOLCHAIN_DIR}/picolibc
 	cd ${TOOLCHAIN_DIR}/picolibc && mkdir -p build-riscv && cd build-riscv && \
 	cp ${TOOLCHAIN_DIR}/meson-build-script-riscv.txt ../scripts && \
-	PATH=${LLVM_INSTALL_DIR}/bin:${PATH} meson setup -Dincludedir=include \
+	PATH=${LLVM_INSTALL_DIR}/bin:${PATH} meson setup --reconfigure -Dincludedir=include \
 	-Dlibdir=lib \
 	-Dspecsdir=none \
 	-Dmultilib=false \
@@ -234,8 +245,8 @@ picolibc-riscv: ${PICOLIBC_RISCV_INSTALL_DIR}
 
 ${TOOLCHAIN_DIR}/pulp-sdk:
 	cd ${TOOLCHAIN_DIR} && \
-	git clone git@github.com:Scheremo/pulp-sdk.git -b scheremo && \
-	cd ${TOOLCHAIN_DIR}/pulp-sdk && git checkout 38e2754c4ad60ced9ef0a6f13410a7d8d6c33d58 && \
+	git clone https://github.com/Scheremo/pulp-sdk.git -b scheremo && \
+	cd ${TOOLCHAIN_DIR}/pulp-sdk && git checkout ${PULP_SDK_COMMIT_HASH} && \
 	git submodule update --init --recursive
 
 ${PULP_SDK_INSTALL_DIR}: ${TOOLCHAIN_DIR}/pulp-sdk
@@ -249,7 +260,7 @@ pulp-sdk: ${PULP_SDK_INSTALL_DIR}
 
 ${TOOLCHAIN_DIR}/qemu:
 	cd ${TOOLCHAIN_DIR} && \
-	git clone git@github.com:qemu/qemu.git --depth 1 -b stable-6.1 && \
+	git clone https://github.com/qemu/qemu.git --depth 1 -b stable-6.1 && \
 	cd ${TOOLCHAIN_DIR}/qemu && \
 	git submodule update --init --recursive
 
@@ -265,15 +276,40 @@ qemu: ${QEMU_INSTALL_DIR}
 
 ${TOOLCHAIN_DIR}/banshee:
 	cd ${TOOLCHAIN_DIR} && \
-	git clone git@github.com:pulp-platform/banshee.git && \
-	cd ${TOOLCHAIN_DIR}/banshee && git checkout 2be56281f23af6edcca979026fa2ecf6eba769d8 && \
+	git clone https://github.com/pulp-platform/banshee.git && \
+	cd ${TOOLCHAIN_DIR}/banshee && git checkout ${BANSHEE_COMMIT_HASH} && \
 	git submodule update --init --recursive && \
 	git apply ${TOOLCHAIN_DIR}/banshee.patch
 
 ${BANSHEE_INSTALL_DIR}: ${TOOLCHAIN_DIR}/banshee
 	export LLVM_SYS_150_PREFIX=${LLVM_INSTALL_DIR} && \
 	cd ${TOOLCHAIN_DIR}/banshee/ && \
-	cargo clean && \
-	cargo install --path . -f
+	${RUSTUP_CARGO} clean && \
+	${RUSTUP_CARGO} install --path . -f
 
 banshee: ${BANSHEE_INSTALL_DIR}
+
+mempool: ${MEMPOOL_INSTALL_DIR}
+
+${TOOLCHAIN_DIR}/mempool:
+	cd ${TOOLCHAIN_DIR} && \
+	git clone https://github.com/Xeratec/mempool.git && \
+	cd ${TOOLCHAIN_DIR}/mempool && git checkout ${MEMPOOL_COMMIT_HASH}
+
+${MEMPOOL_INSTALL_DIR}: ${TOOLCHAIN_DIR}/mempool
+	mkdir -p ${MEMPOOL_INSTALL_DIR}/software && \
+	cd ${TOOLCHAIN_DIR}/mempool && \
+	cp -r ${TOOLCHAIN_DIR}/mempool/software/runtime ${MEMPOOL_INSTALL_DIR}/software
+
+.PHONY: docs clean-docs format
+
+format:
+	python scripts/run_clang_format.py -e "*/third_party/*" -e "*/install/*" -e "*/toolchain/*" -ir ./ scripts --clang-format-executable=${LLVM_INSTALL_DIR}/bin/clang-format
+	autoflake -i -r --remove-all-unused-imports --ignore-init-module-imports --exclude "*/third_party/**" ./
+	yapf -ipr -e "third_party/" -e "install/" -e "toolchain/" .
+	isort --sg "**/third_party/*"  --sg "install/*" --sg "toolchain/*" ./
+
+docs:
+	make -C docs html
+clean-docs:
+	rm -rf docs/_autosummary docs/_build

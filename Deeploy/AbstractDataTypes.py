@@ -26,234 +26,206 @@
 from __future__ import annotations
 
 import copy
-from collections import namedtuple
-from typing import Dict, Iterable, Union
+from abc import abstractmethod
+from dataclasses import dataclass
+from typing import Dict, Generic, Iterable, List, Optional, Type, TypeVar, Union
 
 import numpy as np
 
-_POINTERSYMBOL = "*"
+_NetworkContext = TypeVar("_NetworkContext")
 
-IntegerType = namedtuple('IntegerType', ['width', 'signed'])
-FutureType = namedtuple('FutureType', ['valueType', 'stateReferenceType', 'resolveTemplate', 'dispatchTemplate'])
+_PointerType = TypeVar("Pointer", bound = "Pointer")
+_ImmediateType = TypeVar("Immediate", bound = "Immediate")
+_StructType = TypeVar("Struct", bound = "Struct")
+
+_DeeployType = TypeVar("_DeeployType", _PointerType, _ImmediateType, _StructType)
+_PythonType = TypeVar("_PythonType", str, int, float, Dict[str, "_PythonType"], Iterable["_PythonType"])
 
 
-class ImmediateType(type):
+class _ClassPropertyDescriptor(object):
 
-    def __new__(cls, name, bases, namespace):
-        assert "typeName" in namespace.keys(), "Missing typeName in immediate type constructor!"
-        assert "typeWidth" in namespace.keys(), "Missing typeWidth in immediate type constructor!"
+    def __init__(self, fget, fset = None):
+        self.fget = fget
+        self.fset = fset
 
-        retCls = super().__new__(cls, name, bases, namespace)
+    def __get__(self, obj, other = None):
+        if other is None:
+            other = type(obj)
+        return self.fget.__get__(obj, other)()
 
-        return retCls
+    def __set__(self, obj, value):
+        if not self.fset:
+            raise AttributeError("can't set attribute")
+        type_ = type(obj)
+        return self.fset.__get__(obj, type_)(value)
+
+    def setter(self, func):
+        if not isinstance(func, (classmethod, staticmethod)):
+            func = classmethod(func)
+        self.fset = func
+        return self
+
+
+def _classproperty(func):
+    if not isinstance(func, (classmethod, staticmethod)):
+        func = classmethod(func)
+
+    return _ClassPropertyDescriptor(func)
+
+
+class _SlotPickleMixin(object):
+
+    def __getstate__(self):
+        return dict((slot, getattr(self, slot)) for slot in self.__slots__ if hasattr(self, slot))
+
+    def __setstate__(self, state):
+        for slot, value in state.items():
+            setattr(self, slot, value)
+
+
+@dataclass
+class BaseType(Generic[_PythonType, _DeeployType], _SlotPickleMixin):
+    """Deeploy abstraction to represent data types that can be expressed in the C language
+    """
+
+    __slots__ = [
+        "value"  #: _PythonType: Variable that stores the underlying represented Python-typed value
+    ]
+    typeName: str  #: str: The C typename of this type
+    typeWidth: int  #: int: the number of BITS to be assigned to the type
 
     @classmethod
-    def __prepare__(cls, name, bases):
-        return dict()
+    @abstractmethod
+    def checkValue(cls, value: _PythonType, ctxt: Optional[_NetworkContext] = None) -> bool:
+        """Checks whether a given Python-type value (usually FP64) can be represented with a Deeploy type
 
-    def __instancecheck__(cls, other):
-        if hasattr(other, "typeName") and hasattr(other, "typeWidth"):
-            return cls.typeName == other.typeName and cls.typeWidth == other.typeWidth
+        Parameters
+        ----------
+        value : _PythonType
+            Python-typed value to check
+        ctxt : Optional[_NetworkContext]
+            Current NetworkContext
+
+        Returns
+        -------
+        bool
+            Returns true if value can represented by cls
+
+        """
+        return False
+
+    @classmethod
+    @abstractmethod
+    def checkPromotion(cls, value: Union[_PythonType, _DeeployType], ctxt: Optional[_NetworkContext] = None) -> bool:
+        """Checks whether a given Python-typed or Deeploy-typed value can be represented with the Deeploy type
+
+        Parameters
+        ----------
+        value : Union[_PythonType, _DeeployType]
+            Python-typed or Deeploy-typed value to be checked for
+            promotion to cls
+        ctxt : Optional[_NetworkContext]
+            Current NetworkContext
+
+        Returns
+        -------
+        bool
+            Returns true if the value can be promoted to cls
+
+        """
         return False
 
 
-class IntegerImmediateType(ImmediateType):
+class VoidType(BaseType):
+    """Helper type to represent the C void type for pointers
 
-    def __new__(cls, name, bases, namespace):
-        assert "typeMax" in namespace.keys(), "Missing typeMax in immediate type constructor!"
-        assert "typeMin" in namespace.keys(), "Missing typeMin in immediate type constructor!"
-
-        retCls = super().__new__(cls, name, bases, namespace)
-        return retCls
-
-    def __instancecheck__(cls, other):
-        if not super().__instancecheck__(other):
-            return False
-
-        if hasattr(other, "typeMax") and hasattr(other, "typeMin"):
-            return cls.typeMin == other.typeMin and cls.typeMax == other.typeMax
-        return False
+    """
+    __slots__ = []
+    typeName = "void"
+    typeWidth = 32
 
 
-class StructType(type):
+class Immediate(BaseType[_PythonType, _ImmediateType]):
+    """Represents any immediate value, e.g. 6, 7.48,... Can not be used to represent values that are deferenced at runtime.
+    """
 
-    class StructDict(dict):
-
-        def __init__(self):
-            super().__init__()
-            self._members = {}
-
-        def __setitem__(self, key, value):
-            if isinstance(value, (ImmediateType, StructType, PointerType)):
-                self._members[key] = value
-            else:
-                super().__setitem__(key, value)
-
-    def __new__(cls, name, bases, namespace):
-        retCls = super().__new__(cls, name, bases, namespace)
-
-        assert "typeName" in namespace.keys(), "Missing typeName in struct type constructor!"
-        assert "typeWidth" in namespace.keys(), "Missing typeWidth in struct type constructor!"
-        assert "structTypeDict" in namespace.keys(), "Missing structTypeDict in struct type constructor!"
-
-        return retCls
-
-    @classmethod
-    def __prepare__(cls, name, bases):
-        return StructType.StructDict()
-
-    def __instancecheck__(cls, other):
-
-        if not (hasattr(other, "typeName") and hasattr(other, "typeWidth") and hasattr(other, "structTypeDict")):
-            return False
-
-        if not (cls.typeName == other.typeName and cls.typeWidth == other.typeWidth):
-            return False
-
-        return cls.structTypeDict == other.structTypeDict
-
-
-class PointerType(type):
-
-    def __new__(cls, name, bases, namespace):
-        retCls = super().__new__(cls, name, bases, namespace)
-
-        assert "typeName" in namespace.keys(), "Missing typeName in pointer type constructor!"
-        assert "typeWidth" in namespace.keys(), "Missing typeWidth in pointer type constructor!"
-        assert "referencedType" in namespace.keys(), "Missing referencedType in pointer type constructor!"
-
-        return retCls
-
-    def __instancecheck__(cls, other):
-        if hasattr(other, "typeName") and hasattr(other, "typeWidth"):
-            return cls.typeName == other.typeName and cls.typeWidth == other.typeWidth
-
-
-class _DataTypeCollection(type):
-
-    class TypeDict(dict):
-
-        def __init__(self):
-            super().__init__()
-            self._members = {}
-
-        def __setitem__(self, key, value):
-            if isinstance(value, IntegerType):
-                if value.signed:
-                    self._members[key] = IntegerImmediateType(
-                        key, (IntegerImmediateClass,), {
-                            "typeName": key,
-                            "typeWidth": value.width,
-                            "typeMax": 2**(value.width - 1) - 1,
-                            "typeMin": -2**(value.width - 1)
-                        })
-                else:
-                    self._members[key] = IntegerImmediateType(key, (IntegerImmediateClass,), {
-                        "typeName": key,
-                        "typeWidth": value.width,
-                        "typeMax": 2**(value.width) - 1,
-                        "typeMin": 0
-                    })
-            elif isinstance(value, dict):
-                width = 0
-                for _type in value.values():
-                    width += _type.typeWidth
-                self._members[key] = StructType(key, (StructClass,), {
-                    "typeName": key,
-                    "typeWidth": width,
-                    "structTypeDict": value
-                })
-            else:
-                super().__setitem__(key, value)
-
-        def update(self, other):
-            for key, value in other.items():
-                if isinstance(value, (ImmediateType, StructType, PointerType)):
-                    self._members[key] = value
-                else:
-                    self.__setitem__(key, value)
-
-    def __new__(cls, name, bases, namespace):
-        retCls = super().__new__(cls, name, bases, namespace)
-        # SCHEREMO: The members field is used to store all generated types in the collection
-        retCls._members = namespace._members
-        return retCls
-
-    def __add__(cls, otherCls):
-        meta = type(cls)
-        members = type(cls).TypeDict()
-        members.update(cls._members)
-        members.update(otherCls._members)
-        newCls = meta("ComposedTypes", (cls, otherCls), members)
-        return newCls
-
-    def __getattr__(cls, key):
-        return cls._members[key]
-
-    def __iter__(cls):
-        return (cls._members[key] for key in cls._members.keys())
-
-    @classmethod
-    def __prepare__(cls, name, bases):
-        return _DataTypeCollection.TypeDict()
-
-
-class DataTypeCollection(metaclass = _DataTypeCollection):
-    pass
-
-
-class ImmediateClass(metaclass = ImmediateType):
-
-    __slots__ = ["value"]
-    typeName: str = None
-    typeWidth: int = None
-
-    @classmethod
-    def checkValue(cls, value, ctxt = None):
-        return True
-
-    @classmethod
-    def _checkValue(cls, value: Union[int, float, ImmediateClass], ctxt = None):
-
-        # Value promotion
-        if issubclass(type(value), ImmediateClass):
-            _value = value.value
-        # Value assignment
-        else:
-            _value = value
-
-        return cls.checkValue(_value, ctxt)
-
-    def __init__(self, value: Union[int, float, ImmediateClass, ImmediateType], ctxt = None):
-
-        assert self._checkValue(value), f"Cannot assign {value} to a {self.typeName}"
+    def __init__(self, value: Union[int, float, Immediate], ctxt: Optional[_NetworkContext] = None):
+        assert self.checkPromotion(value), f"Cannot assign {value} to a {self.typeName}"
         self.value = value
 
-    def __eq__(self, other):
+    @classmethod
+    def partialOrderUpcast(cls, otherCls: Type[Immediate]) -> bool:
+        """This method checks whether a data type (cls) can be used to represent any value that can be represented by another data type (otherCls). For more information on partial order sets and type conversion, check:https://en.wikipedia.org/wiki/Partially_ordered_set https://en.wikipedia.org/wiki/Type_conversion
+
+        Parameters
+        ----------
+        otherCls : Type[Immediate]
+            The class you want to upcast an immediate of this cls to
+
+        Returns
+        -------
+        bool
+            Returns true if this cls can be statically promoted to
+            otherCls
+
+        """
+        return False
+
+    @classmethod
+    def checkPromotion(cls, value: Union[_PythonType, _ImmediateType], ctxt: Optional[_NetworkContext] = None):
+        # SCHEREMO: np.ndarray is Iterable
+        if isinstance(value, Immediate):
+            return cls.checkPromotion(value.value, ctxt)
+
+        return cls.checkValue(value, ctxt)
+
+    def __eq__(self, other) -> bool:
         if not (isinstance(self, type(other)) and hasattr(other, "value")):
             return False
-
         return self.value == other.value
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return f"{str(self.value)}"
 
 
-class IntegerImmediateClass(ImmediateClass, metaclass = IntegerImmediateType):
+class IntegerImmediate(Immediate[Union[int, Iterable[int]], _ImmediateType]):
 
-    __slots__ = ["value"]
-    typeName: str = None
-    typeWidth: int = None
-    typeMax: Union[int, float] = None
-    typeMin: Union[int, float] = None
+    signed: bool  #: bool: Represents whether the underlying integer is signed or unsigned
+    typeMax: int  #: int: Represents the largest possible representable value, i.e. `2^{typeWidth}-1` for unsigned values and `2^{typeWidth-1}-1` for signed values.
+    typeMin: int  #: int: Represenst the smallest possible representable value, i.e. `0` for unsigned values and `-2^{typeWidth-1}` for signed values.
+
+    @_classproperty
+    def typeMax(cls) -> int:
+        if cls.signed:
+            return 2**(cls.typeWidth - 1) - 1
+        else:
+            return 2**(cls.typeWidth) - 1
+
+    @_classproperty
+    def typeMin(cls) -> int:
+        if cls.signed:
+            return -2**(cls.typeWidth - 1)
+        else:
+            return 0
 
     @classmethod
-    def checkValue(cls, value: Union[int, np.array], ctxt = None):
-        if not isinstance(value, Iterable):
-            _max, _min = (value, value)
+    def partialOrderUpcast(cls, otherCls: Type[Immediate]) -> bool:
+        if issubclass(otherCls, IntegerImmediate):
+            return cls.typeMax >= otherCls.typeMax and cls.typeMin <= otherCls.typeMin
         else:
+            return False
+
+    @classmethod
+    def checkValue(cls, value: Union[int, Iterable[int]], ctxt: Optional[_NetworkContext] = None):
+
+        if isinstance(value, int):
+            _max, _min = (value, value)
+        elif isinstance(value, np.ndarray):
             _max = value.max()
             _min = value.min()
+        elif isinstance(value, Iterable):
+            _max = max(value)
+            _min = min(value)
 
         if _max > cls.typeMax:
             return False
@@ -262,57 +234,82 @@ class IntegerImmediateClass(ImmediateClass, metaclass = IntegerImmediateType):
         return True
 
 
-class PointerClass(metaclass = PointerType):
+class Pointer(BaseType[Optional[str], _PointerType]):
+    """Represents a C Pointer type to an underlying BaseType data type
+    """
 
-    __slots__ = ["referenceName", "_mangledReferenceName"]
-    typeName: str = None
-    typeWidth: int = None
-    referencedType: Union[ImmediateType, StructType, PointerType] = None
+    __slots__: List[str] = ["referenceName", "_mangledReferenceName"]
+    referencedType: Type[
+        _DeeployType]  #: Type[_DeeployType]: type definition of the underlying type that this type points to
+
+    @_classproperty
+    def typeName(cls):
+        return cls.referencedType.typeName + "*"
 
     @classmethod
-    def checkValue(cls, value: str, ctxt: NetworkContext) -> bool:
+    def checkValue(cls, value: Optional[str], ctxt: Optional[_NetworkContext] = None) -> bool:
         if ctxt is None:
             return False
 
         if value is None or value == "NULL":
-            print(f"WARNING: Setting pointer value to NULL - Referenced data is invalid!")
+            print("WARNING: Setting pointer value to NULL - Referenced data is invalid!")
             return True
 
         reference = ctxt.lookup(value)
-        _type = reference._type
 
-        if _type is None:
-            if not hasattr(reference, value):
-                return True
-            return cls.referencedType._checkValue(reference.value)
+        if hasattr(reference, "_type") and reference._type is not None:
+            # Void pointer & DeeployType check
+            _type = reference._type
+            if not issubclass(cls.referencedType, VoidType) and _type.referencedType != cls.referencedType:
+                return False
+            return True
 
-        if not isinstance(cls, Pointer(HelperTypes.void)) and not isinstance(_type.referencedType, cls.referencedType):
-            return False
-
-        return True
+        if not hasattr(reference, value):
+            return True
+        return cls.referencedType.checkPromotion(reference.value, ctxt)
 
     @classmethod
-    def _checkValue(cls, _value: Union[str, PointerClass], ctxt: NetworkContext) -> bool:
-        if issubclass(type(_value), PointerClass):
+    def checkPromotion(cls, _value: Union[Optional[str], Pointer], ctxt: Optional[_NetworkContext] = None) -> bool:
+        if isinstance(_value, Pointer):
             value = _value.referenceName
         else:
             value = _value
         return cls.checkValue(value, ctxt)
 
-    def __init__(self, _value: str, ctxt: NetworkContext):
+    def __init__(self, _value: Union[Optional[str], Pointer], ctxt: Optional[_NetworkContext] = None):
+        """Initializes a pointer to a registered object in the NetworkContext
 
-        if _value is not None and not self._checkValue(_value, ctxt):
+        Parameters
+        ----------
+        _value : Union[Optional[str], Pointer]
+            Name of the memory buffer in the NetworkContext to be
+            represented or Pointer object
+        ctxt : Optional[_NetworkContext]
+            Current NetworkContext
+
+        Raises
+        ------
+        ValueError
+            Raises a ValueError if the memory buffer does not exist or
+            cannot be pointed to with this Pointer class
+
+        """
+
+        if _value is not None and not self.checkPromotion(_value, ctxt):
             raise ValueError(f"value {_value} is not of type {self.referencedType}!")
 
         if _value is None:
-            self.referenceName = "NULL"
+            self.referenceName = "NULL"  #: str: Either NULL iff this pointer corresponds to a NULL pointer in C, or the name of the memory buffer this pointer points to.
             self._mangledReferenceName = "NULL"
+        elif isinstance(_value, Pointer):
+            self.referenceName = _value.referenceName
+            self._mangledReferenceName = _value._mangledReferenceName
         else:
             self.referenceName = _value
             self._mangledReferenceName = ctxt._mangle(_value)
 
     def __eq__(self, other):
-        if not (isinstance(self, type(other)) and hasattr(other, "referenceName")):
+        if not isinstance(other, Pointer):
             return False
 
         return self.referenceName == other.referenceName
@@ -321,72 +318,100 @@ class PointerClass(metaclass = PointerType):
         return f"{self._mangledReferenceName}"
 
 
-class StructClass(metaclass = StructType):
+class Struct(BaseType[Union[str, Dict[str, _DeeployType]], _StructType]):
+    """Deeploy data type abstraction for C-like packed structs
+    """
 
-    __slots__ = ["value"]
-    typeName: str = None
-    typeWidth: int = None
-    structTypeDict: Dict[str, Union[ImmediateType, StructType, PointerType]] = None
+    structTypeDict: Dict[str, Type[BaseType]] = {
+    }  #: Dict[str, Type[BaseType]]: The definition of the struct mapping its field names to their associated Deeploy-types
 
-    @classmethod
-    def _setDict(cls, other, ctxt = None):
-        _other = copy.deepcopy(other)
-
-        for key, value in other.items():
-            if not cls._compareType(other, key):
-                _other[key] = cls.structTypeDict[key](other[key], ctxt)
-            else:
-                _other[key] = other[key]
-
-        return _other
+    @_classproperty
+    def typeWidth(cls) -> int:
+        return sum(q.typeWidth for q in cls.structTypeDict.values())
 
     @classmethod
-    def _compareType(cls, other, key):
-        if not (key in cls.structTypeDict):
+    def _castDict(cls,
+                  inputValue: Union[str, Struct, Dict[str, BaseType]],
+                  ctxt: Optional[_NetworkContext] = None) -> Dict[str, BaseType]:
+
+        if isinstance(inputValue, str):
+            inputDict = ctxt.lookup(inputValue).structDict.value
+        elif isinstance(inputValue, Struct):
+            inputDict = inputValue.value
+        else:
+            inputDict = inputValue
+
+        castedDict: Dict[str, BaseType] = {}
+
+        for key, value in copy.deepcopy(inputDict).items():
+            castedDict[key] = cls.structTypeDict[key](inputDict[key], ctxt)
+
+        return castedDict
+
+    @classmethod
+    def checkValue(cls, value: Union[str, Dict[str, BaseType]], ctxt: Optional[_NetworkContext] = None):
+
+        if isinstance(value, str):
+            value = ctxt.lookup(value).structDict.value
+
+        if not hasattr(value, "keys"):
             return False
-        if not (isinstance(other[key], cls.structTypeDict[key])):
-            return False
-        return True
 
-    @classmethod
-    def checkValue(cls, other: Union[Dict, StructClass], ctxt = None):
-        for key, value in other.items():
-            if not cls.structTypeDict[key]._checkValue(value, ctxt):
+        if set(value.keys()) != set(cls.structTypeDict.keys()):
+            return False
+
+        for key, _value in value.items():
+            if not cls.structTypeDict[key].checkPromotion(_value, ctxt):
                 return False
 
         return True
 
     @classmethod
-    def _checkValue(cls, _other: Union[Dict, StructClass], ctxt = None):
+    def checkPromotion(cls, _other: Union[str, Dict[str, BaseType], Struct], ctxt: Optional[_NetworkContext] = None):
 
-        if issubclass(type(_other), StructClass):
+        if isinstance(_other, Struct):
             other = _other.value
         else:
             other = _other
 
-        if not hasattr(other, "keys"):
-            return False
-
-        if set(other.keys()) != set(cls.structTypeDict.keys()):
-            return False
-
         return cls.checkValue(other, ctxt)
 
-    def __init__(self, structDict: Dict[str, Union[ImmediateClass, PointerClass, StructClass]], ctxt = None):
-        if isinstance(structDict, str):
-            structDict = ctxt.lookup(structDict).structDict.value
+    def __init__(self, structDict: Union[str, Struct, Dict[str, BaseType]], ctxt: Optional[_NetworkContext] = None):
+        """Initialize a new struct object
 
-        if not self._checkValue(structDict, ctxt):
+        Parameters
+        ----------
+        structDict : Union[str, Struct, Dict[str, BaseType]]
+            Either an initialized Deeploy-type struct, a string name
+            refering to an intialized struct registered in the
+            NetworkContext, or a full definition of the struct
+            to-be-initialized
+        ctxt : Optional[_NetworkContext]
+            Current NetworkContext
+
+        Raises
+        ------
+        Exception
+            Raises an Exception if structDict cannot be assigned to a
+            struct of layout structTypeDict
+
+        """
+
+        if not self.checkPromotion(structDict, ctxt):
             raise Exception(f"Can't assign {structDict} to {type(self)}!")
 
-        self.value = self._setDict(structDict, ctxt)
+        self.value = self._castDict(
+            structDict, ctxt
+        )  #: structTypeDict: the value of the struct; corresponds to an element with type layout defined in cls.structTypeDict
 
     def __eq__(self, other):
 
         if not (hasattr(other, 'typeWidth') and hasattr(other, 'typeName') and hasattr(other, "value")):
             return False
+
         if any([not key in other.value.keys() for key in self.value.keys()]):
             return False
+
         return all([self.value[key] == other.value[key] for key in self.value.keys()])
 
     def __repr__(self):
@@ -408,44 +433,57 @@ class StructClass(metaclass = StructType):
         return _repr
 
 
-def Pointer(dataType: Union[Union[ImmediateClass, PointerClass, StructClass], Union[ImmediateType, StructType,
-                                                                                    PointerType]],
-            pointerWidth = 32):
+def StructClass(typeName: str, _structTypeDict: Dict[str, Type[BaseType]]) -> Type[Struct]:  # type: ignore
+    """Helper function to dynamically generate a Struct class from a structTypeDict definition. Used in Closure Generation to capture a closure's arguments.
 
-    if issubclass(type(dataType), (ImmediateClass, PointerClass, StructClass)):
-        typeName = dataType.__class__.__name__
-        ptrName = typeName + _POINTERSYMBOL
+    Parameters
+    ----------
+    typeName : str
+        Name of the Struct class that is being created
+    _structTypeDict : Dict[str, Type[BaseType]]
+        Layout of the Struct class that is being created
 
-        return PointerType(ptrName, (PointerClass,), {
-            "typeName": ptrName,
-            "typeWidth": pointerWidth,
-            "referencedType": dataType.__class__
-        })(dataType)
+    Returns
+    -------
+    Type[Struct]:
+        Returns the class definition of a Struct class corresponding
+        to the function arguments
 
-    elif issubclass(type(dataType), (ImmediateType, PointerType, StructType)):
-        typeName = dataType.typeName
-        ptrName = typeName + _POINTERSYMBOL
+    """
 
-        return PointerType(ptrName, (PointerClass,), {
-            "typeName": ptrName,
-            "typeWidth": pointerWidth,
-            "referencedType": dataType
+    if typeName not in globals().keys():
+        retCls = type(typeName, (Struct,), {
+            "typeName": typeName,
+            "structTypeDict": _structTypeDict,
         })
-
+        globals()[typeName] = retCls
     else:
-        raise Exception(f"Can't create pointer to {dataType}!")
+        retCls = globals()[typeName]
+
+    return retCls
 
 
-def Struct(typeName: str, structTypeDict: Dict[str:Union[ImmediateClass, PointerClass, StructClass]]):
-    width = 0
-    for _type in structTypeDict.values():
-        width += _type.typeWidth
-    return StructType(typeName, (StructClass,), {
-        "typeName": typeName,
-        "typeWidth": width,
-        "structTypeDict": structTypeDict
-    })
+def PointerClass(DeeployType: _DeeployType) -> Type[Pointer[BaseType]]:  # type: ignore
+    """Generates a Pointer class definition at runtime that wraps around the given referenceType
 
+    Parameters
+    ----------
+    DeeployType : _DeeployType
+        Type of the underlying referencedType
 
-class HelperTypes(DataTypeCollection):
-    void = IntegerType(32, True)
+    Returns
+    -------
+    Type[Pointer[BaseType]]:
+        Returns a unique Pointer class corresponding to a Pointer to
+        DeeployType
+
+    """
+
+    typeName = DeeployType.typeName + "Ptr"
+    if typeName not in globals().keys():
+        retCls = type(typeName, (Pointer,), {"typeWidth": 32, "referencedType": DeeployType})
+        globals()[typeName] = retCls
+    else:
+        retCls = globals()[typeName]
+
+    return retCls
